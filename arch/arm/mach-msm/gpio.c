@@ -20,8 +20,13 @@
 #include <mach/gpio.h>
 #include "gpio_chip.h"
 #include "gpio_hw.h"
-#include "proc_comm.h"
 #include "smd_private.h"
+
+#ifndef CONFIG_MSM_AMSS_VERSION_WINCE
+#include "proc_comm.h"
+#else
+#include "proc_comm_wince.h"
+#endif
 
 enum {
 	GPIO_DEBUG_SLEEP = 1U << 0,
@@ -59,226 +64,225 @@ struct msm_gpio_regs {
 	void __iomem *int_edge;
 	void __iomem *int_pos;
 	void __iomem *oe;
+	void __iomem *owner;
 };
 
 struct msm_gpio_chip {
-	struct gpio_chip        chip;
-	struct msm_gpio_regs    regs;
+	struct gpio_chip chip;
+	struct msm_gpio_regs regs;
 #if MSM_GPIO_BROKEN_INT_CLEAR
-	unsigned                int_status_copy;
+	unsigned int_status_copy;
 #endif
-	unsigned int            both_edge_detect;
-	unsigned int            int_enable[2]; /* 0: awake, 1: sleep */
+	unsigned int both_edge_detect;
+	unsigned int int_enable[2];	/* 0: awake, 1: sleep */
 };
 
-struct msm_gpio_chip msm_gpio_chips[] = {
+static struct msm_gpio_chip msm_gpio_chips[] = {
 	{
-		.regs = {
-			.out =         GPIO_OUT_0,
-			.in =          GPIO_IN_0,
-			.int_status =  GPIO_INT_STATUS_0,
-			.int_clear =   GPIO_INT_CLEAR_0,
-			.int_en =      GPIO_INT_EN_0,
-			.int_edge =    GPIO_INT_EDGE_0,
-			.int_pos =     GPIO_INT_POS_0,
-			.oe =          GPIO_OE_0,
-		},
-		.chip = {
-			.start = 0,
-			.end = 15,
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+	 .regs = {
+		  .out = GPIO_OUT_0,
+		  .in = GPIO_IN_0,
+		  .int_status = GPIO_INT_STATUS_0,
+		  .int_clear = GPIO_INT_CLEAR_0,
+		  .int_en = GPIO_INT_EN_0,
+		  .int_edge = GPIO_INT_EDGE_0,
+		  .int_pos = GPIO_INT_POS_0,
+		  .oe = GPIO_OE_0,
+		  .owner = GPIO_OWNER_0,
+		  },
+	 .chip = {
+		  .start = 0,
+		  .end = 15,
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 	{
-		.regs = {
-			.out =         GPIO_OUT_1,
-			.in =          GPIO_IN_1,
-			.int_status =  GPIO_INT_STATUS_1,
-			.int_clear =   GPIO_INT_CLEAR_1,
-			.int_en =      GPIO_INT_EN_1,
-			.int_edge =    GPIO_INT_EDGE_1,
-			.int_pos =     GPIO_INT_POS_1,
-			.oe =          GPIO_OE_1,
-		},
-		.chip = {
-			.start = 16,
+	 .regs = {
+		  .out = GPIO_OUT_1,
+		  .in = GPIO_IN_1,
+		  .int_status = GPIO_INT_STATUS_1,
+		  .int_clear = GPIO_INT_CLEAR_1,
+		  .int_en = GPIO_INT_EN_1,
+		  .int_edge = GPIO_INT_EDGE_1,
+		  .int_pos = GPIO_INT_POS_1,
+		  .oe = GPIO_OE_1,
+		  .owner = GPIO_OWNER_1,
+		  },
+	 .chip = {
+		  .start = 16,
 #if defined(CONFIG_ARCH_MSM7X30)
-			.end = 43,
+		  .end = 43,
 #else
-			.end = 42,
+		  .end = 42,
 #endif
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 	{
-		.regs = {
-			.out =         GPIO_OUT_2,
-			.in =          GPIO_IN_2,
-			.int_status =  GPIO_INT_STATUS_2,
-			.int_clear =   GPIO_INT_CLEAR_2,
-			.int_en =      GPIO_INT_EN_2,
-			.int_edge =    GPIO_INT_EDGE_2,
-			.int_pos =     GPIO_INT_POS_2,
-			.oe =          GPIO_OE_2,
-		},
-		.chip = {
+	 .regs = {
+		  .out = GPIO_OUT_2,
+		  .in = GPIO_IN_2,
+		  .int_status = GPIO_INT_STATUS_2,
+		  .int_clear = GPIO_INT_CLEAR_2,
+		  .int_en = GPIO_INT_EN_2,
+		  .int_edge = GPIO_INT_EDGE_2,
+		  .int_pos = GPIO_INT_POS_2,
+		  .oe = GPIO_OE_2,
+		  .owner = GPIO_OWNER_2,
+		  },
+	 .chip = {
 #if defined(CONFIG_ARCH_MSM7X30)
-			.start = 44,
+		  .start = 44,
 #else
-			.start = 43,
+		  .start = 43,
 #endif
-			.end = 67,
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+		  .end = 67,
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 	{
-		.regs = {
-			.out =         GPIO_OUT_3,
-			.in =          GPIO_IN_3,
-			.int_status =  GPIO_INT_STATUS_3,
-			.int_clear =   GPIO_INT_CLEAR_3,
-			.int_en =      GPIO_INT_EN_3,
-			.int_edge =    GPIO_INT_EDGE_3,
-			.int_pos =     GPIO_INT_POS_3,
-			.oe =          GPIO_OE_3,
-		},
-		.chip = {
-			.start = 68,
-			.end = 94,
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+	 .regs = {
+		  .out = GPIO_OUT_3,
+		  .in = GPIO_IN_3,
+		  .int_status = GPIO_INT_STATUS_3,
+		  .int_clear = GPIO_INT_CLEAR_3,
+		  .int_en = GPIO_INT_EN_3,
+		  .int_edge = GPIO_INT_EDGE_3,
+		  .int_pos = GPIO_INT_POS_3,
+		  .oe = GPIO_OE_3,
+		  .owner = GPIO_OWNER_3,
+		  },
+	 .chip = {
+		  .start = 68,
+		  .end = 94,
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 	{
-		.regs = {
-			.out =         GPIO_OUT_4,
-			.in =          GPIO_IN_4,
-			.int_status =  GPIO_INT_STATUS_4,
-			.int_clear =   GPIO_INT_CLEAR_4,
-			.int_en =      GPIO_INT_EN_4,
-			.int_edge =    GPIO_INT_EDGE_4,
-			.int_pos =     GPIO_INT_POS_4,
-			.oe =          GPIO_OE_4,
-		},
-		.chip = {
-			.start = 95,
+	 .regs = {
+		  .out = GPIO_OUT_4,
+		  .in = GPIO_IN_4,
+		  .int_status = GPIO_INT_STATUS_4,
+		  .int_clear = GPIO_INT_CLEAR_4,
+		  .int_en = GPIO_INT_EN_4,
+		  .int_edge = GPIO_INT_EDGE_4,
+		  .int_pos = GPIO_INT_POS_4,
+		  .oe = GPIO_OE_4,
+		  .owner = GPIO_OWNER_4,
+		  },
+	 .chip = {
+		  .start = 95,
 #if defined(CONFIG_ARCH_QSD8X50)
-			.end = 103,
+		  .end = 103,
 #else
-			.end = 106,
+		  .end = 106,
 #endif
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 	{
-		.regs = {
-			.out =         GPIO_OUT_5,
-			.in =          GPIO_IN_5,
-			.int_status =  GPIO_INT_STATUS_5,
-			.int_clear =   GPIO_INT_CLEAR_5,
-			.int_en =      GPIO_INT_EN_5,
-			.int_edge =    GPIO_INT_EDGE_5,
-			.int_pos =     GPIO_INT_POS_5,
-			.oe =          GPIO_OE_5,
-		},
-		.chip = {
+	 .regs = {
+		  .out = GPIO_OUT_5,
+		  .in = GPIO_IN_5,
+		  .int_status = GPIO_INT_STATUS_5,
+		  .int_clear = GPIO_INT_CLEAR_5,
+		  .int_en = GPIO_INT_EN_5,
+		  .int_edge = GPIO_INT_EDGE_5,
+		  .int_pos = GPIO_INT_POS_5,
+		  .oe = GPIO_OE_5,
+		  .owner = GPIO_OWNER_5,
+		  },
+	 .chip = {
 #if defined(CONFIG_ARCH_QSD8X50)
-			.start = 104,
-			.end = 121,
+		  .start = 104,
+		  .end = 121,
 #elif defined(CONFIG_ARCH_MSM7X30)
-			.start = 107,
-			.end = 133,
+		  .start = 107,
+		  .end = 133,
 #else
-			.start = 107,
-			.end = 121,
+		  .start = 107,
+		  .end = 121,
 #endif
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 #if defined(CONFIG_ARCH_QSD8X50) || defined(CONFIG_ARCH_MSM7X30)
 	{
-		.regs = {
-			.out =         GPIO_OUT_6,
-			.in =          GPIO_IN_6,
-			.int_status =  GPIO_INT_STATUS_6,
-			.int_clear =   GPIO_INT_CLEAR_6,
-			.int_en =      GPIO_INT_EN_6,
-			.int_edge =    GPIO_INT_EDGE_6,
-			.int_pos =     GPIO_INT_POS_6,
-			.oe =          GPIO_OE_6,
-		},
-		.chip = {
+	 .regs = {
+		  .out = GPIO_OUT_6,
+		  .in = GPIO_IN_6,
+		  .int_status = GPIO_INT_STATUS_6,
+		  .int_clear = GPIO_INT_CLEAR_6,
+		  .int_en = GPIO_INT_EN_6,
+		  .int_edge = GPIO_INT_EDGE_6,
+		  .int_pos = GPIO_INT_POS_6,
+		  .oe = GPIO_OE_6,
+		  },
+	 .chip = {
 #if defined(CONFIG_ARCH_MSM7X30)
-			.start = 134,
-			.end = 150,
+		  .start = 134,
+		  .end = 150,
 #else
-			.start = 122,
-			.end = 152,
+		  .start = 122,
+		  .end = 152,
 #endif
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 	{
-		.regs = {
-			.out =         GPIO_OUT_7,
-			.in =          GPIO_IN_7,
-			.int_status =  GPIO_INT_STATUS_7,
-			.int_clear =   GPIO_INT_CLEAR_7,
-			.int_en =      GPIO_INT_EN_7,
-			.int_edge =    GPIO_INT_EDGE_7,
-			.int_pos =     GPIO_INT_POS_7,
-			.oe =          GPIO_OE_7,
-		},
-		.chip = {
+	 .regs = {
+		  .out = GPIO_OUT_7,
+		  .in = GPIO_IN_7,
+		  .int_status = GPIO_INT_STATUS_7,
+		  .int_clear = GPIO_INT_CLEAR_7,
+		  .int_en = GPIO_INT_EN_7,
+		  .int_edge = GPIO_INT_EDGE_7,
+		  .int_pos = GPIO_INT_POS_7,
+		  .oe = GPIO_OE_7,
+		  },
+	 .chip = {
 #if defined(CONFIG_ARCH_MSM7X30)
-			.start = 151,
-			.end = 181,
+		  .start = 151,
+		  .end = 181,
 #else
-			.start = 153,
-			.end = 164,
+		  .start = 153,
+		  .end = 164,
 #endif
-			.configure = msm_gpio_configure,
-			.get_irq_num = msm_gpio_get_irq_num,
-			.read = msm_gpio_read,
-			.write = msm_gpio_write,
-			.read_detect_status = msm_gpio_read_detect_status,
-			.clear_detect_status = msm_gpio_clear_detect_status
-		}
-	},
+		  .configure = msm_gpio_configure,
+		  .get_irq_num = msm_gpio_get_irq_num,
+		  .read = msm_gpio_read,
+		  .write = msm_gpio_write,
+		  .read_detect_status = msm_gpio_read_detect_status,
+		  .clear_detect_status = msm_gpio_clear_detect_status}
+	 },
 #endif
 };
 
@@ -290,7 +294,7 @@ static void msm_gpio_update_both_edge_detect(struct msm_gpio_chip *msm_chip)
 		val = readl(msm_chip->regs.in);
 		pol = readl(msm_chip->regs.int_pos);
 		pol = (pol & ~msm_chip->both_edge_detect) |
-		      (~val & msm_chip->both_edge_detect);
+		    (~val & msm_chip->both_edge_detect);
 		writel(pol, msm_chip->regs.int_pos);
 		intstat = readl(msm_chip->regs.int_status);
 		val2 = readl(msm_chip->regs.in);
@@ -304,7 +308,7 @@ static void msm_gpio_update_both_edge_detect(struct msm_gpio_chip *msm_chip)
 static int msm_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
 {
 	struct msm_gpio_chip *msm_chip =
-		container_of(chip, struct msm_gpio_chip, chip);
+	    container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (n - chip->start);
 	unsigned v;
 
@@ -319,7 +323,7 @@ static int msm_gpio_write(struct gpio_chip *chip, unsigned n, unsigned on)
 static int msm_gpio_read(struct gpio_chip *chip, unsigned n)
 {
 	struct msm_gpio_chip *msm_chip =
-		container_of(chip, struct msm_gpio_chip, chip);
+	    container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (n - chip->start);
 
 	return (readl(msm_chip->regs.in) & b) ? 1 : 0;
@@ -329,7 +333,7 @@ static int msm_gpio_read_detect_status(struct gpio_chip *chip,
 				       unsigned int gpio)
 {
 	struct msm_gpio_chip *msm_chip =
-		container_of(chip, struct msm_gpio_chip, chip);
+	    container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (gpio - chip->start);
 	unsigned v;
 
@@ -344,7 +348,7 @@ static int msm_gpio_clear_detect_status(struct gpio_chip *chip,
 					unsigned int gpio)
 {
 	struct msm_gpio_chip *msm_chip =
-		container_of(chip, struct msm_gpio_chip, chip);
+	    container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (gpio - chip->start);
 
 #if MSM_GPIO_BROKEN_INT_CLEAR
@@ -359,11 +363,11 @@ static int msm_gpio_clear_detect_status(struct gpio_chip *chip,
 	return 0;
 }
 
-int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio,
-		       unsigned long flags)
+static int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio,
+			      unsigned long flags)
 {
 	struct msm_gpio_chip *msm_chip =
-		container_of(chip, struct msm_gpio_chip, chip);
+	    container_of(chip, struct msm_gpio_chip, chip);
 	unsigned b = 1U << (gpio - chip->start);
 	unsigned v;
 
@@ -383,21 +387,20 @@ int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio,
 		if (flags & (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING)) {
 			writel(v | b, msm_chip->regs.int_edge);
 			irq_desc[MSM_GPIO_TO_INT(gpio)].handle_irq =
-				handle_edge_irq;
+			    handle_edge_irq;
 		} else {
 			writel(v & (~b), msm_chip->regs.int_edge);
 			irq_desc[MSM_GPIO_TO_INT(gpio)].handle_irq =
-				handle_level_irq;
+			    handle_level_irq;
 		}
 		if ((flags & (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING)) ==
-			(IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING)) {
+		    (IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING)) {
 			msm_chip->both_edge_detect |= b;
 			msm_gpio_update_both_edge_detect(msm_chip);
 		} else {
 			msm_chip->both_edge_detect &= ~b;
 			v = readl(msm_chip->regs.int_pos);
-			if (flags &
-				(IRQF_TRIGGER_RISING | IRQF_TRIGGER_HIGH)) {
+			if (flags & (IRQF_TRIGGER_RISING | IRQF_TRIGGER_HIGH)) {
 				writel(v | b, msm_chip->regs.int_pos);
 			} else {
 				writel(v & (~b), msm_chip->regs.int_pos);
@@ -406,8 +409,7 @@ int msm_gpio_configure(struct gpio_chip *chip, unsigned int gpio,
 	}
 
 	/* used by msm_gpio_irq_mask and msm_gpio_irq_unmask */
-	if (flags &
-		(MSM_GPIOF_ENABLE_INTERRUPT | MSM_GPIOF_DISABLE_INTERRUPT)) {
+	if (flags & (MSM_GPIOF_ENABLE_INTERRUPT | MSM_GPIOF_DISABLE_INTERRUPT)) {
 		v = readl(msm_chip->regs.int_edge);
 		/* level triggered interrupts are also latched */
 		if (!(v & b))
@@ -437,7 +439,6 @@ static int msm_gpio_get_irq_num(struct gpio_chip *chip, unsigned int gpio,
 		*irqnumflagsp = 0;
 	return 0;
 }
-
 
 static void msm_gpio_irq_ack(unsigned int irq)
 {
@@ -475,11 +476,11 @@ static int msm_gpio_irq_set_wake(unsigned int irq, unsigned int on)
 	struct msm_gpio_chip *msm_chip = get_irq_chip_data(irq);
 	spin_lock_irqsave(&msm_chip->chip.lock, irq_flags);
 	ret = msm_gpio_configure(&msm_chip->chip, irq - FIRST_GPIO_IRQ,
-		on ? MSM_GPIOF_ENABLE_WAKE : MSM_GPIOF_DISABLE_WAKE);
+				 on ? MSM_GPIOF_ENABLE_WAKE :
+				 MSM_GPIOF_DISABLE_WAKE);
 	spin_unlock_irqrestore(&msm_chip->chip.lock, irq_flags);
 	return ret;
 }
-
 
 static int msm_gpio_irq_set_type(unsigned int irq, unsigned int flow_type)
 {
@@ -506,8 +507,8 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 			m = v & -v;
 			j = fls(m) - 1;
 			/* printk("%s %08x %08x bit %d gpio %d irq %d\n",
-				__func__, v, m, j, msm_chip->chip.start + j,
-				FIRST_GPIO_IRQ + msm_chip->chip.start + j); */
+			   __func__, v, m, j, msm_chip->chip.start + j,
+			   FIRST_GPIO_IRQ + msm_chip->chip.start + j); */
 			v &= ~m;
 			generic_handle_irq(FIRST_GPIO_IRQ +
 					   msm_chip->chip.start + j);
@@ -517,12 +518,12 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 }
 
 static struct irq_chip msm_gpio_irq_chip = {
-	.name      = "msmgpio",
-	.ack       = msm_gpio_irq_ack,
-	.mask      = msm_gpio_irq_mask,
-	.unmask    = msm_gpio_irq_unmask,
-	.set_wake  = msm_gpio_irq_set_wake,
-	.set_type  = msm_gpio_irq_set_type,
+	.name = "msmgpio",
+	.ack = msm_gpio_irq_ack,
+	.mask = msm_gpio_irq_mask,
+	.unmask = msm_gpio_irq_unmask,
+	.set_wake = msm_gpio_irq_set_wake,
+	.set_type = msm_gpio_irq_set_type,
 };
 
 #define NUM_GPIO_SMEM_BANKS 6
@@ -552,8 +553,8 @@ static void msm_gpio_sleep_int(unsigned long arg)
 		int count = smem_gpio->num_fired[i];
 		for (j = 0; j < count; j++) {
 			/* TODO: Check mask */
-			generic_handle_irq(
-				MSM_GPIO_TO_INT(smem_gpio->fired[i][j]));
+			generic_handle_irq(MSM_GPIO_TO_INT
+					   (smem_gpio->fired[i][j]));
 		}
 	}
 	local_irq_enable();
@@ -588,17 +589,15 @@ void msm_gpio_enter_sleep(int from_idle)
 			shiftr = 32 - shiftl;
 			tmp = msm_gpio_chips[i].int_enable[!from_idle];
 			smem_gpio->enabled[index] |= tmp << shiftl;
-			smem_gpio->enabled[index+1] |= tmp >> shiftr;
+			smem_gpio->enabled[index + 1] |= tmp >> shiftr;
 			smem_gpio->detection[index] |=
-				readl(msm_gpio_chips[i].regs.int_edge) <<
-				shiftl;
-			smem_gpio->detection[index+1] |=
-				readl(msm_gpio_chips[i].regs.int_edge) >>
-				shiftr;
+			    readl(msm_gpio_chips[i].regs.int_edge) << shiftl;
+			smem_gpio->detection[index + 1] |=
+			    readl(msm_gpio_chips[i].regs.int_edge) >> shiftr;
 			smem_gpio->polarity[index] |=
-				readl(msm_gpio_chips[i].regs.int_pos) << shiftl;
-			smem_gpio->polarity[index+1] |=
-				readl(msm_gpio_chips[i].regs.int_pos) >> shiftr;
+			    readl(msm_gpio_chips[i].regs.int_pos) << shiftl;
+			smem_gpio->polarity[index + 1] |=
+			    readl(msm_gpio_chips[i].regs.int_pos) >> shiftr;
 		}
 	}
 
@@ -632,7 +631,8 @@ void msm_gpio_exit_sleep(void)
 	if (smem_gpio && (smem_gpio->num_fired[0] || smem_gpio->num_fired[1])) {
 		if (msm_gpio_debug_mask & GPIO_DEBUG_SLEEP)
 			printk(KERN_INFO "gpio: fired %x %x\n",
-			      smem_gpio->num_fired[0], smem_gpio->num_fired[1]);
+			       smem_gpio->num_fired[0],
+			       smem_gpio->num_fired[1]);
 		tasklet_schedule(&msm_gpio_sleep_int_tasklet);
 	}
 }
@@ -664,11 +664,112 @@ static int __init msm_init_gpio(void)
 
 postcore_initcall(msm_init_gpio);
 
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+
+int gpio_tlmm_config(unsigned config, unsigned disable)
+{
+	void __iomem *addr, __iomem *addr2;
+	struct msm_gpio_chip *msm_chip;
+	unsigned cfg, gpio, i;
+	unsigned long flags_gpio;
+
+	gpio = GPIO_PIN(config);
+
+	for (i = 0; i < ARRAY_SIZE(msm_gpio_chips); i++) {
+		msm_chip = &msm_gpio_chips[i];
+		if (msm_chip->chip.start <= gpio && msm_chip->chip.end >= gpio)
+			break;
+		msm_chip = NULL;
+
+	}
+	
+	if (!msm_chip) {
+		printk("%s: could not find the gpio %d\n", __func__, gpio);
+		return -EINVAL;
+	}
+
+	spin_lock_irqsave(&msm_chip->chip.lock, flags_gpio);
+
+	if (GPIO_PULL(config) < 16 || GPIO_PULL(config) > 42) {
+		addr = (void __iomem *)(MSM_GPIOCFG1_BASE + 0x20);
+		addr2 = (void __iomem *)(MSM_GPIOCFG1_BASE + 0x24);
+	}	
+	else {
+		addr = (void __iomem *)(MSM_GPIOCFG2_BASE + 0x410);
+		addr2 = (void __iomem *)(MSM_GPIOCFG2_BASE + 0x414);
+	}
+
+	if (!addr || !addr2) {
+		printk(KERN_WARNING "%s: could not find addr\n", __func__);
+		spin_unlock_irqrestore(&msm_chip->chip.lock, flags_gpio);
+		return 0;
+	}
+
+	writel(gpio, addr);
+	cfg =
+	    (GPIO_DRVSTR(config) << 6) | (GPIO_FUNC(config) << 2) |
+	    (GPIO_PULL(config));
+	writel(cfg, addr2);
+
+	printk("msm_gpio_set_function(%x, %x)\n", gpio, cfg);
+	if (readl(addr) != gpio)
+		printk(KERN_WARNING "%s: could not set alt func %u => %u\n",
+		       __func__, gpio, GPIO_FUNC(config));
+
+	spin_unlock_irqrestore(&msm_chip->chip.lock, flags_gpio);
+
+	if (GPIO_DIR(config))
+		gpio_direction_output(gpio, !disable);
+	else
+		gpio_direction_input(gpio);
+
+	return 0;
+}
+#else
 int gpio_tlmm_config(unsigned config, unsigned disable)
 {
 	return msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, &disable);
 }
+#endif
 EXPORT_SYMBOL(gpio_tlmm_config);
+
+static DEFINE_SPINLOCK(gpio_flag_lock);
+
+void msm_gpio_set_flags(unsigned gpio, unsigned long flags)
+{
+
+	int i;
+	unsigned long irq_flags;
+	struct msm_gpio_chip *msm_chip;
+	unsigned b;
+	unsigned v;
+
+	spin_lock_irqsave(&gpio_flag_lock, irq_flags);
+	for (i = 0; i < ARRAY_SIZE(msm_gpio_chips); i++) {
+		msm_chip = &msm_gpio_chips[i];
+		if (msm_chip->chip.start <= gpio && msm_chip->chip.end >= gpio)
+			break;
+		msm_chip = NULL;
+
+	}
+
+	if (!msm_chip)
+		return;
+
+	b = 1U << (gpio - msm_chip->chip.start);
+
+	if (msm_chip->regs.owner) {
+		v = readl(msm_chip->regs.owner);
+		if (flags & GPIOF_OWNER_ARM11) {
+			writel(v | b, msm_chip->regs.owner);
+		} else {
+			writel(v & ~b, msm_chip->regs.owner);
+		}
+	}
+	spin_unlock_irqrestore(&gpio_flag_lock, irq_flags);
+}
+
+EXPORT_SYMBOL(msm_gpio_set_flags);
 
 int msm_gpios_enable(const struct msm_gpio *table, int size)
 {
@@ -677,11 +778,11 @@ int msm_gpios_enable(const struct msm_gpio *table, int size)
 	const struct msm_gpio *g;
 	for (i = 0; i < size; i++) {
 		g = table + i;
-		rc = gpio_tlmm_config(g->gpio_cfg, GPIO_ENABLE);
+		rc = gpio_tlmm_config(g->gpio_cfg, GPIO_CFG_ENABLE);
 		if (rc) {
-			pr_err("gpio_tlmm_config(0x%08x, GPIO_ENABLE)"
+			pr_err("gpio_tlmm_config(0x%08x, GPIO_CFG_ENABLE)"
 			       " <%s> failed: %d\n",
-			       g->gpio_cfg, g->label ?: "?", rc);
+			       g->gpio_cfg, g->label ? : "?", rc);
 			pr_err("pin %d func %d dir %d pull %d drvstr %d\n",
 			       GPIO_PIN(g->gpio_cfg), GPIO_FUNC(g->gpio_cfg),
 			       GPIO_DIR(g->gpio_cfg), GPIO_PULL(g->gpio_cfg),
@@ -690,10 +791,11 @@ int msm_gpios_enable(const struct msm_gpio *table, int size)
 		}
 	}
 	return 0;
-err:
+ err:
 	msm_gpios_disable(table, i);
 	return rc;
 }
+
 EXPORT_SYMBOL(msm_gpios_enable);
 
 void msm_gpios_disable(const struct msm_gpio *table, int size)
@@ -701,13 +803,13 @@ void msm_gpios_disable(const struct msm_gpio *table, int size)
 	int rc;
 	int i;
 	const struct msm_gpio *g;
-	for (i = size-1; i >= 0; i--) {
+	for (i = size - 1; i >= 0; i--) {
 		g = table + i;
-		rc = gpio_tlmm_config(g->gpio_cfg, GPIO_DISABLE);
+		rc = gpio_tlmm_config(g->gpio_cfg, GPIO_CFG_DISABLE);
 		if (rc) {
-			pr_err("gpio_tlmm_config(0x%08x, GPIO_DISABLE)"
+			pr_err("gpio_tlmm_config(0x%08x, GPIO_CFG_DISABLE)"
 			       " <%s> failed: %d\n",
-			       g->gpio_cfg, g->label ?: "?", rc);
+			       g->gpio_cfg, g->label ? : "?", rc);
 			pr_err("pin %d func %d dir %d pull %d drvstr %d\n",
 			       GPIO_PIN(g->gpio_cfg), GPIO_FUNC(g->gpio_cfg),
 			       GPIO_DIR(g->gpio_cfg), GPIO_PULL(g->gpio_cfg),
@@ -715,6 +817,7 @@ void msm_gpios_disable(const struct msm_gpio *table, int size)
 		}
 	}
 }
+
 EXPORT_SYMBOL(msm_gpios_disable);
 
 int msm_gpios_request_enable(const struct msm_gpio *table, int size)
@@ -722,10 +825,12 @@ int msm_gpios_request_enable(const struct msm_gpio *table, int size)
 	int rc = msm_gpios_enable(table, size);
 	return rc;
 }
+
 EXPORT_SYMBOL(msm_gpios_request_enable);
 
 void msm_gpios_disable_free(const struct msm_gpio *table, int size)
 {
 	msm_gpios_disable(table, size);
 }
+
 EXPORT_SYMBOL(msm_gpios_disable_free);

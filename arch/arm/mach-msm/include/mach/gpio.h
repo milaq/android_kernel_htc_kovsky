@@ -164,5 +164,6 @@ enum {
 #define GPIO_DRVSTR(gpio_cfg) (((gpio_cfg) >> 17) & 0xf)
 
 int gpio_tlmm_config(unsigned config, unsigned disable);
+void msm_gpio_set_flags(unsigned gpio, unsigned long flags);
 
 #endif /* __ASM_ARCH_MSM_GPIO_H */
