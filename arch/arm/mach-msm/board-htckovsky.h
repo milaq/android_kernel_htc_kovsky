@@ -1,0 +1,32 @@
+/* linux/arch/arm/mach-msm/board-htckovsky.h
+ */
+#ifndef __ARCH_ARM_MACH_MSM_BOARD_HTCKOVSKY_H
+#define __ARCH_ARM_MACH_MSM_BOARD_HTCKOVSKY_H
+
+#include <mach/board.h>
+
+/* GPIO */
+
+#define KOVS100_CAM_PWR0	0
+#define KOVS100_EXT_MIC		17
+#define KOVS100_REARCAM_PWR	23
+#define KOVS100_HEADSET_IN	30
+#define KOVS100_BT_POWER	32
+#define KOVS100_AC_DETECT	37
+#define KOVS100_CAM2_INTR	41
+#define KOVS100_CAM1_INTR	42
+#define KOVS100_JOYSTICK_IRQ	43
+#define KOVS100_N_CHG_ENABLE	44
+#define KOVS100_CHARGER_USB	49
+#define KOVS100_BT_ROUTER	63
+#define KOVS100_MDDI_PWR	82
+#define KOVS100_H2W_DATA	86
+#define KOVS100_H2W_CLK		87
+#define KOVS100_LCD_PWR		98
+#define KOVS100_LCD_VSYNC	97
+#define KOVS100_VFEROUTE_FRONT	99
+
+#define RAPH100_USB_AC_PWR	1
+#define RAPH100_BAT_IRQ		28
+
+#endif /* GUARD */

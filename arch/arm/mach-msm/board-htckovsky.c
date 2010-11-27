@@ -1,0 +1,753 @@
+/* linux/arch/arm/mach-msm/board-htcraphael.c
+ *
+ * Copyright (C) 2007 Google, Inc.
+ * Author: Brian Swetland <swetland@google.com>,
+ * Octavian Voicu, Martijn Stolk
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ */
+
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/platform_device.h>
+#include <linux/input.h>
+#include <linux/android_pmem.h>
+
+#include <linux/mtd/nand.h>
+#include <linux/mtd/partitions.h>
+#include <linux/i2c.h>
+#include <linux/mm.h>
+#include <linux/pda_power.h>
+#include <linux/gpio_keys.h>
+
+#include <mach/hardware.h>
+#include <asm/mach-types.h>
+#include <asm/mach/arch.h>
+#include <asm/mach/map.h>
+#include <asm/mach/flash.h>
+#include <asm/mach/mmc.h>
+#include <asm/setup.h>
+
+#include <mach/board.h>
+#include <mach/msm_iomap.h>
+#include <mach/system.h>
+#include <mach/msm_fb.h>
+#include <mach/msm_hsusb.h>
+#include <mach/msm_serial_hs.h>
+#include <mach/vreg.h>
+#include <mach/board_htc.h>
+
+#include <mach/gpio.h>
+#include <mach/io.h>
+#include <linux/delay.h>
+#ifdef CONFIG_HTC_HEADSET
+#include <mach/htc_headset.h>
+#endif
+#include <linux/microp-keypad.h>
+#include <linux/ds2746_battery.h>
+
+#include "proc_comm_wince.h"
+#include "devices.h"
+//#include "htc_hw.h"
+#include "board-htckovsky.h"
+#include "clock-msm-a11.h"
+#include "gpio_chip.h"
+
+extern int init_mmc(void);
+
+static struct resource raphael_keypad_resources[] = {
+	{
+	 .start = MSM_GPIO_TO_INT(38),
+	 .end = MSM_GPIO_TO_INT(38),
+	 .flags = IORESOURCE_IRQ,
+	 },
+};
+
+static struct microp_keypad_platform_data raphael_keypad_data = {
+	.backlight_gpio = 86,
+};
+
+static struct platform_device keypad_device = {
+	.name = "microp-keypad",
+	.id = 0,
+	.num_resources = ARRAY_SIZE(raphael_keypad_resources),
+	.resource = raphael_keypad_resources,
+	.dev = {.platform_data = &raphael_keypad_data,},
+};
+
+/************
+ POWER SUPPLY
+ ************/
+static char *supplicants[] = {
+	"ds2746_battery",	//hardcoded in ds2746_battery driver for now
+};
+
+static struct resource htckovsky_power_resources[] = {
+	[0] = {
+	       .name = "ac",
+	       .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
+	       IORESOURCE_IRQ_LOWEDGE,
+	       },
+	[1] = {
+	       .name = "usb",
+	       .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
+	       IORESOURCE_IRQ_LOWEDGE,
+	       },
+};
+
+static int htckovsky_is_usb_online(void)
+{
+	int vbus_state = readl(MSM_SHARED_RAM_BASE + 0xfc00c);
+	printk(KERN_DEBUG "[KOVSKY]: is usb online == %d\n", vbus_state);
+	msm_hsusb_set_vbus_state(vbus_state);
+	return vbus_state;
+}
+
+static int htckovsky_is_ac_online(void)
+{
+	int ret = !gpio_get_value(KOVS100_AC_DETECT);
+	printk(KERN_DEBUG "[KOVSKY]: is ac online == %d\n", ret);
+	return ret;
+}
+
+static void htckovsky_set_charge(int flags)
+{
+	switch (flags) {
+	case PDA_POWER_CHARGE_USB:
+		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
+		break;
+	case PDA_POWER_CHARGE_AC:
+		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
+		break;
+	default:
+		gpio_set_value(KOVS100_N_CHG_ENABLE, 1);
+		return;
+	}
+	gpio_set_value(KOVS100_N_CHG_ENABLE, 0);
+}
+
+static int htckovsky_power_init(struct device *dev)
+{
+	int rc = 0;
+	printk(KERN_DEBUG "[KOVSKY]: POWER INIT\n");
+
+	rc = gpio_request(KOVS100_N_CHG_ENABLE, "HTC Kovsky Power Supply");
+	if (rc)
+		goto err;
+
+	rc = gpio_request(KOVS100_AC_DETECT, "HTC Kovsky Power Supply");
+	if (rc)
+		goto err;
+
+	htckovsky_power_resources[0].start = gpio_to_irq(KOVS100_AC_DETECT);
+	htckovsky_power_resources[0].end = htckovsky_power_resources[0].start;
+	htckovsky_power_resources[1].start = gpio_to_irq(KOVS100_AC_DETECT);
+	htckovsky_power_resources[1].end = htckovsky_power_resources[1].start;
+ err:
+	return rc;
+}
+
+static void htckovsky_power_exit(struct device *dev)
+{
+	gpio_free(KOVS100_AC_DETECT);
+	gpio_free(KOVS100_N_CHG_ENABLE);
+}
+
+static struct pda_power_pdata htckovsky_power_data = {
+	.init = htckovsky_power_init,
+	.is_ac_online = htckovsky_is_ac_online,
+	.is_usb_online = htckovsky_is_usb_online,
+	.set_charge = htckovsky_set_charge,
+	.exit = htckovsky_power_exit,
+	.supplied_to = supplicants,
+	.num_supplicants = ARRAY_SIZE(supplicants),
+};
+
+static struct platform_device htckovsky_powerdev = {
+	.name = "pda-power",
+	.id = -1,
+	.resource = htckovsky_power_resources,
+	.num_resources = ARRAY_SIZE(htckovsky_power_resources),
+	.dev = {
+		.platform_data = &htckovsky_power_data,
+		},
+};				//End of power supply
+
+static void ds2746_set_charge(int enable)
+{
+	if (!enable) {
+		htckovsky_set_charge(0);
+		return;
+	}
+
+	if (htckovsky_is_ac_online())
+		htckovsky_set_charge(PDA_POWER_CHARGE_AC);
+	else if (htckovsky_is_usb_online())
+		htckovsky_set_charge(PDA_POWER_CHARGE_USB);
+	else
+		htckovsky_set_charge(0);
+
+};
+
+static struct ds2746_platform_data kovsky_battery_data = {
+	.resistance = 1500,
+	.capacity = 1660,
+	.high_voltage = 4200,
+	.low_voltage = 3600,
+	.set_charge = ds2746_set_charge,
+};
+
+static struct i2c_board_info i2c_devices[] = {
+	{
+	 I2C_BOARD_INFO("mt9t012vc", 0x20),
+	 },
+	{
+	 // Battery driver
+	 .type = "ds2746-battery",
+	 .addr = 0x36,
+	 .platform_data = &kovsky_battery_data,
+	 },
+	{
+	 // LED & Backlight controller
+	 I2C_BOARD_INFO("microp-klt", 0x66),
+	 },
+//      {
+//              // Keyboard controller
+//              I2C_BOARD_INFO("microp-ksc", 0x67),
+//      },
+};
+
+static struct platform_device raphael_rfkill = {
+	.name = "htcraphael_rfkill",
+	.id = -1,
+};
+
+#define SND(num, desc) { .name = desc, .id = num }
+static struct snd_endpoint snd_endpoints_list[] = {
+	SND(0, "HANDSET"),
+	SND(1, "SPEAKER"),
+	SND(2, "HEADSET"),
+	SND(3, "BT"),
+	SND(44, "BT_EC_OFF"),
+	SND(10, "HEADSET_AND_SPEAKER"),
+	SND(256, "CURRENT"),
+
+	/* Bluetooth accessories. */
+
+	SND(12, "HTC BH S100"),
+	SND(13, "HTC BH M100"),
+	SND(14, "Motorola H500"),
+	SND(15, "Nokia HS-36W"),
+	SND(16, "PLT 510v.D"),
+	SND(17, "M2500 by Plantronics"),
+	SND(18, "Nokia HDW-3"),
+	SND(19, "HBH-608"),
+	SND(20, "HBH-DS970"),
+	SND(21, "i.Tech BlueBAND"),
+	SND(22, "Nokia BH-800"),
+	SND(23, "Motorola H700"),
+	SND(24, "HTC BH M200"),
+	SND(25, "Jabra JX10"),
+	SND(26, "320Plantronics"),
+	SND(27, "640Plantronics"),
+	SND(28, "Jabra BT500"),
+	SND(29, "Motorola HT820"),
+	SND(30, "HBH-IV840"),
+	SND(31, "6XXPlantronics"),
+	SND(32, "3XXPlantronics"),
+	SND(33, "HBH-PV710"),
+	SND(34, "Motorola H670"),
+	SND(35, "HBM-300"),
+	SND(36, "Nokia BH-208"),
+	SND(37, "Samsung WEP410"),
+	SND(38, "Jabra BT8010"),
+	SND(39, "Motorola S9"),
+	SND(40, "Jabra BT620s"),
+	SND(41, "Nokia BH-902"),
+	SND(42, "HBH-DS220"),
+	SND(43, "HBH-DS980"),
+};
+
+#undef SND
+
+static struct msm_snd_endpoints raphael_snd_endpoints = {
+	.endpoints = snd_endpoints_list,
+	.num = ARRAY_SIZE(snd_endpoints_list),
+};
+
+static struct platform_device raphael_snd = {
+	.name = "msm_snd",
+	.id = -1,
+	.dev = {
+		.platform_data = &raphael_snd_endpoints,
+		},
+};
+
+#ifdef CONFIG_HTC_HEADSET
+static struct h2w_platform_data kovsky_headset_data = {
+	.cable_in1 = KOVS100_HEADSET_IN,
+	.headset_mic_35mm = KOVS100_EXT_MIC,
+	.jack_inverted = 1,
+};
+
+static struct platform_device kovsky_headset = {
+	.name = "htc_headset_35mm",
+	.id = -1,
+	.dev = {
+		.platform_data = &kovsky_headset_data,
+		},
+};
+#endif
+
+static struct platform_device touchscreen = {
+	.name = "tssc-manager",
+	.id = -1,
+};
+
+/***
+ USB
+ ***/
+static void msm72k_usb_ulpi_config(int enable)
+{
+	int n;
+	/* Configure ULPI DATA pins */
+	for (n = 0x6f; n <= 0x76; n++) {
+		gpio_tlmm_config(GPIO_CFG(n, 1,
+					  enable ? GPIO_CFG_INPUT :
+					  GPIO_CFG_OUTPUT,
+					  enable ? GPIO_CFG_NO_PULL :
+					  GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
+	}
+	gpio_tlmm_config(GPIO_CFG(0x77, 1, GPIO_CFG_INPUT,
+				  enable ? GPIO_CFG_NO_PULL :
+				  GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
+	gpio_tlmm_config(GPIO_CFG
+			 (0x78, 1, GPIO_CFG_INPUT,
+			  enable ? GPIO_CFG_NO_PULL : GPIO_CFG_PULL_DOWN,
+			  GPIO_CFG_2MA), 0);
+	gpio_tlmm_config(GPIO_CFG
+			 (0x79, 1, GPIO_CFG_OUTPUT,
+			  enable ? GPIO_CFG_NO_PULL : GPIO_CFG_PULL_UP,
+			  GPIO_CFG_2MA), 0);
+
+}
+
+static int usb_phy_init_seq_msm72k[] = {
+	0x40, 0x31,		/* High Speed TX Boost */
+	0x1D, 0x0D,		/* Rising edge interrupts control register */
+	0x1D, 0x10,		/* Falling edge interrupts control register */
+	0x5, 0xA,		/* OTG Control register */
+	-1
+};
+
+//TODO: implement the corresponding functions
+//in the usb driver via pdata
+static int htckovsky_request_ulpi_gpios(void)
+{
+	static bool done = false;
+	int n, ret;
+
+	if (done)
+		return 0;
+
+	for (n = 0x6f; n <= 0x79; n++) {
+		ret = gpio_request(n, "MSM ULPI");
+		if (ret)
+			goto free_ulpi;
+	}
+	ret = gpio_request(0x54, "MSM USB");
+	if (ret)
+		goto free_x54;
+	ret = gpio_request(0x64, "MSM USB");
+	if (ret)
+		goto free_x64;
+	ret = gpio_request(0x69, "MSM USB");
+	if (ret)
+		goto free_x69;
+
+	done = true;
+	return 0;
+
+ free_x69:
+	gpio_free(0x69);
+ free_x64:
+	gpio_free(0x64);
+ free_x54:
+	gpio_free(0x54);
+
+ free_ulpi:
+	for (--n; n >= 0x6f; n--)
+		gpio_free(n);
+	return ret;
+}
+
+static inline void htckovsky_usb_disable(void)
+{
+	printk(KERN_DEBUG "[KOVSKY]: Disable USB\n");
+	htckovsky_request_ulpi_gpios();
+	gpio_set_value(0x64, 0);
+	gpio_set_value(0x69, 0);
+}
+
+static void htckovsky_usb_enable(void)
+{
+	htckovsky_request_ulpi_gpios();
+	htckovsky_usb_disable();
+
+	printk(KERN_DEBUG "[KOVSKY]: Enable USB\n");
+	gpio_set_value(0x54, 1);
+
+	//msm_gpio_set_flags(KOVS100_BT_ROUTER, GPIOF_DRIVE_OUTPUT | GPIOF_OUTPUT_LOW);
+	gpio_set_value(KOVS100_BT_ROUTER, 0);
+
+	gpio_set_value(0x69, 1);
+	gpio_set_value(0x64, 0);
+	mdelay(3);
+	gpio_set_value(0x64, 1);
+	mdelay(3);
+
+	msm72k_usb_ulpi_config(1);
+}
+
+static void htckovsky_usb_connected(int state)
+{
+	printk(KERN_DEBUG "[KOVSKY]: %s(%d)\n", __func__, state);
+	htckovsky_request_ulpi_gpios();
+	if (!state) {
+		msm72k_usb_ulpi_config(0);
+		htckovsky_usb_disable();
+	}
+}
+
+static struct msm_hsusb_platform_data htckovsky_hsusb_pdata = {
+	.phy_init_seq = usb_phy_init_seq_msm72k,
+	.phy_reset = htckovsky_usb_enable,
+	.usb_connected = htckovsky_usb_connected,
+};
+
+static struct platform_device android_usb = {
+	.name = "android_usb_devices",
+	.id = -1,
+};
+
+/******
+ Camera
+ ******/
+#ifdef CONFIG_MSM_CAMERA
+static unsigned camera_off_gpio_table[] = {
+	/* CAMERA */
+	GPIO_CFG(2, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT2 */
+	GPIO_CFG(3, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT3 */
+	GPIO_CFG(4, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT4 */
+	GPIO_CFG(5, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT5 */
+	GPIO_CFG(6, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT6 */
+	GPIO_CFG(7, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT7 */
+	GPIO_CFG(8, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT8 */
+	GPIO_CFG(9, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT9 */
+	GPIO_CFG(10, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT10 */
+	GPIO_CFG(11, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT11 */
+	GPIO_CFG(12, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* PCLK */
+	GPIO_CFG(13, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* HSYNC_IN */
+	GPIO_CFG(14, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* VSYNC_IN */
+	GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* MCLK */
+};
+
+static unsigned camera_on_gpio_table[] = {
+	/* CAMERA */
+	GPIO_CFG(2, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT2 */
+	GPIO_CFG(3, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT3 */
+	GPIO_CFG(4, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT4 */
+	GPIO_CFG(5, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT5 */
+	GPIO_CFG(6, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT6 */
+	GPIO_CFG(7, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT7 */
+	GPIO_CFG(8, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT8 */
+	GPIO_CFG(9, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT9 */
+	GPIO_CFG(10, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT10 */
+	GPIO_CFG(11, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT11 */
+	GPIO_CFG(12, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PCLK */
+	GPIO_CFG(13, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* HSYNC_IN */
+	GPIO_CFG(14, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* VSYNC_IN */
+	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA),	/* MCLK */
+};
+
+static void config_gpio_table(unsigned *table, int len)
+{
+	int n;
+	unsigned id;
+	for (n = 0; n < len; n++) {
+		id = table[n];
+		gpio_tlmm_config(id, 0);
+	}
+}
+
+static void config_camera_on_gpios(void)
+{
+	printk(KERN_DEBUG "+%s\n", __func__);
+	config_gpio_table(camera_on_gpio_table,
+			  ARRAY_SIZE(camera_on_gpio_table));
+	printk(KERN_DEBUG "-%s\n", __func__);
+}
+
+static void config_camera_off_gpios(void)
+{
+	printk(KERN_DEBUG "-%s\n", __func__);
+	config_gpio_table(camera_off_gpio_table,
+			  ARRAY_SIZE(camera_off_gpio_table));
+	printk(KERN_DEBUG "-%s\n", __func__);
+}
+
+static struct msm_camera_device_platform_data msm_camera_device_data = {
+	.camera_gpio_on = config_camera_on_gpios,
+	.camera_gpio_off = config_camera_off_gpios,
+	.ioext.mdcphy = MSM_MDC_PHYS,
+	.ioext.mdcsz = MSM_MDC_SIZE,
+	.ioext.appphy = MSM_CLK_CTL_PHYS,
+	.ioext.appsz = MSM_CLK_CTL_SIZE,
+};
+
+#ifdef CONFIG_MT9T012VC
+static void kovsky_af_vdd(int on)
+{
+	struct msm_dex_command dex = {
+		.cmd = on ? PCOM_PMIC_REG_ON : PCOM_PMIC_REG_OFF,
+		.has_data = 1,
+		.data = 0x100,
+	};
+
+	msm_proc_comm_wince(&dex, 0);
+}
+
+/* This is needed to control the lens position*/
+static void kovsky_pull_vcm_d(int on)
+{
+	kovsky_af_vdd(on);
+	gpio_direction_output(0x6b, on);
+	gpio_direction_output(0x1c, on);
+}
+
+static int camera_set_state(int on)
+{
+	gpio_direction_output(1, on);
+	gpio_direction_output(0x17, on);
+	gpio_direction_output(0x1f, on);
+	gpio_direction_output(0, on);
+	gpio_direction_output(0x63, !on);
+
+	if (on) {
+		gpio_direction_output(0, 1);
+		mdelay(10);
+		gpio_direction_output(0, 0);
+		mdelay(10);
+		gpio_direction_output(0, 1);
+	}
+	return 0;
+}
+
+static struct msm_camera_sensor_info msm_camera_sensor_mt9t012vc_data = {
+	//fake sensor name for the stupid proprietary driver
+	.sensor_name = "mt9t013",
+	.pdata = &msm_camera_device_data,
+	.set_actuator = kovsky_pull_vcm_d,
+	.set_state = camera_set_state,
+};
+
+static struct platform_device msm_camera_sensor_mt9t012vc = {
+	.name = "msm_camera_mt9t012vc",
+	.dev = {
+		.platform_data = &msm_camera_sensor_mt9t012vc_data,
+		},
+};
+#endif				//CONFIG_MT9T012VC
+#endif				//CONFIG_MSM_CAMERA
+
+struct platform_device msm_device_rtc = {
+	.name = "msm_rtc",
+	.id = -1,
+};
+
+static struct gpio_keys_button htckovsky_button_table[] = {
+	/*KEY   GPIO    ACTIVE_LOW      DESCRIPTION     type    wakeup  debounce */
+	{KEY_VOLUMEUP, 39, 1, "Volume Up", EV_KEY, 0, 0},
+	{KEY_VOLUMEDOWN, 40, 1, "Volume Down", EV_KEY, 0, 0},
+	{KEY_POWER, 83, 1, "Power button", EV_KEY, 1, 0},
+	{KEY_HOME, 42, 1, "Camera half press", EV_KEY, 0, 10},
+	{KEY_POWER, 41, 1, "Camera full press", EV_KEY, 0, 0},
+};
+
+static struct gpio_keys_platform_data htckovsky_gpio_keys_data = {
+	.buttons = htckovsky_button_table,
+	.nbuttons = ARRAY_SIZE(htckovsky_button_table),
+};
+
+static struct platform_device htckovsky_gpio_keys = {
+	.name = "gpio-keys",
+	.dev = {
+		.platform_data = &htckovsky_gpio_keys_data,
+		},
+	.id = -1,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&htckovsky_gpio_keys,
+//	&raphael_rfkill,
+	&msm_device_smd,
+//	&msm_device_nand,
+//      &keypad_device,
+//	&msm_device_i2c,
+//      &msm_device_rtc,
+//      &msm_device_htc_hw,
+#ifdef CONFIG_SERIAL_MSM_HS
+//	&msm_device_uart_dm2,
+#endif
+	&msm_device_hsusb,
+#ifdef CONFIG_USB_ANDROID
+	&android_usb,
+#endif
+	&htckovsky_powerdev,
+#ifdef CONFIG_MT9T012VC
+//	&msm_camera_sensor_mt9t012vc,
+#endif
+	&touchscreen,
+//	&raphael_snd,
+#ifdef CONFIG_HTC_HEADSET
+//	&kovsky_headset,
+#endif
+};
+
+extern struct sys_timer msm_timer;
+
+static struct msm_acpu_clock_platform_data htckovsky_clock_data = {
+	.acpu_switch_time_us = 50,
+	.max_speed_delta_khz = 256000,
+	.vdd_switch_time_us = 62,
+	.power_collapse_khz = 19200,
+	.wait_for_irq_khz = 19200,
+};
+
+void msm_serial_debug_init(unsigned int base, int irq,
+			   const char *clkname, int signal_irq);
+
+#ifdef CONFIG_SERIAL_MSM_HS
+static struct msm_serial_hs_platform_data msm_uart_dm2_pdata = {
+	.rx_wakeup_irq = MSM_GPIO_TO_INT(21),
+	.inject_rx_on_wakeup = 1,
+	.rx_to_inject = 0x32,
+};
+#endif
+
+static void htcraphael_reset(void)
+{
+	struct msm_dex_command dex = {.cmd = PCOM_NOTIFY_ARM9_REBOOT };
+	msm_proc_comm_wince(&dex, 0);
+	mdelay(0x15e);
+	gpio_request(25, "MSM Reset");
+	msm_gpio_set_flags(25, GPIOF_OWNER_ARM11);
+	gpio_direction_output(25, 0);
+	printk(KERN_INFO "%s: Soft reset done.\n", __func__);
+}
+
+static void htcraphael_set_vibrate(uint32_t val)
+{
+	struct msm_dex_command vibra;
+
+	if (val == 0) {
+		vibra.cmd = PCOM_VIBRA_OFF;
+		msm_proc_comm_wince(&vibra, 0);
+	} else if (val > 0) {
+		if (val == 1 || val > 0xb22)
+			val = 0xb22;
+		writel(val, MSM_SHARED_RAM_BASE + 0xfc130);
+		vibra.cmd = PCOM_VIBRA_ON;
+		msm_proc_comm_wince(&vibra, 0);
+	}
+}
+
+#if 0
+static htc_hw_pdata_t msm_htc_hw_pdata = {
+	.set_vibrate = htcraphael_set_vibrate,
+	.battery_smem_offset = 0xfc140,	//XXX: raph800
+	.battery_smem_field_size = 4,
+};
+#endif
+
+static void __init htckovsky_init(void)
+{
+	int i;
+
+	msm_acpu_clock_init(&htckovsky_clock_data);
+	msm_proc_comm_wince_init();
+
+	// Register hardware reset hook
+	msm_hw_reset_hook = htcraphael_reset;
+
+	// Device pdata overrides
+	//msm_device_htc_hw.dev.platform_data = &msm_htc_hw_pdata;
+	msm_device_hsusb.dev.platform_data = &htckovsky_hsusb_pdata;
+
+#ifdef CONFIG_SERIAL_MSM_HS
+	msm_device_uart_dm2.dev.platform_data = &msm_uart_dm2_pdata;
+#endif
+
+	msm_init_pmic_vibrator();
+	// Register devices
+	platform_add_devices(devices, ARRAY_SIZE(devices));
+
+	// Register I2C devices
+	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
+
+	// Initialize SD controllers
+	init_mmc();
+
+	/* A little vibrating welcome */
+	for (i = 0; i < 2; i++) {
+		htcraphael_set_vibrate(1);
+		mdelay(150);
+		htcraphael_set_vibrate(0);
+		mdelay(75);
+	}
+}
+
+static void __init htckovsky_map_io(void)
+{
+	msm_map_common_io();
+	msm_clock_a11_fixup();
+	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
+}
+
+static void __init htckovsky_init_irq(void)
+{
+	msm_init_irq();
+}
+
+static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
+				   char **cmdline, struct meminfo *mi)
+{
+	mi->nr_banks = 1;
+	mi->bank[0].start = PAGE_ALIGN(PHYS_OFFSET);
+	mi->bank[0].node = PHYS_TO_NID(mi->bank[0].start);
+	mi->bank[0].size = 107 * 1024 * 1024;
+	mi->nr_banks++;
+	mi->bank[1].start = PAGE_ALIGN(PHYS_OFFSET + 0x10000000);
+	mi->bank[1].node = PHYS_TO_NID(mi->bank[1].start);
+	mi->bank[1].size = (128 - 34) * 1024 * 1024;
+	printk(KERN_INFO "fixup: nr_banks = %d\n", mi->nr_banks);
+	printk(KERN_INFO "fixup: bank0 start=%08lx, node=%08x, size=%08lx\n",
+	       mi->bank[0].start, mi->bank[0].node, mi->bank[0].size);
+	if (mi->nr_banks > 1)
+		printk(KERN_INFO
+		       "fixup: bank1 start=%08lx, node=%08x, size=%08lx\n",
+		       mi->bank[1].start, mi->bank[1].node, mi->bank[1].size);
+}
+
+MACHINE_START(HTCKOVSKY, "HTC Kovsky GSM phone (aka Xperia X1)")
+    .fixup = htckovsky_fixup,.boot_params = 0x10000100,.map_io =
+    htckovsky_map_io,.init_irq = htckovsky_init_irq,.init_machine =
+    htckovsky_init,.timer = &msm_timer, MACHINE_END
