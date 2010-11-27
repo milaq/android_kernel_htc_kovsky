@@ -96,5 +96,5 @@ config I2C_DEBUG_BUS
 	  debug messages to the system log.  Select this if you are having
 	  a problem with I2C support and want to see more of what is going
 	  on.
-
+source drivers/i2c/chips/Kconfig
 endif # I2C
