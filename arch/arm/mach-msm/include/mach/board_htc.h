@@ -18,9 +18,13 @@
 #include <linux/list.h>
 #include <asm/setup.h>
 
-struct msm_pmem_setting{
+struct msm_pmem_setting {
 	resource_size_t pmem_start;
 	resource_size_t pmem_size;
+	//it is not *pmem*, but added to allow us use a simple
+	//macro to calculate memory sizes
+	resource_size_t fb_start;
+	resource_size_t fb_size;
 	resource_size_t pmem_adsp_start;
 	resource_size_t pmem_adsp_size;
 	resource_size_t pmem_gpu0_start;
