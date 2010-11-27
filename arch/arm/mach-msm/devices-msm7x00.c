@@ -22,15 +22,19 @@
 #include <mach/msm_iomap.h>
 #include <mach/dma.h>
 #include "devices.h"
-#include "proc_comm.h"
 
 #include <asm/mach/flash.h>
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 
-
 #include "clock.h"
 #include <mach/mmc.h>
+
+#ifdef CONFIG_MSM_AMSS_VERSION_ANDROID
+#include "proc_comm.h"
+#else
+#include "proc_comm_wince.h"
+#endif
 
 static struct resource resources_uart1[] = {
 	{
@@ -202,6 +206,7 @@ struct platform_device msm_device_i2c = {
 #define GPIO_I2C_DAT 61
 void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 {
+#ifdef CONFIG_MSM_AMSS_VERSION_ANDROID
 	unsigned id;
 	if (gpio) {
 		id = PCOM_GPIO_CFG(GPIO_I2C_CLK, 0, GPIO_OUTPUT,
@@ -220,12 +225,13 @@ void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 				   GPIO_NO_PULL, GPIO_8MA);
 		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
 	}
+#endif
 }
 
 static struct resource resources_hsusb[] = {
 	{
 		.start	= MSM_HSUSB_PHYS,
-		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE,
+		.end	= MSM_HSUSB_PHYS + MSM_HSUSB_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	{
@@ -296,8 +302,8 @@ static struct resource resources_sdc1[] = {
 		.name	= "status_irq"
 	},
 	{
-		.start	= 8,
-		.end	= 8,
+		.start	= DMOV_SDC1_CHAN,
+		.end	= DMOV_SDC1_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -325,8 +331,8 @@ static struct resource resources_sdc2[] = {
 		.name	= "status_irq"
 	},
 	{
-		.start	= 8,
-		.end	= 8,
+		.start	= DMOV_SDC2_CHAN,
+		.end	= DMOV_SDC2_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -354,8 +360,8 @@ static struct resource resources_sdc3[] = {
 		.name	= "status_irq"
 	},
 	{
-		.start	= 8,
-		.end	= 8,
+		.start	= DMOV_SDC3_CHAN,
+		.end	= DMOV_SDC3_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -383,8 +389,8 @@ static struct resource resources_sdc4[] = {
 		.name	= "status_irq"
 	},
 	{
-		.start	= 8,
-		.end	= 8,
+		.start	= DMOV_SDC4_CHAN,
+		.end	= DMOV_SDC4_CHAN,
 		.flags	= IORESOURCE_DMA,
 	},
 };
@@ -556,47 +562,47 @@ struct platform_device msm_device_touchscreen = {
 };
 
 struct clk msm_clocks_7x01a[] = {
-	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
-	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
-	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
-	CLK_PCOM("ebi2_clk",	EBI2_CLK,	NULL, 0),
-	CLK_PCOM("ecodec_clk",	ECODEC_CLK,	NULL, 0),
-	CLK_PCOM("mddi_clk",	EMDH_CLK,	&msm_device_mddi1.dev, OFF),
-	CLK_PCOM("gp_clk",	GP_CLK,		NULL, 0),
-	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, OFF),
-	CLK_PCOM("i2c_clk",	I2C_CLK,	&msm_device_i2c.dev, 0),
-	CLK_PCOM("icodec_rx_clk",	ICODEC_RX_CLK,	NULL, 0),
-	CLK_PCOM("icodec_tx_clk",	ICODEC_TX_CLK,	NULL, 0),
-	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
-	CLK_PCOM("mdc_clk",	MDC_CLK,	NULL, 0),
-	CLK_PCOM("mdp_clk",	MDP_CLK,	&msm_device_mdp.dev, OFF),
-	CLK_PCOM("pbus_clk",	PBUS_CLK,	NULL, 0),
-	CLK_PCOM("pcm_clk",	PCM_CLK,	NULL, 0),
-	CLK_PCOM("mddi_clk",	PMDH_CLK,	&msm_device_mddi0.dev, OFF | CLK_MINMAX),
-	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
-	CLK_PCOM("sdc_clk",	SDC1_CLK,	&msm_device_sdc1.dev, OFF),
-	CLK_PCOM("sdc_pclk",	SDC1_P_CLK,	&msm_device_sdc1.dev, OFF),
-	CLK_PCOM("sdc_clk",	SDC2_CLK,	&msm_device_sdc2.dev, OFF),
-	CLK_PCOM("sdc_pclk",	SDC2_P_CLK,	&msm_device_sdc2.dev, OFF),
-	CLK_PCOM("sdc_clk",	SDC3_CLK,	&msm_device_sdc3.dev, OFF),
-	CLK_PCOM("sdc_pclk",	SDC3_P_CLK,	&msm_device_sdc3.dev, OFF),
-	CLK_PCOM("sdc_clk",	SDC4_CLK,	&msm_device_sdc4.dev, OFF),
-	CLK_PCOM("sdc_pclk",	SDC4_P_CLK,	&msm_device_sdc4.dev, OFF),
-	CLK_PCOM("tsif_clk",	TSIF_CLK,	NULL, 0),
-	CLK_PCOM("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
-	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
-	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
-	CLK_PCOM("uart_clk",	UART1_CLK,	&msm_device_uart1.dev, OFF),
-	CLK_PCOM("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, OFF),
-	CLK_PCOM("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
-	CLK_PCOM("uartdm_clk",	UART1DM_CLK,	&msm_device_uart_dm1.dev, OFF),
-	CLK_PCOM("uartdm_clk",	UART2DM_CLK,	&msm_device_uart_dm2.dev, OFF),
-	CLK_PCOM("usb_hs_clk",	USB_HS_CLK,	&msm_device_hsusb.dev, OFF),
-	CLK_PCOM("usb_hs_pclk",	USB_HS_P_CLK,	&msm_device_hsusb.dev, OFF),
-	CLK_PCOM("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
-	CLK_PCOM("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MINMAX),
-	CLK_PCOM("vfe_clk",	VFE_CLK,	NULL, OFF),
-	CLK_PCOM("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, OFF),
+	CLK_IMPL("adm_clk",	ADM_CLK,	NULL, 0),
+	CLK_IMPL("adsp_clk",	ADSP_CLK,	NULL, 0),
+	CLK_IMPL("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
+	CLK_IMPL("ebi2_clk",	EBI2_CLK,	NULL, 0),
+	CLK_IMPL("ecodec_clk",	ECODEC_CLK,	NULL, 0),
+	CLK_IMPL("mddi_clk",	EMDH_CLK,	&msm_device_mddi1.dev, OFF),
+	CLK_IMPL("gp_clk",	GP_CLK,		NULL, 0),
+	CLK_IMPL("grp_clk",	GRP_3D_CLK,	NULL, OFF),
+	CLK_IMPL("i2c_clk",	I2C_CLK,	&msm_device_i2c.dev, 0),
+	CLK_IMPL("icodec_rx_clk",	ICODEC_RX_CLK,	NULL, 0),
+	CLK_IMPL("icodec_tx_clk",	ICODEC_TX_CLK,	NULL, 0),
+	CLK_IMPL("imem_clk",	IMEM_CLK,	NULL, OFF),
+	CLK_IMPL("mdc_clk",	MDC_CLK,	NULL, 0),
+	CLK_IMPL("mdp_clk",	MDP_CLK,	&msm_device_mdp.dev, OFF),
+	CLK_IMPL("pbus_clk",	PBUS_CLK,	NULL, 0),
+	CLK_IMPL("pcm_clk",	PCM_CLK,	NULL, 0),
+	CLK_IMPL("mddi_clk",	PMDH_CLK,	&msm_device_mddi0.dev, OFF | CLK_MINMAX),
+	CLK_IMPL("sdac_clk",	SDAC_CLK,	NULL, OFF),
+	CLK_IMPL("sdc_clk",	SDC1_CLK,	&msm_device_sdc1.dev, OFF),
+	CLK_IMPL("sdc_pclk",	SDC1_P_CLK,	&msm_device_sdc1.dev, OFF),
+	CLK_IMPL("sdc_clk",	SDC2_CLK,	&msm_device_sdc2.dev, OFF),
+	CLK_IMPL("sdc_pclk",	SDC2_P_CLK,	&msm_device_sdc2.dev, OFF),
+	CLK_IMPL("sdc_clk",	SDC3_CLK,	&msm_device_sdc3.dev, OFF),
+	CLK_IMPL("sdc_pclk",	SDC3_P_CLK,	&msm_device_sdc3.dev, OFF),
+	CLK_IMPL("sdc_clk",	SDC4_CLK,	&msm_device_sdc4.dev, OFF),
+	CLK_IMPL("sdc_pclk",	SDC4_P_CLK,	&msm_device_sdc4.dev, OFF),
+	CLK_IMPL("tsif_clk",	TSIF_CLK,	NULL, 0),
+	CLK_IMPL("tsif_ref_clk",	TSIF_REF_CLK,	NULL, 0),
+	CLK_IMPL("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
+	CLK_IMPL("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
+	CLK_IMPL("uart_clk",	UART1_CLK,	&msm_device_uart1.dev, OFF),
+	CLK_IMPL("uart_clk",	UART2_CLK,	&msm_device_uart2.dev, OFF),
+	CLK_IMPL("uart_clk",	UART3_CLK,	&msm_device_uart3.dev, OFF),
+	CLK_IMPL("uartdm_clk",	UART1DM_CLK,	&msm_device_uart_dm1.dev, OFF),
+	CLK_IMPL("uartdm_clk",	UART2DM_CLK,	&msm_device_uart_dm2.dev, OFF),
+	CLK_IMPL("usb_hs_clk",	USB_HS_CLK,	&msm_device_hsusb.dev, OFF),
+	CLK_IMPL("usb_hs_pclk",	USB_HS_P_CLK,	&msm_device_hsusb.dev, OFF),
+	CLK_IMPL("usb_otg_clk",	USB_OTG_CLK,	NULL, 0),
+	CLK_IMPL("vdc_clk",	VDC_CLK,	NULL, OFF | CLK_MINMAX),
+	CLK_IMPL("vfe_clk",	VFE_CLK,	NULL, OFF),
+	CLK_IMPL("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, OFF),
 };
 
 unsigned msm_num_clocks_7x01a = ARRAY_SIZE(msm_clocks_7x01a);
