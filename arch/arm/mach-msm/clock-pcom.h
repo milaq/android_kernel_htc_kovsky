@@ -156,4 +156,7 @@ int pc_clk_reset(unsigned id, enum clk_reset_action action);
 	.dbg_name = #clk_id, \
 	}
 
+#define CLK_IMPL CLK_PCOM
+#define LOCAL_CLK_OPS clk_ops_pcom
+
 #endif

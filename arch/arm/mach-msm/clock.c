@@ -31,8 +31,6 @@
 #include <mach/clk.h>
 
 #include "clock.h"
-#include "proc_comm.h"
-#include "clock-7x30.h"
 
 static DEFINE_MUTEX(clocks_mutex);
 static DEFINE_SPINLOCK(clocks_lock);
@@ -158,7 +156,7 @@ EXPORT_SYMBOL(clk_disable);
 int clk_reset(struct clk *clk, enum clk_reset_action action)
 {
 	if (!clk->ops->reset)
-		clk->ops->reset = &pc_clk_reset;
+		return 0;
 	return clk->ops->reset(clk->remote_id, action);
 }
 EXPORT_SYMBOL(clk_reset);
@@ -296,7 +294,7 @@ EXPORT_SYMBOL(clks_print_running);
 static void __init set_clock_ops(struct clk *clk)
 {
 	if (!clk->ops) {
-		clk->ops = &clk_ops_pcom;
+		clk->ops = &LOCAL_CLK_OPS;
 		clk->id = clk->remote_id;
 	}
 }
@@ -377,7 +375,7 @@ static int clock_debug_local_get(void *data, u64 *val)
 {
 	struct clk *clock = data;
 
-	*val = clock->ops != &clk_ops_pcom;
+	*val = clock->ops != &LOCAL_CLK_OPS;
 
 	return 0;
 }
@@ -508,6 +506,10 @@ static int __init clock_late_init(void)
 	struct clk *clk;
 	struct hlist_node *pos;
 	unsigned count = 0;
+
+	if (LOCAL_CLK_OPS.late_init_clk)
+		LOCAL_CLK_OPS.late_init_clk();
+	pr_info("%s: platform hook\n", __func__);
 
 	mutex_lock(&clocks_mutex);
 	hlist_for_each_entry(clk, pos, &clocks, list) {
