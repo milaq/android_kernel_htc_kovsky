@@ -28,10 +28,10 @@ extern int msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
 
 /* This struct holds the device-specific numbers and tables */
 static struct mmc_dev_data {
-	unsigned sdcard_status_gpio;
+	int sdcard_status_gpio;
 	char sdcard_device_id:3;
-	unsigned wifi_power_gpio1;
-	unsigned wifi_power_gpio2;
+	int wifi_power_gpio1;
+	int wifi_power_gpio2;
 	unsigned *sdcard_on_gpio_table;
 	unsigned *sdcard_off_gpio_table;
 	int sdcard_on_gpio_table_size;
@@ -512,6 +512,7 @@ static int mmc_request_gpios() {
 			goto free_pin1;
 	}
 	printk("%s: requested misc mmc gpios\n", __func__);
+	return 0;
 
 free_pin1:
 	if (mmc_pdata.wifi_power_gpio1 > 0)
