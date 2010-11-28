@@ -19,6 +19,9 @@
 #include "mdp_ppp.h"
 #include "mdp_csc_table.h"
 
+//HACK
+#include <asm/mach-types.h>
+
 #define MDP_CMD_DEBUG_ACCESS_BASE (0x10000)
 
 #ifdef CONFIG_FB_MSM_MDDI
@@ -44,8 +47,12 @@ static void mdp_dma_to_mddi(void *priv, uint32_t addr, uint32_t stride,
 
 	dma2_cfg |= DMA_DITHER_EN;
 
-	/* 666 18BPP */
-	dma2_cfg |= DMA_DSTC0G_6BITS | DMA_DSTC1B_6BITS | DMA_DSTC2R_6BITS;
+	if ( machine_is_htcraphael_cdma() || machine_is_htcraphael_cdma500() || machine_is_htcdiamond_cdma() || machine_is_htcblackstone() || machine_is_htckovsky() )
+		/* 565 16BPP */
+		dma2_cfg |= DMA_DSTC0G_6BITS | DMA_DSTC1B_5BITS | DMA_DSTC2R_5BITS;
+	else
+		/* 666 18BPP */
+		dma2_cfg |= DMA_DSTC0G_6BITS | DMA_DSTC1B_6BITS | DMA_DSTC2R_6BITS;
 
 #ifdef CONFIG_MSM_MDP22
 	/* setup size, address, and stride */
