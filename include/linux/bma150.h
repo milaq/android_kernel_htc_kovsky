@@ -9,18 +9,18 @@
 #define BMA150_I2C_NAME "bma150"
 #define BMA150_G_SENSOR_NAME "bma150"
 
-#define BMAIO				0xA1
+#define BMAIO			0xA1
 
 /* BMA150 register address */
-#define CHIP_ID_REG			0x00
-#define VERSION_REG			0x01
+#define CHIP_ID_REG		0x00
+#define VERSION_REG		0x01
 #define X_AXIS_LSB_REG		0x02
 #define X_AXIS_MSB_REG		0x03
 #define Y_AXIS_LSB_REG		0x04
 #define Y_AXIS_MSB_REG		0x05
 #define Z_AXIS_LSB_REG		0x06
 #define Z_AXIS_MSB_REG		0x07
-#define TEMP_RD_REG			0x08
+#define TEMP_RD_REG		0x08
 #define SMB150_STATUS_REG	0x09
 #define SMB150_CTRL_REG		0x0a
 #define SMB150_CONF1_REG	0x0b
@@ -55,9 +55,9 @@
 
 
 /* range and bandwidth */
-#define BMA_RANGE_2G			0
-#define BMA_RANGE_4G			1
-#define BMA_RANGE_8G			2
+#define BMA_RANGE_2G		0
+#define BMA_RANGE_4G		1
+#define BMA_RANGE_8G		2
 
 #define BMA_BW_25HZ		0
 #define BMA_BW_50HZ		1
@@ -65,11 +65,17 @@
 #define BMA_BW_190HZ		3
 #define BMA_BW_375HZ		4
 #define BMA_BW_750HZ		5
-#define BMA_BW_1500HZ	6
+#define BMA_BW_1500HZ		6
 
 /* mode settings */
 #define BMA_MODE_NORMAL   	0
 #define BMA_MODE_SLEEP       	1
+
+/* Actions */
+#define BMA150_ACT_ENABLE	0
+#define BMA150_ACT_SCALE	1
+#define BMA150_ACT_BW		2
+
 
 struct bma150_platform_data {
 	int intr;
