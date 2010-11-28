@@ -27,7 +27,6 @@
 #include <mach/msm_rpcrouter.h>
 
 #include <mach/msm_iomap.h>
-#include <mach/amss_para.h>
 #include <asm/io.h>
 
 #include "clock.h"

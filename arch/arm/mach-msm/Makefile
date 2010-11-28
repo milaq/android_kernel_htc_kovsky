@@ -8,7 +8,9 @@ obj-$(CONFIG_ARCH_MSM_SCORPION) += idle-v7.o
 obj-$(CONFIG_ARCH_MSM_SCORPION) += arch-init-scorpion.o
 obj-$(CONFIG_ARCH_QSD8X50) += acpuclock-qsd8x50.o
 obj-$(CONFIG_ARCH_MSM7X30) += acpuclock-7x30.o
-obj-y += clock.o clock-pcom.o
+obj-y += clock.o
+obj-$(CONFIG_MSM_AMSS_VERSION_ANDROID) += clock-pcom.o
+obj-$(CONFIG_MSM_AMSS_VERSION_WINCE) += clock-msm-a11.o
 obj-y += gpio.o generic_gpio.o
 obj-y += nand_partitions.o
 
@@ -68,7 +70,9 @@ obj-$(CONFIG_MACH_MSM7X30_SURF) += board-surf7x30.o
 obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
 obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
 
+obj-$(CONFIG_MSM_AMSS_VERSION_WINCE) += devices-msm7x00.o board-wince-mmc.o board-wince-pmem.o msm_vibrator.o
 obj-$(CONFIG_MACH_HTCKOVSKY) += board-htckovsky.o board-htckovsky-panel.o
+obj-$(CONFIG_USB_ANDROID) += board-android-usb.o
 
 obj-$(CONFIG_HTC_PWRSINK) += htc_pwrsink.o
 obj-$(CONFIG_HTC_PWRSPLY) += htc_power_supply.o
