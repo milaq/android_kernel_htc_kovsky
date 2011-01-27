@@ -1,19 +1,21 @@
 #ifndef _MICROP_KEYPAD_H
 #define _MICROP_KEYPAD_H
 
+#include <linux/platform_device.h>
 
-#define MICROP_KBD_MAX_KEYS 0x48
-
-struct microp_keypad_clamshell {
-        int gpio;
-        int irq;
+enum microp_key_state {
+	KEY_RELEASED,
 };
 
 struct microp_keypad_platform_data {
-        struct microp_keypad_clamshell clamshell;
-	int backlight_gpio;
+	int irq_keypress;
+	int irq_clamshell;
+	int (*get_scancode)(int *out_code, enum microp_key_state flags);
+	int (*is_keypad_disabled)(void);
+	int (*init)(struct device *dev);
+	void (*exit)(struct device *dev);
+	int *keypad_scancodes;
+	int keypad_scancodes_size;	
 };
-
-
 
 #endif
