@@ -21,6 +21,7 @@
 #include <mach/irqs.h>
 #include <mach/msm_iomap.h>
 #include <mach/dma.h>
+#include <mach/gpio.h>
 #include "devices.h"
 
 #include <asm/mach/flash.h>
@@ -29,12 +30,6 @@
 
 #include "clock.h"
 #include <mach/mmc.h>
-
-#ifdef CONFIG_MSM_AMSS_VERSION_ANDROID
-#include "proc_comm.h"
-#else
-#include "proc_comm_wince.h"
-#endif
 
 static struct resource resources_uart1[] = {
 	{
@@ -206,26 +201,24 @@ struct platform_device msm_device_i2c = {
 #define GPIO_I2C_DAT 61
 void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 {
-#ifdef CONFIG_MSM_AMSS_VERSION_ANDROID
-	unsigned id;
+	unsigned config;
 	if (gpio) {
-		id = PCOM_GPIO_CFG(GPIO_I2C_CLK, 0, GPIO_OUTPUT,
-				   GPIO_NO_PULL, GPIO_2MA);
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
-		id = PCOM_GPIO_CFG(GPIO_I2C_DAT, 0, GPIO_OUTPUT,
-				   GPIO_NO_PULL, GPIO_2MA);
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
+		config = GPIO_CFG(GPIO_I2C_CLK, 0, GPIO_CFG_OUTPUT,
+				   GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
+		gpio_tlmm_config(config, 0);
+		config = GPIO_CFG(GPIO_I2C_DAT, 0, GPIO_CFG_OUTPUT,
+				   GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
+		gpio_tlmm_config(config, 0);
 		*gpio_clk = GPIO_I2C_CLK;
 		*gpio_dat = GPIO_I2C_DAT;
 	} else {
-		id = PCOM_GPIO_CFG(GPIO_I2C_CLK, 1, GPIO_INPUT,
-				   GPIO_NO_PULL, GPIO_8MA);
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
-		id = PCOM_GPIO_CFG(GPIO_I2C_DAT , 1, GPIO_INPUT,
-				   GPIO_NO_PULL, GPIO_8MA);
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &id, 0);
+		config = GPIO_CFG(GPIO_I2C_CLK, 1, GPIO_CFG_INPUT,
+				   GPIO_CFG_NO_PULL, GPIO_CFG_8MA);
+		gpio_tlmm_config(config, 0);
+		config = GPIO_CFG(GPIO_I2C_DAT , 1, GPIO_CFG_INPUT,
+				   GPIO_CFG_NO_PULL, GPIO_CFG_8MA);
+		gpio_tlmm_config(config, 0);
 	}
-#endif
 }
 
 static struct resource resources_hsusb[] = {
