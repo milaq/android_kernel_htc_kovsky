@@ -32,7 +32,6 @@
 #include "clock.h"
 
 static DEFINE_MUTEX(clocks_mutex);
-static DEFINE_SPINLOCK(clocks_lock);
 static HLIST_HEAD(clocks);
 
 enum {
@@ -784,8 +783,6 @@ void __init msm_clock_a11_fixup(void)
 {
 	if (nand_boot)
 		mdelay(6000);
-
-//      spin_lock_init(&clocks_lock);
 
 	mutex_lock(&clocks_mutex);
 	if (pll_get_rate(0) == 196608000) {
