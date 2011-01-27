@@ -18,9 +18,24 @@
 #define __ASM_ARCH_MSM_BOARD_H
 
 #include <linux/types.h>
+#include <mach/mmc.h>
+
+struct msm_pmem_setting {
+	resource_size_t pmem_start;
+	resource_size_t pmem_size;
+	resource_size_t pmem_adsp_start;
+	resource_size_t pmem_adsp_size;
+	resource_size_t pmem_gpu0_start;
+	resource_size_t pmem_gpu0_size;
+	resource_size_t pmem_gpu1_start;
+	resource_size_t pmem_gpu1_size;
+	resource_size_t pmem_camera_start;
+	resource_size_t pmem_camera_size;
+	resource_size_t ram_console_start;
+	resource_size_t ram_console_size;
+};
 
 /* platform device data structures */
-
 struct msm_acpu_clock_platform_data
 {
 	uint32_t acpu_switch_time_us;
@@ -88,6 +103,15 @@ void __init msm_map_common_io(void);
 void __init msm_init_irq(void);
 void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks);
 void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
+int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
+			unsigned int stat_irq, unsigned long stat_irq_flags);
+
+#ifdef CONFIG_ANDROID_PMEM
+void __init msm_add_mem_devices(struct msm_pmem_setting *setting);
+#else
+static inline void __init msm_add_mem_devices(struct msm_pmem_setting *setting) {
+}
+#endif
 
 #ifdef CONFIG_USB_MSM_72K
 void msm_hsusb_set_vbus_state(int online);

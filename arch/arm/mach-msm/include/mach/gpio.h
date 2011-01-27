@@ -117,13 +117,13 @@ void msm_gpios_disable(const struct msm_gpio *table, int size);
 /* GPIO TLMM: Function -- GPIO specific */
 
 /* GPIO TLMM: Direction */
-enum {
+enum msm_gpiod_dir {
 	GPIO_CFG_INPUT,
 	GPIO_CFG_OUTPUT,
 };
 
 /* GPIO TLMM: Pullup/Pulldown */
-enum {
+enum msm_gpio_pull {
 	GPIO_CFG_NO_PULL,
 	GPIO_CFG_PULL_DOWN,
 	GPIO_CFG_KEEPER,
@@ -131,7 +131,7 @@ enum {
 };
 
 /* GPIO TLMM: Drive Strength */
-enum {
+enum msm_gpio_drive {
 	GPIO_CFG_2MA,
 	GPIO_CFG_4MA,
 	GPIO_CFG_6MA,
@@ -142,7 +142,7 @@ enum {
 	GPIO_CFG_16MA,
 };
 
-enum {
+enum msm_gpio_state {
 	GPIO_CFG_ENABLE,
 	GPIO_CFG_DISABLE,
 };
@@ -163,7 +163,7 @@ enum {
 #define GPIO_PULL(gpio_cfg)   (((gpio_cfg) >> 15) & 0x3)
 #define GPIO_DRVSTR(gpio_cfg) (((gpio_cfg) >> 17) & 0xf)
 
-int gpio_tlmm_config(unsigned config, unsigned disable);
+int gpio_tlmm_config(unsigned config, enum msm_gpio_state);
 void msm_gpio_set_flags(unsigned gpio, unsigned long flags);
 
 #endif /* __ASM_ARCH_MSM_GPIO_H */

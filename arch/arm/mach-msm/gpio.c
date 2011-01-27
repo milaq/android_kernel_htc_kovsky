@@ -666,7 +666,7 @@ postcore_initcall(msm_init_gpio);
 
 #ifdef CONFIG_MSM_AMSS_VERSION_WINCE
 
-int gpio_tlmm_config(unsigned config, unsigned disable)
+int gpio_tlmm_config(unsigned config, enum msm_gpio_state enable)
 {
 	void __iomem *addr, __iomem *addr2;
 	struct msm_gpio_chip *msm_chip;
@@ -688,8 +688,6 @@ int gpio_tlmm_config(unsigned config, unsigned disable)
 		return -EINVAL;
 	}
 
-	spin_lock_irqsave(&msm_chip->chip.lock, flags_gpio);
-
 	if (GPIO_PIN(config) < 16 || GPIO_PIN(config) > 42) {
 		addr = (void __iomem *)(MSM_GPIOCFG1_BASE + 0x20);
 		addr2 = (void __iomem *)(MSM_GPIOCFG1_BASE + 0x24);
@@ -701,10 +699,10 @@ int gpio_tlmm_config(unsigned config, unsigned disable)
 
 	if (!addr || !addr2) {
 		printk(KERN_WARNING "%s: could not find addr\n", __func__);
-		spin_unlock_irqrestore(&msm_chip->chip.lock, flags_gpio);
-		return 0;
+		return -EINVAL;
 	}
 
+	spin_lock_irqsave(&msm_chip->chip.lock, flags_gpio);
 	writel(gpio, addr);
 	cfg =
 	    (GPIO_DRVSTR(config) << 6) | (GPIO_FUNC(config) << 2) |
@@ -718,15 +716,15 @@ int gpio_tlmm_config(unsigned config, unsigned disable)
 
 	spin_unlock_irqrestore(&msm_chip->chip.lock, flags_gpio);
 
-	if (GPIO_DIR(config))
-		gpio_direction_output(gpio, !disable);
+	if (GPIO_DIR(config) == GPIO_CFG_OUTPUT)
+		gpio_direction_output(gpio, enable == GPIO_CFG_ENABLE);
 	else
 		gpio_direction_input(gpio);
 
 	return 0;
 }
 #else
-int gpio_tlmm_config(unsigned config, unsigned disable)
+int gpio_tlmm_config(unsigned config, enum msm_gpio_state)
 {
 	return msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, &disable);
 }
