@@ -43,6 +43,11 @@
 #define IOMEM(x)	((void __force __iomem *)(x))
 #endif
 
+#define MSM_SMI_PHYS		0x00000000
+#define MSM_SMI2_PHYS		0x02000000
+#define MSM_EBI_PHYS		0x10000000
+#define MSM_EBIN_PHYS		0x20000000
+
 #define MSM_VIC_BASE          IOMEM(0xF8000000)
 #define MSM_VIC_PHYS          0xC0000000
 #define MSM_VIC_SIZE          SZ_4K
