@@ -81,7 +81,7 @@ int msm_proc_comm_wince(struct msm_dex_command * in, unsigned *out)
 	writeb(base_cmd, base + PC_COMMAND);
 
 	// If we have data to pass, add 0x100 bit and store the data
-	if ( in->has_data )
+	if (in->has_data)
 	{
 		writel(readl(base + PC_COMMAND) | DEX_HAS_DATA, base + PC_COMMAND);
 		writel(in->data, base + PC_DATA);
@@ -153,45 +153,10 @@ end:
 #endif
 }
 
-#define PLLn_BASE(n)		(MSM_CLK_CTL_BASE + 0x300 + 28 * (n))
-#define TCX0			19200000 // Hz
-#define PLL_FREQ(l, m, n)	(TCX0 * (l) + TCX0 * (m) / (n))
-
-#define DUMP_PLL(name, base) { \
-	unsigned int mode, L, M, N, freq; \
-	mode = readl(base); \
-	L = readl(base + 0x4); \
-	M = readl(base + 0x8); \
-	N = readl(base + 0xc); \
-	freq = PLL_FREQ(L, M, N); \
-	printk(KERN_INFO "%s @ %p: MODE=%08x L=%08x M=%08x N=%08x freq=%u Hz (%u MHz)\n", \
-		name, base, mode, L, M, N, freq, freq / 1000000); \
-	}
-
-// Dump useful debug stuff
-void dump_debug_stuff(void)
-{
-	unsigned int pcb_xc;
-	char amss_ver[16];
-
-	// Dump PLL params (for debug purposes, no relation to proc_comm)
-	DUMP_PLL("PLL0", PLLn_BASE(0));
-	DUMP_PLL("PLL1", PLLn_BASE(1));
-	DUMP_PLL("PLL2", PLLn_BASE(2));
-	DUMP_PLL("PLL3", PLLn_BASE(3));
-
-	// Dump PCB XC
-	pcb_xc = readl(MSM_SHARED_RAM_BASE + 0xfc048);
-	printk(KERN_INFO "PCB XC: %08x\n", pcb_xc);
-
-	// Dump AMMS version
-	*(unsigned int *) (amss_ver + 0x0) = readl(MSM_SHARED_RAM_BASE + 0xfc030 + 0x0);
-	*(unsigned int *) (amss_ver + 0x4) = readl(MSM_SHARED_RAM_BASE + 0xfc030 + 0x4);
-	*(unsigned int *) (amss_ver + 0x8) = readl(MSM_SHARED_RAM_BASE + 0xfc030 + 0x8);
-	*(unsigned int *) (amss_ver + 0xc) = readl(MSM_SHARED_RAM_BASE + 0xfc030 + 0xc);
-	amss_ver[15] = 0;
-	printk(KERN_INFO "AMSS version: %s\n", amss_ver);
-}
+#define MDM_COMMAND 0x10
+#define MDM_STATUS  0x14
+#define MDM_DATA1   0x18
+#define MDM_DATA2   0x1C
 
 // Initialize PCOM registers
 int msm_proc_comm_wince_init()
@@ -212,8 +177,10 @@ int msm_proc_comm_wince_init()
 
 	spin_unlock_irqrestore(&proc_comm_lock, flags);
 	printk(KERN_INFO "%s: WinCE PCOM initialized.\n", __func__);
-
-	dump_debug_stuff();
+	printk(KERN_INFO "[PCOM] MDM_STATUS = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_STATUS));
+	printk(KERN_INFO "[PCOM] MDM_COMMAND = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_COMMAND));
+	printk(KERN_INFO "[PCOM] MDM_DATA1 = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_DATA1));
+	printk(KERN_INFO "[PCOM] MDM_DATA2 = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_DATA2));
 
 	return 0;
 #endif
