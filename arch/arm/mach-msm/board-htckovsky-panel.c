@@ -548,7 +548,13 @@ static int htckovsky_mddi_panel_uninit(struct msm_mddi_bridge_platform_data *bri
 	return 0;
 }
 
-extern struct resource resources_msm_fb[];
+static struct resource htckovsky_fb_resources[] = {
+	{
+		.start = KOVS110_PMEM_FB_START,
+		.end = KOVS110_PMEM_FB_START + KOVS110_PMEM_FB_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
 
 static struct msm_mddi_bridge_platform_data epson_client_data = {
 	.init = htckovsky_mddi_panel_unblank,
@@ -566,7 +572,7 @@ static struct msm_mddi_platform_data mddi_pdata = {
 	.vsync_irq = MSM_GPIO_TO_INT(KOVS100_LCD_VSYNC),
 	.clk_rate = 122880000,
 	.power_client = htckovsky_mddi_power_client,
-	.fb_resource = resources_msm_fb,
+	.fb_resource = htckovsky_fb_resources,
 	.num_clients = 1,
 	.client_platform_data = {
 		{
@@ -578,6 +584,7 @@ static struct msm_mddi_platform_data mddi_pdata = {
 		},
 	},
 };
+
 
 int __init htckovsky_init_panel(void)
 {
