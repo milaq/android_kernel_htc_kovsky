@@ -966,7 +966,7 @@ static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
 
 	mi->bank[1].start = PAGE_ALIGN(PHYS_OFFSET + 0x10000000);
 	mi->bank[1].node = PHYS_TO_NID(mi->bank[1].start);
-	mi->bank[1].size = (128 - 34) * 1024 * 1024;
+	mi->bank[1].size = (128 - 50) * 1024 * 1024;
 	printk(KERN_INFO "fixup: nr_banks = %d\n", mi->nr_banks);
 
 	for (i = 0; i < mi->nr_banks; i++) {
