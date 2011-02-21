@@ -43,9 +43,12 @@ void (*msm_hw_reset_hook) (void);
 
 #define MODULE_NAME "msm_smd"
 
+wait_queue_head_t rpccall_wait;
+int rpccall_done = 0;
+
 enum {
 	MSM_SMD_DEBUG = 1U << 0,
-	MSM_SMSM_DEBUG = 1U << 0,
+	MSM_SMSM_DEBUG = 1U << 1,
 };
 
 static int msm_smd_debug_mask;
@@ -153,7 +156,7 @@ DEFINE_SPINLOCK(smem_lock);
  */
 static DEFINE_MUTEX(smd_creation_mutex);
 
-static int smd_initialized;
+static int smd_initialized = 0;
 
 LIST_HEAD(smd_ch_closed_list);
 LIST_HEAD(smd_ch_list_modem);
@@ -199,6 +202,8 @@ static void smd_channel_probe_worker(struct work_struct *work)
 			    (shared[n].name, shared[n].cid, ctype))
 				smd_ch_allocated[n] = 1;
 	}
+	rpccall_done = 1;
+	wake_up(&rpccall_wait);
 }
 
 /* how many bytes are available for reading */
@@ -518,7 +523,11 @@ static int smd_is_packet(int chn, unsigned type)
 		return 0;
 
 	/* older AMSS reports SMD_KIND_UNKNOWN always */
+#if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
+	if ((chn > 28) || (chn == 1))
+#else
 	if ((chn > 4) || (chn == 1))
+#endif
 		return 1;
 	else
 		return 0;
@@ -614,12 +623,22 @@ static int smd_alloc_v2(struct smd_channel *ch)
 	void *buffer;
 	unsigned buffer_sz;
 
-	shared2 = smem_alloc(SMEM_SMD_BASE_ID + ch->n, sizeof(*shared2));
-	buffer = smem_item(SMEM_SMD_FIFO_BASE_ID + ch->n, &buffer_sz);
-
-	if (!buffer)
+	shared2 = smem_alloc(SMEM_SMD_BASE_ID + ch->n, sizeof(struct smd_shared_v2));
+	if (!shared2) {
+		pr_err("%s cid %d does not exists\n", __func__, ch->n);
 		return -1;
+	}
 
+	buffer = smem_item(SMEM_SMD_FIFO_BASE_ID + ch->n, &buffer_sz);
+	if (!buffer) {
+		pr_err("%s cid %d fifo not found\n", __func__, ch->n);
+		return -1;
+	}
+	
+	if (!buffer_sz) {
+		pr_err("%s: cid %d buffer size = 0\n", __func__, ch->n);
+		return -1;
+	}
 	/* buffer must be a power-of-two size */
 	if (buffer_sz & (buffer_sz - 1))
 		return -1;
@@ -636,7 +655,7 @@ static int smd_alloc_v2(struct smd_channel *ch)
 static int smd_alloc_v1(struct smd_channel *ch)
 {
 	struct smd_shared_v1 *shared1;
-	shared1 = smem_alloc(ID_SMD_CHANNELS + ch->n, sizeof(*shared1));
+	shared1 = smem_alloc(ID_SMD_CHANNELS + ch->n, sizeof(struct smd_shared_v1));
 	if (!shared1) {
 		pr_err("smd_alloc_channel() cid %d does not exist\n", ch->n);
 		return -1;
@@ -702,7 +721,6 @@ static int smd_alloc_channel(const char *name, uint32_t cid, uint32_t type)
 	mutex_lock(&smd_creation_mutex);
 	list_add(&ch->ch_list, &smd_ch_closed_list);
 	mutex_unlock(&smd_creation_mutex);
-
 	platform_device_register(&ch->pdev);
 	return 0;
 }
@@ -734,7 +752,7 @@ int smd_open(const char *name, smd_channel_t ** _ch,
 	struct smd_channel *ch;
 	unsigned long flags;
 
-	if (smd_initialized == 0) {
+	if (!smd_initialized) {
 		pr_info("smd_open() before smd_init()\n");
 		return -ENODEV;
 	}
@@ -750,16 +768,15 @@ int smd_open(const char *name, smd_channel_t ** _ch,
 	ch->current_packet = 0;
 	ch->last_state = SMD_SS_CLOSED;
 	ch->priv = priv;
-
 	*_ch = ch;
 
 	spin_lock_irqsave(&smd_lock, flags);
 
-	if ((ch->type & SMD_TYPE_MASK) == SMD_TYPE_APPS_MODEM)
+	if ((ch->type & SMD_TYPE_MASK) == SMD_TYPE_APPS_MODEM) {
 		list_add(&ch->ch_list, &smd_ch_list_modem);
-	else
+	} else {
 		list_add(&ch->ch_list, &smd_ch_list_dsp);
-
+	}
 	/* If the remote side is CLOSING, we need to get it to
 	 * move to OPENING (which we'll do by moving from CLOSED to
 	 * OPENING) and then get it to move from OPENING to
@@ -776,7 +793,6 @@ int smd_open(const char *name, smd_channel_t ** _ch,
 	}
 	spin_unlock_irqrestore(&smd_lock, flags);
 	smd_kick(ch);
-
 	return 0;
 }
 
@@ -995,7 +1011,7 @@ int smsm_set_sleep_duration(uint32_t delay)
 int smd_core_init(void)
 {
 	int r;
-	pr_info("smd_core_init()\n");
+	pr_info("+%s()\n", __func__);
 
 	/* wait for essential items to be initialized */
 	for (;;) {
@@ -1016,7 +1032,7 @@ int smd_core_init(void)
 		return r;
 	r = enable_irq_wake(INT_A9_M2A_0);
 	if (r < 0)
-		pr_err("smd_core_init: enable_irq_wake failed for A9_M2A_0\n");
+		pr_err("%s: enable_irq_wake failed for A9_M2A_0\n", __func__);
 
 	r = request_irq(INT_A9_M2A_5, smsm_irq_handler,
 			IRQF_TRIGGER_RISING, "smsm_dev", 0);
@@ -1026,7 +1042,7 @@ int smd_core_init(void)
 	}
 	r = enable_irq_wake(INT_A9_M2A_5);
 	if (r < 0)
-		pr_err("smd_core_init: enable_irq_wake failed for A9_M2A_5\n");
+		pr_err("%s: enable_irq_wake failed for A9_M2A_5\n", __func__);
 
 #if defined(CONFIG_QDSP6)
 	r = request_irq(INT_ADSP_A11, smd_dsp_irq_handler,
@@ -1049,7 +1065,7 @@ int smd_core_init(void)
 	smsm_change_state(SMSM_STATE_APPS_DEM, ~0, 0);
 #endif
 
-	pr_info("smd_core_init() done\n");
+	pr_info("-%s()\n", __func__);
 
 	return 0;
 }
@@ -1060,6 +1076,7 @@ static int msm_smd_probe(struct platform_device *pdev)
 {
 	pr_info("smd_init()\n");
 
+	init_waitqueue_head(&rpccall_wait);
 	INIT_WORK(&probe_work, smd_channel_probe_worker);
 
 	if (smd_core_init()) {
@@ -1067,6 +1084,7 @@ static int msm_smd_probe(struct platform_device *pdev)
 		return -1;
 	}
 
+	rpccall_done = 0;
 	do_smd_probe();
 
 	msm_check_for_modem_crash = check_for_modem_crash;
@@ -1074,7 +1092,9 @@ static int msm_smd_probe(struct platform_device *pdev)
 	msm_init_last_radio_log(THIS_MODULE);
 
 	smd_initialized = 1;
+	wait_event_interruptible(rpccall_wait, rpccall_done == 1);
 
+	printk(KERN_INFO "-%s()\n", __func__);
 	return 0;
 }
 

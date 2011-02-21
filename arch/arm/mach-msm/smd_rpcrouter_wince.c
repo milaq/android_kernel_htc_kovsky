@@ -1,20 +1,20 @@
 
 /* arch/arm/mach-msm/smd_rpcrouter.c
- *
- * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007 QUALCOMM Incorporated
- * Author: San Mehat <san@android.com>
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
- * GNU General Public License for more details.
- *
- */
+*
+* Copyright (C) 2007 Google, Inc.
+* Copyright (c) 2007 QUALCOMM Incorporated
+* Author: San Mehat <san@android.com>
+*
+* This software is licensed under the terms of the GNU General Public
+* License version 2, as published by the Free Software Foundation, and
+* may be copied, distributed, and modified under those terms.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+* GNU General Public License for more details.
+*
+*/
 
 /* TODO: handle cases where smd_write() will tempfail due to full fifo */
 /* TODO: thread priority? schedule a work to bump it? */
@@ -422,11 +422,6 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 
 		initialized = 1;
 
-//              new_server(0x3000ffff,0); // don't know why these are done twice
-//              new_server(0x3000ffff,0);
-//              new_server(0x31000000,0);
-//              new_server(0x31000000,0);
-//              new_server(0x3000000b,0); // register this for adsp
 		new_server(0x3000fffe, 1);
 
 		/* Send list of servers one at a time */
@@ -448,7 +443,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 			rpcrouter_send_control_msg(&ctl);
 		}
 		spin_unlock_irqrestore(&server_list_lock, flags);
-
+		
 		queue_work(rpcrouter_workqueue, &work_create_rpcrouter_pdev);
 		break;
 
@@ -494,6 +489,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 			}
 			schedule_work(&work_create_pdevs);
 			wake_up(&newserver_wait);
+			
 		} else {
 			if ((server->pid == msg->srv.pid) &&
 			    (server->cid == msg->srv.cid)) {
@@ -943,8 +939,8 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 EXPORT_SYMBOL(msm_rpc_write);
 
 /*
- * NOTE: It is the responsibility of the caller to kfree buffer
- */
+* NOTE: It is the responsibility of the caller to kfree buffer
+*/
 int msm_rpc_read(struct msm_rpc_endpoint *ept, void **buffer,
 		 unsigned user_len, long timeout)
 {
@@ -1013,7 +1009,7 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 	req->vers = ept->dst_vers;
 	req->procedure = cpu_to_be32(proc);
 
-	/* Allow replys to be added to the queue */
+/* Allow replys to be added to the queue */
 	ept->flags |= MSM_RPC_ENABLE_RECEIVE;
 
 	rc = msm_rpc_write(ept, req, request_size);
@@ -1161,6 +1157,7 @@ struct msm_rpc_endpoint *msm_rpc_connect(uint32_t prog, uint32_t vers,
 	struct msm_rpc_endpoint *ept;
 	struct rr_server *server;
 
+	RR("+%s(prog=%08x, vers=%08x)\n", __func__, prog, vers);
 	server = rpcrouter_lookup_server(prog, vers);
 	if (!server)
 		return ERR_PTR(-EHOSTUNREACH);
@@ -1205,7 +1202,7 @@ int msm_rpc_register_server(struct msm_rpc_endpoint *ept,
 	msg.srv.prog = prog;
 	msg.srv.vers = vers;
 
-	RR("x NEW_SERVER id=%d:%08x prog=%08x:%x\n",
+	RR("x REG_NEW_SERVER id=%d:%08x prog=%08x:%x\n",
 	   ept->pid, ept->cid, prog, vers);
 
 	rc = rpcrouter_send_control_msg(&msg);
@@ -1265,15 +1262,8 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 
 	queue_work(rpcrouter_workqueue, &work_read_data);
 
-//      msg.cmd = RPCROUTER_CTRL_CMD_BYE;
-//      rpcrouter_send_control_msg(&msg);
-//      msleep(50);
-
 	// wince rpc init
 	msg.cmd = RPCROUTER_CTRL_CMD_HELLO;
-//      rpcrouter_send_control_msg(&msg);
-//      msleep(50);
-
 	process_control_msg(&msg, sizeof(msg));
 	msleep(100);
 
