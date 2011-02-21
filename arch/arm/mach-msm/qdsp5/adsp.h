@@ -22,6 +22,7 @@
 #include <linux/msm_adsp.h>
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_adsp.h>
+#include <mach/smd.h>
 
 int adsp_pmem_fixup(struct msm_adsp_module *module, void **addr,
 		    unsigned long len);
@@ -110,7 +111,7 @@ struct adsp_info {
 	/* stats */
 	uint32_t events_received;
 	uint32_t event_backlog_max;
-
+	
 #if CONFIG_MSM_AMSS_VERSION >= 6350
 	/* rpc_client for init_info */
 	struct msm_rpc_endpoint *init_info_rpc_client;
@@ -120,28 +121,14 @@ struct adsp_info {
 #endif
 };
 
+int msm_adsp_probe(struct adsp_info *new_adsp_info);
+
 #define RPC_ADSP_RTOS_ATOM_PROG 0x3000000a
 #define RPC_ADSP_RTOS_MTOA_PROG 0x3000000b
 #define RPC_ADSP_RTOS_ATOM_NULL_PROC 0
 #define RPC_ADSP_RTOS_MTOA_NULL_PROC 0
 #define RPC_ADSP_RTOS_APP_TO_MODEM_PROC 2
 #define RPC_ADSP_RTOS_MODEM_TO_APP_PROC 2
-
-#if CONFIG_MSM_AMSS_VERSION >= 6350
-#define RPC_ADSP_RTOS_ATOM_VERS MSM_RPC_VERS(1,0)
-#define RPC_ADSP_RTOS_MTOA_VERS MSM_RPC_VERS(2,1) /* must be actual vers */
-#define MSM_ADSP_DRIVER_NAME "rs3000000a:00010000"
-#elif (CONFIG_MSM_AMSS_VERSION == 6220) || (CONFIG_MSM_AMSS_VERSION == 6225)
-#define RPC_ADSP_RTOS_ATOM_VERS MSM_RPC_VERS(0x71d1094b, 0)
-#define RPC_ADSP_RTOS_MTOA_VERS MSM_RPC_VERS(0xee3a9966, 0)
-#define MSM_ADSP_DRIVER_NAME "rs3000000a:71d1094b"
-#elif CONFIG_MSM_AMSS_VERSION == 6210
-#define RPC_ADSP_RTOS_ATOM_VERS MSM_RPC_VERS(0x20f17fd3, 0)
-#define RPC_ADSP_RTOS_MTOA_VERS MSM_RPC_VERS(0x75babbd6, 0)
-#define MSM_ADSP_DRIVER_NAME "rs3000000a:20f17fd3"
-#else
-#error "Unknown AMSS version"
-#endif
 
 enum rpc_adsp_rtos_proc_type {
 	RPC_ADSP_RTOS_PROC_NONE = 0,

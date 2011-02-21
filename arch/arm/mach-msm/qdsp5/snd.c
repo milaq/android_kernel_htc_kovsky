@@ -27,6 +27,9 @@
 #include <asm/ioctls.h>
 #include <mach/board.h>
 #include <mach/msm_rpcrouter.h>
+#include <mach/smd.h>
+
+#define RPC_SND_PROG    0x30000002
 
 struct snd_ctxt {
 	struct mutex lock;
@@ -36,20 +39,6 @@ struct snd_ctxt {
 };
 
 static struct snd_ctxt the_snd;
-
-#define RPC_SND_PROG    0x30000002
-#define RPC_SND_CB_PROG 0x31000002
-#if CONFIG_MSM_AMSS_VERSION == 6210
-#define RPC_SND_VERS	0x94756085 /* 2490720389 */
-#elif (CONFIG_MSM_AMSS_VERSION == 6220) || \
-      (CONFIG_MSM_AMSS_VERSION == 6225)
-#define RPC_SND_VERS	0xaa2b1a44 /* 2854951492 */
-#elif CONFIG_MSM_AMSS_VERSION == 6350
-#define RPC_SND_VERS 	MSM_RPC_VERS(1,0)
-#endif
-
-#define SND_SET_DEVICE_PROC 2
-#define SND_SET_VOLUME_PROC 3
 
 struct rpc_snd_set_device_args {
 	uint32_t device;
@@ -125,6 +114,17 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct snd_ctxt *snd = file->private_data;
 	int rc = 0;
 
+	uint32_t device_proc, volume_proc;
+	if (!amss_get_num_value(AMSS_SND_SET_DEVICE_PROC, &device_proc)) {
+		printk(KERN_ERR "%s: unable to get SND_SET_DEVICE_PROC\n", __func__);
+		return -EINVAL;
+	}
+
+	if (!amss_get_num_value(AMSS_SND_SET_VOLUME_PROC, &volume_proc)) {
+		printk(KERN_ERR "%s: unable to get SND_SET_VOLUME_PROC\n", __func__);
+		return -EINVAL;
+	}
+
 	mutex_lock(&snd->lock);
 	switch (cmd) {
 	case SND_SET_DEVICE:
@@ -150,7 +150,7 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						 dev.ear_mute, dev.mic_mute);
 
 		rc = msm_rpc_call(snd->ept,
-			SND_SET_DEVICE_PROC,
+			device_proc,
 			&dmsg, sizeof(dmsg), 5 * HZ);
 		break;
 
@@ -177,7 +177,7 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						vol.method, vol.volume);
 
 		rc = msm_rpc_call(snd->ept,
-			SND_SET_VOLUME_PROC,
+			volume_proc,
 			&vmsg, sizeof(vmsg), 5 * HZ);
 		break;
 
@@ -218,10 +218,16 @@ static int snd_open(struct inode *inode, struct file *file)
 	struct snd_ctxt *snd = &the_snd;
 	int rc = 0;
 
+	uint32_t snd_vers;
+	if (!amss_get_num_value(AMSS_RPC_SND_VERS, &snd_vers)) {
+		printk(KERN_ERR "%s: unable to get RPC_SND_VERS\n", __func__);
+		return -EINVAL;
+	}
+
 	mutex_lock(&snd->lock);
 	if (snd->opened == 0) {
 		if (snd->ept == NULL) {
-			snd->ept = msm_rpc_connect(RPC_SND_PROG, RPC_SND_VERS,
+			snd->ept = msm_rpc_connect(RPC_SND_PROG, snd_vers,
 					MSM_RPC_UNINTERRUPTIBLE);
 			if (IS_ERR(snd->ept)) {
 				rc = PTR_ERR(snd->ept);
@@ -257,10 +263,14 @@ struct miscdevice snd_misc = {
 
 static int snd_probe(struct platform_device *pdev)
 {
+	int rc;
+	printk("+%s()\n", __func__);
 	struct snd_ctxt *snd = &the_snd;
 	mutex_init(&snd->lock);
 	snd->snd_epts = (struct msm_snd_endpoints *)pdev->dev.platform_data;
-	return misc_register(&snd_misc);
+	rc = misc_register(&snd_misc);
+	printk("-%s() rc=%d\n", __func__, rc);
+	return rc;
 }
 
 static struct platform_driver snd_plat_driver = {
