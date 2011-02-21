@@ -50,8 +50,12 @@ static char *usb_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	"rndis",
 #endif
+#ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
+#endif
+#ifdef CONFIG_USB_ANDROID_ADB
 	"adb",
+#endif
 #ifdef CONFIG_USB_ANDROID_ACM
 	"acm",
 #endif
@@ -150,16 +154,26 @@ static struct platform_device android_usb_device = {
 
 static int android_usb_probe(struct platform_device *pdev)
 {
+	int ret = 0;
+
 #ifdef CONFIG_USB_ANDROID
-	platform_device_register(&android_usb_device);
+	ret = platform_device_register(&android_usb_device);
+	if (ret)
+        goto exit_or_fail;
 #endif
 #ifdef CONFIG_USB_ANDROID_RNDIS
-	platform_device_register(&rndis_device);
+	ret = platform_device_register(&rndis_device);
+    if (ret)
+        goto exit_or_fail;
 #endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
-	platform_device_register(&usb_mass_storage_device);
+	ret = platform_device_register(&usb_mass_storage_device);
+    if (ret)
+        goto exit_or_fail;
 #endif
-	return 0;
+
+exit_or_fail:
+	return ret;
 }
 
 static int android_usb_remove(struct platform_device *pdev)
