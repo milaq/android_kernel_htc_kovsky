@@ -22,7 +22,7 @@
 #include <linux/types.h>
 #include <linux/rtc.h>
 
-#include <mach/../../proc_comm_wince.h>
+#include <mach/../../dex_comm.h>
 
 #define SECSFROM_1970_TO_1980 315532800
 
@@ -42,10 +42,10 @@ msmrtc_pmlib_set_time(struct device *dev, struct rtc_time *tm)
 	rtc_tm_to_time(tm, &unix_time);
 	unix_time=unix_time-SECSFROM_1970_TO_1980; // MSM RTC starts 10 years after unix time
 
-	dex.cmd = PCOM_WRITE_RTC;
+	dex.cmd = DEX_WRITE_RTC;
 	dex.has_data = 1;
 	dex.data = unix_time;
-	msm_proc_comm_wince(&dex, 0);
+	msm_dex_comm(&dex, 0);
 
 	return 0;
 }
@@ -56,8 +56,8 @@ msmrtc_pmlib_read_time(struct device *dev, struct rtc_time *tm)
 	unsigned secs;
 	struct msm_dex_command dex;
 
-	dex.cmd = PCOM_READ_RTC;
-	msm_proc_comm_wince(&dex, &secs);
+	dex.cmd = DEX_READ_RTC;
+	msm_dex_comm(&dex, &secs);
 	secs = secs + SECSFROM_1970_TO_1980;	// MSM RTC starts 10 years after unix time
 	rtc_time_to_tm(secs, tm);
 	return 0;
@@ -140,15 +140,15 @@ msmrtc_suspend(struct platform_device *dev, pm_message_t state)
 			return 0;
 		}
 
-		dex.cmd = PCOM_READ_RTC;
-		msm_proc_comm_wince(&dex, &secs);
+		dex.cmd = DEX_READ_RTC;
+		msm_dex_comm(&dex, &secs);
 
 		printk("Wake up in %d seconds\n",diff);
 
-		dex.cmd = PCOM_SET_ALARM_RTC;
+		dex.cmd = DEX_SET_ALARM_RTC;
 		dex.has_data = 1;
 		dex.data = secs + diff;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 	}
 
 	return 0;
