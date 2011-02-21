@@ -105,7 +105,6 @@ static int verbose = 0;
 /* anyone waiting for a state change waits here */
 static DECLARE_WAIT_QUEUE_HEAD(qmi_wait_queue);
 
-
 static void qmi_dump_msg(struct qmi_msg *msg, const char *prefix)
 {
 	unsigned sz, n;
@@ -129,8 +128,7 @@ static void qmi_dump_msg(struct qmi_msg *msg, const char *prefix)
 		if (n > sz)
 			break;
 
-		printk(KERN_INFO "qmi: %s: tlv: %02x %04x { ",
-		       prefix, x[0], n);
+		printk(KERN_INFO "qmi: %s: tlv: %02x %04x { ", prefix, x[0], n);
 		x += 3;
 		sz -= n;
 		while (n-- > 0)
@@ -228,17 +226,17 @@ static int qmi_send(struct qmi_ctxt *ctxt, struct qmi_msg *msg)
 	data = msg->tlv - hlen;
 
 	/* prepend encap and qmux header */
-	*data++ = 0x01; /* ifc selector */
+	*data++ = 0x01;		/* ifc selector */
 
 	/* qmux header */
 	*data++ = len;
 	*data++ = len >> 8;
-	*data++ = 0x00; /* flags: client */
+	*data++ = 0x00;		/* flags: client */
 	*data++ = msg->service;
 	*data++ = msg->client_id;
 
 	/* qmi header */
-	*data++ = 0x00; /* flags: send */
+	*data++ = 0x00;		/* flags: send */
 	*data++ = msg->txn_id;
 	if (msg->service != QMI_CTL)
 		*data++ = msg->txn_id >> 8;
@@ -314,8 +312,7 @@ static void qmi_process_unicast_wds_msg(struct qmi_ctxt *ctxt,
 			printk(KERN_ERR
 			       "qmi: wds: network stop failed (%04x)\n", err);
 		} else {
-			printk(KERN_INFO
-			       "qmi: wds: network stopped\n");
+			printk(KERN_INFO "qmi: wds: network stopped\n");
 			ctxt->state = STATE_OFFLINE;
 			ctxt->state_dirty = 1;
 		}
@@ -324,9 +321,11 @@ static void qmi_process_unicast_wds_msg(struct qmi_ctxt *ctxt,
 		if (qmi_get_status(msg, &err)) {
 			printk(KERN_ERR
 			       "qmi: wds: network start failed (%04x)\n", err);
-		} else if (qmi_get_tlv(msg, 0x01, sizeof(ctxt->wds_handle), &ctxt->wds_handle)) {
-			printk(KERN_INFO
-			       "qmi: wds no handle?\n");
+		} else
+		    if (qmi_get_tlv
+			(msg, 0x01, sizeof(ctxt->wds_handle),
+			 &ctxt->wds_handle)) {
+			printk(KERN_INFO "qmi: wds no handle?\n");
 		} else {
 			printk(KERN_INFO
 			       "qmi: wds: got handle 0x%08x\n",
@@ -372,12 +371,12 @@ static void qmi_process_broadcast_wds_msg(struct qmi_ctxt *ctxt,
 			ctxt->state_dirty = 1;
 		}
 	} else {
-		printk(KERN_ERR "qmi: unknown bcast msg type 0x%04x\n", msg->type);
+		printk(KERN_ERR "qmi: unknown bcast msg type 0x%04x\n",
+		       msg->type);
 	}
 }
 
-static void qmi_process_wds_msg(struct qmi_ctxt *ctxt,
-				struct qmi_msg *msg)
+static void qmi_process_wds_msg(struct qmi_ctxt *ctxt, struct qmi_msg *msg)
 {
 	printk("wds: %04x @ %02x\n", msg->type, msg->client_id);
 	if (msg->client_id == ctxt->wds_client_id) {
@@ -503,17 +502,17 @@ static void qmi_open_work(struct work_struct *ws)
 static void qmi_notify(void *priv, unsigned event)
 {
 	struct qmi_ctxt *ctxt = priv;
-	
+
 	switch (event) {
-	case SMD_EVENT_DATA: {
-		int sz;
-		sz = smd_cur_packet_size(ctxt->ch);
-		if ((sz > 0) && (sz <= smd_read_avail(ctxt->ch))) {
-			wake_lock_timeout(&ctxt->wake_lock, HZ / 2);
-			queue_work(qmi_wq, &ctxt->read_work);
+	case SMD_EVENT_DATA:{
+			int sz;
+			sz = smd_cur_packet_size(ctxt->ch);
+			if ((sz > 0) && (sz <= smd_read_avail(ctxt->ch))) {
+				wake_lock_timeout(&ctxt->wake_lock, HZ / 2);
+				queue_work(qmi_wq, &ctxt->read_work);
+			}
+			break;
 		}
-		break;
-	}
 	case SMD_EVENT_OPEN:
 		printk(KERN_INFO "qmi: smd opened\n");
 		queue_work(qmi_wq, &ctxt->open_work);
@@ -648,29 +647,30 @@ static int qmi_print_state(struct qmi_ctxt *ctxt, char *buf, int max)
 	}
 
 	i = scnprintf(buf, max, "STATE=%s\n", statename);
-	i += scnprintf(buf + i, max - i, "CID=%d\n",ctxt->wds_client_id);
+	i += scnprintf(buf + i, max - i, "CID=%d\n", ctxt->wds_client_id);
 
-	if (ctxt->state != STATE_ONLINE){
+	if (ctxt->state != STATE_ONLINE) {
 		return i;
 	}
 
 	i += scnprintf(buf + i, max - i, "ADDR=%d.%d.%d.%d\n",
-		ctxt->addr[0], ctxt->addr[1], ctxt->addr[2], ctxt->addr[3]);
-	i += scnprintf(buf + i, max - i, "MASK=%d.%d.%d.%d\n",
-		ctxt->mask[0], ctxt->mask[1], ctxt->mask[2], ctxt->mask[3]);
+		       ctxt->addr[0], ctxt->addr[1], ctxt->addr[2],
+		       ctxt->addr[3]);
+	i += scnprintf(buf + i, max - i, "MASK=%d.%d.%d.%d\n", ctxt->mask[0],
+		       ctxt->mask[1], ctxt->mask[2], ctxt->mask[3]);
 	i += scnprintf(buf + i, max - i, "GATEWAY=%d.%d.%d.%d\n",
-		ctxt->gateway[0], ctxt->gateway[1], ctxt->gateway[2],
-		ctxt->gateway[3]);
-	i += scnprintf(buf + i, max - i, "DNS1=%d.%d.%d.%d\n",
-		ctxt->dns1[0], ctxt->dns1[1], ctxt->dns1[2], ctxt->dns1[3]);
-	i += scnprintf(buf + i, max - i, "DNS2=%d.%d.%d.%d\n",
-		ctxt->dns2[0], ctxt->dns2[1], ctxt->dns2[2], ctxt->dns2[3]);
+		       ctxt->gateway[0], ctxt->gateway[1], ctxt->gateway[2],
+		       ctxt->gateway[3]);
+	i += scnprintf(buf + i, max - i, "DNS1=%d.%d.%d.%d\n", ctxt->dns1[0],
+		       ctxt->dns1[1], ctxt->dns1[2], ctxt->dns1[3]);
+	i += scnprintf(buf + i, max - i, "DNS2=%d.%d.%d.%d\n", ctxt->dns2[0],
+		       ctxt->dns2[1], ctxt->dns2[2], ctxt->dns2[3]);
 
 	return i;
 }
 
-static ssize_t qmi_read(struct file *fp, char __user *buf,
-			size_t count, loff_t *pos)
+static ssize_t qmi_read(struct file *fp, char __user * buf,
+			size_t count, loff_t * pos)
 {
 	struct qmi_ctxt *ctxt = fp->private_data;
 	char msg[256];
@@ -701,9 +701,8 @@ static ssize_t qmi_read(struct file *fp, char __user *buf,
 	return len;
 }
 
-
-static ssize_t qmi_write(struct file *fp, const char __user *buf,
-			 size_t count, loff_t *pos)
+static ssize_t qmi_write(struct file *fp, const char __user * buf,
+			 size_t count, loff_t * pos)
 {
 	struct qmi_ctxt *ctxt = fp->private_data;
 	unsigned char cmd[64];
@@ -721,8 +720,8 @@ static ssize_t qmi_write(struct file *fp, const char __user *buf,
 	cmd[len] = 0;
 
 	/* lazy */
-	if (cmd[len-1] == '\n') {
-		cmd[len-1] = 0;
+	if (cmd[len - 1] == '\n') {
+		cmd[len - 1] = 0;
 		len--;
 	}
 
@@ -734,11 +733,12 @@ static ssize_t qmi_write(struct file *fp, const char __user *buf,
 		ctxt->state_dirty = 1;
 		wake_up(&qmi_wait_queue);
 	} else if (!strncmp(cmd, "down", 4)) {
-retry_down:
+ retry_down:
 		mutex_lock(&ctxt->lock);
 		if (ctxt->wds_busy) {
 			mutex_unlock(&ctxt->lock);
-			r = wait_event_interruptible(qmi_wait_queue, !ctxt->wds_busy);
+			r = wait_event_interruptible(qmi_wait_queue,
+						     !ctxt->wds_busy);
 			if (r < 0)
 				return r;
 			goto retry_down;
@@ -747,17 +747,18 @@ retry_down:
 		qmi_network_down(ctxt);
 		mutex_unlock(&ctxt->lock);
 	} else if (!strncmp(cmd, "up:", 3)) {
-retry_up:
+ retry_up:
 		mutex_lock(&ctxt->lock);
 		if (ctxt->wds_busy) {
 			mutex_unlock(&ctxt->lock);
-			r = wait_event_interruptible(qmi_wait_queue, !ctxt->wds_busy);
+			r = wait_event_interruptible(qmi_wait_queue,
+						     !ctxt->wds_busy);
 			if (r < 0)
 				return r;
 			goto retry_up;
 		}
 		ctxt->wds_busy = 1;
-		qmi_network_up(ctxt, cmd+3);
+		qmi_network_up(ctxt, cmd + 3);
 		mutex_unlock(&ctxt->lock);
 	} else {
 		return -EINVAL;
@@ -804,26 +805,28 @@ static struct file_operations qmi_fops = {
 static struct qmi_ctxt qmi_device0 = {
 	.ch_name = "SMD_DATA5_CNTL",
 	.misc = {
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "qmi0",
-		.fops = &qmi_fops,
-	}
+		 .minor = MISC_DYNAMIC_MINOR,
+		 .name = "qmi0",
+		 .fops = &qmi_fops,
+		 }
 };
+
 static struct qmi_ctxt qmi_device1 = {
 	.ch_name = "SMD_DATA6_CNTL",
 	.misc = {
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "qmi1",
-		.fops = &qmi_fops,
-	}
+		 .minor = MISC_DYNAMIC_MINOR,
+		 .name = "qmi1",
+		 .fops = &qmi_fops,
+		 }
 };
+
 static struct qmi_ctxt qmi_device2 = {
 	.ch_name = "SMD_DATA7_CNTL",
 	.misc = {
-		.minor = MISC_DYNAMIC_MINOR,
-		.name = "qmi2",
-		.fops = &qmi_fops,
-	}
+		 .minor = MISC_DYNAMIC_MINOR,
+		 .name = "qmi2",
+		 .fops = &qmi_fops,
+		 }
 };
 
 static struct qmi_ctxt *qmi_minor_to_ctxt(unsigned n)

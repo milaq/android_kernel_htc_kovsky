@@ -1,4 +1,4 @@
-/* arch/arm/mach-msm/proc_comm_wince.c
+/* arch/arm/mach-msm/dex_comm.c
  *
  * Author: maejrep
  *
@@ -23,7 +23,7 @@
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
 
-#include "proc_comm_wince.h"
+#include "dex_comm.h"
 
 #define MSM_A2M_INT(n) (MSM_CSR_BASE + 0x400 + (n) * 4)
 
@@ -57,7 +57,7 @@ int (*msm_check_for_modem_crash)(void);
 
 #define TIMEOUT (10000000) /* 10s in microseconds */
 
-int msm_proc_comm_wince(struct msm_dex_command * in, unsigned *out)
+int msm_dex_comm(struct msm_dex_command * in, unsigned *out)
 {
 #if !defined(CONFIG_MSM_AMSS_VERSION_WINCE)
   #warning NON-WinCE compatible AMSS version selected. WinCE proc_comm implementation is disabled and stubbed to return -EIO.
@@ -153,13 +153,8 @@ end:
 #endif
 }
 
-#define MDM_COMMAND 0x10
-#define MDM_STATUS  0x14
-#define MDM_DATA1   0x18
-#define MDM_DATA2   0x1C
-
 // Initialize PCOM registers
-int msm_proc_comm_wince_init()
+int msm_dex_comm_init()
 {
 #if !defined(CONFIG_MSM_AMSS_VERSION_WINCE)
         return 0;
@@ -176,12 +171,6 @@ int msm_proc_comm_wince_init()
 	writel(0, base + PC_STATUS);
 
 	spin_unlock_irqrestore(&proc_comm_lock, flags);
-	printk(KERN_INFO "%s: WinCE PCOM initialized.\n", __func__);
-	printk(KERN_INFO "[PCOM] MDM_STATUS = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_STATUS));
-	printk(KERN_INFO "[PCOM] MDM_COMMAND = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_COMMAND));
-	printk(KERN_INFO "[PCOM] MDM_DATA1 = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_DATA1));
-	printk(KERN_INFO "[PCOM] MDM_DATA2 = %d\n", readl(MSM_SHARED_RAM_BASE + MDM_DATA2));
-
 	return 0;
 #endif
 }

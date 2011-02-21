@@ -90,7 +90,7 @@ static smd_channel_t *smd_channel;
 static int initialized;
 static wait_queue_head_t newserver_wait;
 static wait_queue_head_t smd_wait;
-static int smd_wait_count; /* odd while waiting */
+static int smd_wait_count;	/* odd while waiting */
 
 static DEFINE_SPINLOCK(local_endpoints_lock);
 static DEFINE_SPINLOCK(remote_endpoints_lock);
@@ -120,17 +120,16 @@ static DECLARE_WORK(work_create_rpcrouter_pdev, do_create_rpcrouter_pdev);
 struct rr_context {
 	struct rr_packet *pkt;
 	uint8_t *ptr;
-	uint32_t state; /* current assembly state */
-	uint32_t count; /* bytes needed in this state */
+	uint32_t state;		/* current assembly state */
+	uint32_t count;		/* bytes needed in this state */
 };
 
 struct rr_context the_rr_context;
 
 static struct platform_device rpcrouter_pdev = {
-	.name		= "oncrpc_router",
-	.id		= -1,
+	.name = "oncrpc_router",
+	.id = -1,
 };
-
 
 static int rpcrouter_send_control_msg(union rr_control_msg *msg)
 {
@@ -169,9 +168,8 @@ static int rpcrouter_send_control_msg(union rr_control_msg *msg)
 }
 
 static struct rr_server *rpcrouter_create_server(uint32_t pid,
-							uint32_t cid,
-							uint32_t prog,
-							uint32_t ver)
+						 uint32_t cid,
+						 uint32_t prog, uint32_t ver)
 {
 	struct rr_server *server;
 	unsigned long flags;
@@ -197,7 +195,7 @@ static struct rr_server *rpcrouter_create_server(uint32_t pid,
 			goto out_fail;
 	}
 	return server;
-out_fail:
+ out_fail:
 	spin_lock_irqsave(&server_list_lock, flags);
 	list_del(&server->list);
 	spin_unlock_irqrestore(&server_list_lock, flags);
@@ -223,8 +221,7 @@ static struct rr_server *rpcrouter_lookup_server(uint32_t prog, uint32_t ver)
 
 	spin_lock_irqsave(&server_list_lock, flags);
 	list_for_each_entry(server, &server_list, list) {
-		if (server->prog == prog
-		 && server->vers == ver) {
+		if (server->prog == prog && server->vers == ver) {
 			spin_unlock_irqrestore(&server_list_lock, flags);
 			return server;
 		}
@@ -286,7 +283,8 @@ struct msm_rpc_endpoint *msm_rpcrouter_create_local_endpoint(dev_t dev)
 		ept->dst_vers = cpu_to_be32(srv->vers);
 		ept->flags |= MSM_RPC_ENABLE_RECEIVE;
 
-		D("Creating local ept %p @ %08x:%08x\n", ept, srv->prog, srv->vers);
+		D("Creating local ept %p @ %08x:%08x\n", ept, srv->prog,
+		  srv->vers);
 	} else {
 		/* mark not connected */
 		ept->dst_pid = 0xffffffff;
@@ -430,8 +428,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 
 		r_ept = rpcrouter_lookup_remote_endpoint(msg->cli.cid);
 		if (!r_ept) {
-			printk(KERN_ERR
-			       "rpcrouter: Unable to resume client\n");
+			printk(KERN_ERR "rpcrouter: Unable to resume client\n");
 			break;
 		}
 		spin_lock_irqsave(&r_ept->quota_lock, flags);
@@ -447,9 +444,10 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 		server = rpcrouter_lookup_server(msg->srv.prog, msg->srv.vers);
 
 		if (!server) {
-			server = rpcrouter_create_server(
-				msg->srv.pid, msg->srv.cid,
-				msg->srv.prog, msg->srv.vers);
+			server =
+			    rpcrouter_create_server(msg->srv.pid, msg->srv.cid,
+						    msg->srv.prog,
+						    msg->srv.vers);
 			if (!server)
 				return -ENOMEM;
 			/*
@@ -458,12 +456,12 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 			 * if we get a NEW_SERVER notification
 			 */
 			if (!rpcrouter_lookup_remote_endpoint(msg->srv.cid)) {
-				rc = rpcrouter_create_remote_endpoint(
-					msg->srv.cid);
+				rc = rpcrouter_create_remote_endpoint(msg->srv.
+								      cid);
 				if (rc < 0)
 					printk(KERN_ERR
-						"rpcrouter:Client create"
-						"error (%d)\n", rc);
+					       "rpcrouter:Client create"
+					       "error (%d)\n", rc);
 			}
 			schedule_work(&work_create_pdevs);
 			wake_up(&newserver_wait);
@@ -570,8 +568,8 @@ static int rr_read(void *data, int len)
 {
 	int rc;
 	unsigned long flags;
-//	printk("rr_read() %d\n", len);
-	for(;;) {
+//      printk("rr_read() %d\n", len);
+	for (;;) {
 		spin_lock_irqsave(&smd_lock, flags);
 		if (smd_read_avail(smd_channel) >= len) {
 			rc = smd_read(smd_channel, data, len);
@@ -585,7 +583,7 @@ static int rr_read(void *data, int len)
 		wake_unlock(&rpcrouter_wake_lock);
 		spin_unlock_irqrestore(&smd_lock, flags);
 
-//		printk("rr_read: waiting (%d)\n", len);
+//              printk("rr_read: waiting (%d)\n", len);
 		smd_wait_count++;
 		wake_up(&smd_wait);
 		wait_event(smd_wait, smd_read_avail(smd_channel) >= len);
@@ -626,7 +624,7 @@ static void do_read_data(struct work_struct *work)
 	if (hdr.dst_cid == RPCROUTER_ROUTER_ADDRESS) {
 		if (rr_read(r2r_buf, hdr.size))
 			goto fail_io;
-		process_control_msg((void*) r2r_buf, hdr.size);
+		process_control_msg((void *)r2r_buf, hdr.size);
 		goto done;
 	}
 
@@ -683,19 +681,19 @@ static void do_read_data(struct work_struct *work)
 		goto done;
 	}
 
-packet_complete:
+ packet_complete:
 	spin_lock_irqsave(&ept->read_q_lock, flags);
 	if (ept->flags & MSM_RPC_ENABLE_RECEIVE) {
 		wake_lock(&ept->read_q_wake_lock);
 		list_add_tail(&pkt->list, &ept->read_q);
 		wake_up(&ept->wait_q);
 	} else {
-		pr_warning("smd_rpcrouter: Unexpected incoming data on %08x:%08x\n",
-				be32_to_cpu(ept->dst_prog),
-				be32_to_cpu(ept->dst_vers));
+		pr_warning
+		    ("smd_rpcrouter: Unexpected incoming data on %08x:%08x\n",
+		     be32_to_cpu(ept->dst_prog), be32_to_cpu(ept->dst_vers));
 	}
 	spin_unlock_irqrestore(&ept->read_q_lock, flags);
-done:
+ done:
 
 	if (hdr.confirm_rx) {
 		union rr_control_msg msg;
@@ -711,8 +709,8 @@ done:
 	queue_work(rpcrouter_workqueue, &work_read_data);
 	return;
 
-fail_io:
-fail_data:
+ fail_io:
+ fail_data:
 	printk(KERN_ERR "rpc_router has died\n");
 	wake_unlock(&rpcrouter_wake_lock);
 }
@@ -743,13 +741,13 @@ int msm_rpc_close(struct msm_rpc_endpoint *ept)
 {
 	return msm_rpcrouter_destroy_local_endpoint(ept);
 }
+
 EXPORT_SYMBOL(msm_rpc_close);
 
 static int msm_rpc_write_pkt(struct msm_rpc_endpoint *ept,
 			     struct rr_remote_endpoint *r_ept,
 			     struct rr_header *hdr,
-			     uint32_t pacmark,
-			     void *buffer, int count)
+			     uint32_t pacmark, void *buffer, int count)
 {
 	DEFINE_WAIT(__wait);
 	unsigned long flags;
@@ -828,12 +826,10 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 			printk(KERN_ERR "rr_write: not connected\n");
 			return -ENOTCONN;
 		}
-
 #if !defined(CONFIG_MSM_LEGACY_7X00A_AMSS)
 		if ((ept->dst_prog != rq->prog) ||
-			!msm_rpc_is_compatible_version(
-					be32_to_cpu(ept->dst_vers),
-					be32_to_cpu(rq->vers))) {
+		    !msm_rpc_is_compatible_version(be32_to_cpu(ept->dst_vers),
+						   be32_to_cpu(rq->vers))) {
 #else
 		if (ept->dst_prog != rq->prog || ept->dst_vers != rq->vers) {
 #endif
@@ -847,11 +843,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		}
 		hdr.dst_pid = ept->dst_pid;
 		hdr.dst_cid = ept->dst_cid;
-		IO("CALL on ept %p to %08x:%08x @ %d:%08x (%d bytes) (xid %x proc %x)\n",
-		   ept,
-		   be32_to_cpu(rq->prog), be32_to_cpu(rq->vers),
-		   ept->dst_pid, ept->dst_cid, count,
-		   be32_to_cpu(rq->xid), be32_to_cpu(rq->procedure));
+		IO("CALL on ept %p to %08x:%08x @ %d:%08x (%d bytes) (xid %x proc %x)\n", ept, be32_to_cpu(rq->prog), be32_to_cpu(rq->vers), ept->dst_pid, ept->dst_cid, count, be32_to_cpu(rq->xid), be32_to_cpu(rq->procedure));
 	} else {
 		/* RPC REPLY */
 		/* TODO: locking */
@@ -869,18 +861,17 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		printk(KERN_ERR "rr_write: rejecting packet w/ bad xid\n");
 		return -EINVAL;
 
-found_rroute:
+ found_rroute:
 		IO("REPLY on ept %p to xid=%d @ %d:%08x (%d bytes)\n",
-		   ept,
-		   be32_to_cpu(rq->xid), hdr.dst_pid, hdr.dst_cid, count);
+		   ept, be32_to_cpu(rq->xid), hdr.dst_pid, hdr.dst_cid, count);
 	}
 
 	r_ept = rpcrouter_lookup_remote_endpoint(hdr.dst_cid);
 
 	if (!r_ept) {
 		printk(KERN_ERR
-			"msm_rpc_write(): No route to ept "
-			"[PID %x CID %x]\n", hdr.dst_pid, hdr.dst_cid);
+		       "msm_rpc_write(): No route to ept "
+		       "[PID %x CID %x]\n", hdr.dst_pid, hdr.dst_cid);
 		return -EHOSTUNREACH;
 	}
 
@@ -910,7 +901,8 @@ found_rroute:
 		 */
 		pacmark = PACMARK(xfer, mid, (total == count), (xfer == count));
 
-		ret = msm_rpc_write_pkt(ept, r_ept, &hdr, pacmark, buffer, xfer);
+		ret =
+		    msm_rpc_write_pkt(ept, r_ept, &hdr, pacmark, buffer, xfer);
 		if (ret < 0)
 			return ret;
 
@@ -920,6 +912,7 @@ found_rroute:
 
 	return total;
 }
+
 EXPORT_SYMBOL(msm_rpc_write);
 
 /*
@@ -940,7 +933,7 @@ int msm_rpc_read(struct msm_rpc_endpoint *ept, void **buffer,
 	 * returned as-is (the buffer is at the front)
 	 */
 	if (frag->next == 0) {
-		*buffer = (void*) frag;
+		*buffer = (void *)frag;
 		return rc;
 	}
 
@@ -962,19 +955,17 @@ int msm_rpc_read(struct msm_rpc_endpoint *ept, void **buffer,
 }
 
 int msm_rpc_call(struct msm_rpc_endpoint *ept, uint32_t proc,
-		 void *_request, int request_size,
-		 long timeout)
+		 void *_request, int request_size, long timeout)
 {
 	return msm_rpc_call_reply(ept, proc,
-				  _request, request_size,
-				  NULL, 0, timeout);
+				  _request, request_size, NULL, 0, timeout);
 }
+
 EXPORT_SYMBOL(msm_rpc_call);
 
 int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 		       void *_request, int request_size,
-		       void *_reply, int reply_size,
-		       long timeout)
+		       void *_reply, int reply_size, long timeout)
 {
 	struct rpc_request_hdr *req = _request;
 	struct rpc_reply_hdr *reply;
@@ -1004,7 +995,7 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 		goto error;
 
 	for (;;) {
-		rc = msm_rpc_read(ept, (void*) &reply, -1, timeout);
+		rc = msm_rpc_read(ept, (void *)&reply, -1, timeout);
 		if (rc < 0)
 			goto error;
 		if (rc < (3 * sizeof(uint32_t))) {
@@ -1044,14 +1035,14 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 		break;
 	}
 	kfree(reply);
-error:
+ error:
 	ept->flags &= ~MSM_RPC_ENABLE_RECEIVE;
 	wake_unlock(&ept->read_q_wake_lock);
 
 	return rc;
 }
-EXPORT_SYMBOL(msm_rpc_call_reply);
 
+EXPORT_SYMBOL(msm_rpc_call_reply);
 
 static inline int ept_packet_available(struct msm_rpc_endpoint *ept)
 {
@@ -1064,8 +1055,7 @@ static inline int ept_packet_available(struct msm_rpc_endpoint *ept)
 }
 
 int __msm_rpc_read(struct msm_rpc_endpoint *ept,
-		   struct rr_fragment **frag_ret,
-		   unsigned len, long timeout)
+		   struct rr_fragment **frag_ret, unsigned len, long timeout)
 {
 	struct rr_packet *pkt;
 	struct rpc_request_hdr *rq;
@@ -1079,22 +1069,23 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 		if (timeout < 0) {
 			wait_event(ept->wait_q, ept_packet_available(ept));
 		} else {
-			rc = wait_event_timeout(
-				ept->wait_q, ept_packet_available(ept),
-				timeout);
+			rc = wait_event_timeout(ept->wait_q,
+						ept_packet_available(ept),
+						timeout);
 			if (rc == 0)
 				return -ETIMEDOUT;
 		}
 	} else {
 		if (timeout < 0) {
-			rc = wait_event_interruptible(
-				ept->wait_q, ept_packet_available(ept));
+			rc = wait_event_interruptible(ept->wait_q,
+						      ept_packet_available
+						      (ept));
 			if (rc < 0)
 				return rc;
 		} else {
-			rc = wait_event_interruptible_timeout(
-				ept->wait_q, ept_packet_available(ept),
-				timeout);
+			rc = wait_event_interruptible_timeout(ept->wait_q,
+							      ept_packet_available
+							      (ept), timeout);
 			if (rc == 0)
 				return -ETIMEDOUT;
 		}
@@ -1118,12 +1109,11 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 	rc = pkt->length;
 
 	*frag_ret = pkt->first;
-	rq = (void*) pkt->first->data;
+	rq = (void *)pkt->first->data;
 	if ((rc >= (sizeof(uint32_t) * 3)) && (rq->type == 0)) {
 		IO("READ on ept %p is a CALL on %08x:%08x proc %d xid %d\n",
-			ept, be32_to_cpu(rq->prog), be32_to_cpu(rq->vers),
-			be32_to_cpu(rq->procedure),
-			be32_to_cpu(rq->xid));
+		   ept, be32_to_cpu(rq->prog), be32_to_cpu(rq->vers),
+		   be32_to_cpu(rq->procedure), be32_to_cpu(rq->xid));
 		/* RPC CALL */
 		if (ept->rroute[ept->next_rroute].pid != 0xffffffff) {
 			printk(KERN_WARNING
@@ -1133,12 +1123,14 @@ int __msm_rpc_read(struct msm_rpc_endpoint *ept,
 		ept->rroute[ept->next_rroute].pid = pkt->hdr.src_pid;
 		ept->rroute[ept->next_rroute].cid = pkt->hdr.src_cid;
 		ept->rroute[ept->next_rroute].xid = rq->xid;
-		ept->next_rroute = (ept->next_rroute + 1) & (MAX_REPLY_ROUTE - 1);
+		ept->next_rroute =
+		    (ept->next_rroute + 1) & (MAX_REPLY_ROUTE - 1);
 	}
 #if TRACE_RPC_MSG
 	else if ((rc >= (sizeof(uint32_t) * 3)) && (rq->type == 1))
 		IO("READ on ept %p is a REPLY\n", ept);
-	else IO("READ on ept %p (%d bytes)\n", ept, rc);
+	else
+		IO("READ on ept %p (%d bytes)\n", ept, rc);
 #endif
 
 	kfree(pkt);
@@ -1158,17 +1150,17 @@ int msm_rpc_is_compatible_version(uint32_t server_version,
 
 	return ((server_version & RPC_VERSION_MAJOR_MASK) ==
 		(client_version & RPC_VERSION_MAJOR_MASK)) &&
-		((server_version & RPC_VERSION_MINOR_MASK) >=
-		(client_version & RPC_VERSION_MINOR_MASK));
+	    ((server_version & RPC_VERSION_MINOR_MASK) >=
+	     (client_version & RPC_VERSION_MINOR_MASK));
 }
+
 EXPORT_SYMBOL(msm_rpc_is_compatible_version);
 
 static int msm_rpc_get_compatible_server(uint32_t prog,
-					uint32_t ver,
-					uint32_t *found_vers)
+					 uint32_t ver, uint32_t * found_vers)
 {
 	struct rr_server *server;
-	unsigned long     flags;
+	unsigned long flags;
 	if (found_vers == NULL)
 		return 0;
 
@@ -1186,7 +1178,8 @@ static int msm_rpc_get_compatible_server(uint32_t prog,
 }
 #endif
 
-struct msm_rpc_endpoint *msm_rpc_connect(uint32_t prog, uint32_t vers, unsigned flags)
+struct msm_rpc_endpoint *msm_rpc_connect(uint32_t prog, uint32_t vers,
+					 unsigned flags)
 {
 	struct msm_rpc_endpoint *ept;
 	struct rr_server *server;
@@ -1198,7 +1191,7 @@ struct msm_rpc_endpoint *msm_rpc_connect(uint32_t prog, uint32_t vers, unsigned 
 			return ERR_PTR(-EHOSTUNREACH);
 		if (found_vers != vers) {
 			D("RPC using new version %08x:{%08x --> %08x}\n",
-			 	prog, vers, found_vers);
+			  prog, vers, found_vers);
 			vers = found_vers;
 		}
 	}
@@ -1220,12 +1213,14 @@ struct msm_rpc_endpoint *msm_rpc_connect(uint32_t prog, uint32_t vers, unsigned 
 
 	return ept;
 }
+
 EXPORT_SYMBOL(msm_rpc_connect);
 
-uint32_t msm_rpc_get_vers(struct msm_rpc_endpoint *ept)
+uint32_t msm_rpc_get_vers(struct msm_rpc_endpoint * ept)
 {
 	return be32_to_cpu(ept->dst_vers);
 }
+
 EXPORT_SYMBOL(msm_rpc_get_vers);
 
 /* TODO: permission check? */
@@ -1236,8 +1231,7 @@ int msm_rpc_register_server(struct msm_rpc_endpoint *ept,
 	union rr_control_msg msg;
 	struct rr_server *server;
 
-	server = rpcrouter_create_server(ept->pid, ept->cid,
-					 prog, vers);
+	server = rpcrouter_create_server(ept->pid, ept->cid, prog, vers);
 	if (!server)
 		return -ENODEV;
 
@@ -1311,7 +1305,7 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 }
 
 static int msm_rpcrouter_suspend(struct platform_device *pdev,
-					pm_message_t state)
+				 pm_message_t state)
 {
 	/* Wait until the worker thread has waited at least once so that it
 	 * gets a chance to release its wakelock.
@@ -1323,12 +1317,12 @@ static int msm_rpcrouter_suspend(struct platform_device *pdev,
 }
 
 static struct platform_driver msm_smd_channel2_driver = {
-	.probe		= msm_rpcrouter_probe,
-	.driver		= {
-			.name	= "SMD_RPCCALL",
-			.owner	= THIS_MODULE,
-	},
-	.suspend	= msm_rpcrouter_suspend,
+	.probe = msm_rpcrouter_probe,
+	.driver = {
+		   .name = "SMD_RPCCALL",
+		   .owner = THIS_MODULE,
+		   },
+	.suspend = msm_rpcrouter_suspend,
 };
 
 static int __init rpcrouter_init(void)

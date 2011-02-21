@@ -41,12 +41,12 @@ struct smd_tty_info {
 static struct smd_tty_info smd_tty[MAX_SMD_TTYS];
 
 static const struct smd_tty_channel_desc smd_default_tty_channels[] = {
-	{ .id = 0, .name = "SMD_DS" },
-	{ .id = 27, .name = "SMD_GPSNMEA" },
+	{.id = 0,.name = "SMD_DS"},
+	{.id = 27,.name = "SMD_GPSNMEA"},
 };
 
 static const struct smd_tty_channel_desc *smd_tty_channels =
-		smd_default_tty_channels;
+    smd_default_tty_channels;
 static int smd_tty_channels_len = ARRAY_SIZE(smd_default_tty_channels);
 
 int smd_set_channel_list(const struct smd_tty_channel_desc *channels, int len)
@@ -70,17 +70,19 @@ static void smd_tty_notify(void *priv, unsigned event)
 		return;
 
 	for (;;) {
-		if (test_bit(TTY_THROTTLED, &tty->flags)) break;
+		if (test_bit(TTY_THROTTLED, &tty->flags))
+			break;
 		avail = smd_read_avail(info->ch);
-		if (avail == 0) break;
+		if (avail == 0)
+			break;
 
 		avail = tty_prepare_flip_string(tty, &ptr, avail);
 
 		if (smd_read(info->ch, ptr, avail) != avail) {
 			/* shouldn't be possible since we're in interrupt
-			** context here and nobody else could 'steal' our
-			** characters.
-			*/
+			 ** context here and nobody else could 'steal' our
+			 ** characters.
+			 */
 			printk(KERN_ERR "OOPS - smd_tty_buffer mismatch?!");
 		}
 
@@ -148,15 +150,16 @@ static void smd_tty_close(struct tty_struct *tty, struct file *f)
 	mutex_unlock(&smd_tty_lock);
 }
 
-static int smd_tty_write(struct tty_struct *tty, const unsigned char *buf, int len)
+static int smd_tty_write(struct tty_struct *tty, const unsigned char *buf,
+			 int len)
 {
 	struct smd_tty_info *info = tty->driver_data;
 	int avail;
 
 	/* if we're writing to a packet channel we will
-	** never be able to write more data than there
-	** is currently space for
-	*/
+	 ** never be able to write more data than there
+	 ** is currently space for
+	 */
 	avail = smd_write_avail(info->ch);
 	if (len > avail)
 		len = avail;
@@ -214,11 +217,12 @@ static int __init smd_tty_init(void)
 	smd_tty_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
 	smd_tty_driver->init_termios.c_lflag = 0;
 	smd_tty_driver->flags = TTY_DRIVER_RESET_TERMIOS |
-		TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
+	    TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
 	tty_set_operations(smd_tty_driver, &smd_tty_ops);
 
 	ret = tty_register_driver(smd_tty_driver);
-	if (ret) return ret;
+	if (ret)
+		return ret;
 
 	for (i = 0; i < smd_tty_channels_len; i++)
 		tty_register_device(smd_tty_driver, smd_tty_channels[i].id, 0);

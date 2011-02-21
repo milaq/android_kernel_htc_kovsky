@@ -67,19 +67,19 @@ static int rpcrouter_open(struct inode *inode, struct file *filp)
 static int rpcrouter_release(struct inode *inode, struct file *filp)
 {
 	struct msm_rpc_endpoint *ept;
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *)filp->private_data;
 
 	return msm_rpcrouter_destroy_local_endpoint(ept);
 }
 
-static ssize_t rpcrouter_read(struct file *filp, char __user *buf,
-			      size_t count, loff_t *ppos)
+static ssize_t rpcrouter_read(struct file *filp, char __user * buf,
+			      size_t count, loff_t * ppos)
 {
 	struct msm_rpc_endpoint *ept;
 	struct rr_fragment *frag, *next;
 	int rc;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *)filp->private_data;
 
 	rc = __msm_rpc_read(ept, &frag, count, -1);
 	if (rc < 0)
@@ -87,7 +87,7 @@ static ssize_t rpcrouter_read(struct file *filp, char __user *buf,
 
 	count = rc;
 
-	while (frag != NULL) {		
+	while (frag != NULL) {
 		if (copy_to_user(buf, frag->data, frag->length)) {
 			printk(KERN_ERR
 			       "rpcrouter: could not copy all read data to user!\n");
@@ -102,14 +102,14 @@ static ssize_t rpcrouter_read(struct file *filp, char __user *buf,
 	return rc;
 }
 
-static ssize_t rpcrouter_write(struct file *filp, const char __user *buf,
-				size_t count, loff_t *ppos)
+static ssize_t rpcrouter_write(struct file *filp, const char __user * buf,
+			       size_t count, loff_t * ppos)
 {
-	struct msm_rpc_endpoint	*ept;
+	struct msm_rpc_endpoint *ept;
 	int rc = 0;
 	void *k_buffer;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *)filp->private_data;
 
 	/* A check for safety, this seems non-standard */
 	if (count > SAFETY_MEM_SIZE)
@@ -129,7 +129,7 @@ static ssize_t rpcrouter_write(struct file *filp, const char __user *buf,
 		goto write_out_free;
 
 	rc = count;
-write_out_free:
+ write_out_free:
 	kfree(k_buffer);
 	return rc;
 }
@@ -139,7 +139,7 @@ static unsigned int rpcrouter_poll(struct file *filp,
 {
 	struct msm_rpc_endpoint *ept;
 	unsigned mask = 0;
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *)filp->private_data;
 
 	/* If there's data already in the read queue, return POLLIN.
 	 * Else, wait for the requested amount of time, and check again.
@@ -165,12 +165,12 @@ static long rpcrouter_ioctl(struct file *filp, unsigned int cmd,
 	int rc = 0;
 	uint32_t n;
 
-	ept = (struct msm_rpc_endpoint *) filp->private_data;
+	ept = (struct msm_rpc_endpoint *)filp->private_data;
 	switch (cmd) {
 
 	case RPC_ROUTER_IOCTL_GET_VERSION:
 		n = RPC_ROUTER_VERSION_V1;
-		rc = put_user(n, (unsigned int *) arg);
+		rc = put_user(n, (unsigned int *)arg);
 		break;
 
 	case RPC_ROUTER_IOCTL_GET_MTU:
@@ -178,28 +178,26 @@ static long rpcrouter_ioctl(struct file *filp, unsigned int cmd,
 		 * possible per message
 		 */
 		n = RPCROUTER_MSGSIZE_MAX - sizeof(uint32_t);
-		rc = put_user(n, (unsigned int *) arg);
+		rc = put_user(n, (unsigned int *)arg);
 		break;
 
 	case RPC_ROUTER_IOCTL_REGISTER_SERVER:
-		rc = copy_from_user(&server_args, (void *) arg,
+		rc = copy_from_user(&server_args, (void *)arg,
 				    sizeof(server_args));
 		if (rc < 0)
 			break;
 		msm_rpc_register_server(ept,
-					server_args.prog,
-					server_args.vers);
+					server_args.prog, server_args.vers);
 		break;
 
 	case RPC_ROUTER_IOCTL_UNREGISTER_SERVER:
-		rc = copy_from_user(&server_args, (void *) arg,
+		rc = copy_from_user(&server_args, (void *)arg,
 				    sizeof(server_args));
 		if (rc < 0)
 			break;
 
 		msm_rpc_unregister_server(ept,
-					  server_args.prog,
-					  server_args.vers);
+					  server_args.prog, server_args.vers);
 		break;
 
 	case RPC_ROUTER_IOCTL_GET_MINOR_VERSION:
@@ -216,22 +214,22 @@ static long rpcrouter_ioctl(struct file *filp, unsigned int cmd,
 }
 
 static struct file_operations rpcrouter_server_fops = {
-	.owner	 = THIS_MODULE,
-	.open	 = rpcrouter_open,
+	.owner = THIS_MODULE,
+	.open = rpcrouter_open,
 	.release = rpcrouter_release,
-	.read	 = rpcrouter_read,
-	.write	 = rpcrouter_write,
-	.poll    = rpcrouter_poll,
-	.unlocked_ioctl	 = rpcrouter_ioctl,
+	.read = rpcrouter_read,
+	.write = rpcrouter_write,
+	.poll = rpcrouter_poll,
+	.unlocked_ioctl = rpcrouter_ioctl,
 };
 
 static struct file_operations rpcrouter_router_fops = {
-	.owner	 = THIS_MODULE,
-	.open	 = rpcrouter_open,
+	.owner = THIS_MODULE,
+	.open = rpcrouter_open,
 	.release = rpcrouter_release,
-	.read	 = rpcrouter_read,
-	.write	 = rpcrouter_write,
-	.poll    = rpcrouter_poll,
+	.read = rpcrouter_read,
+	.write = rpcrouter_write,
+	.poll = rpcrouter_poll,
 	.unlocked_ioctl = rpcrouter_ioctl,
 };
 
@@ -246,7 +244,6 @@ int msm_rpcrouter_create_server_cdev(struct rr_server *server)
 		       "RPCROUTER_MAX_REMOTE_SERVERS\n");
 		return -ENOBUFS;
 	}
-
 #if !defined(CONFIG_MSM_LEGACY_7X00A_AMSS)
 	/* Servers with bit 31 set are remote msm servers with hashkey version.
 	 * Servers with bit 31 not set are remote msm servers with
@@ -262,13 +259,12 @@ int msm_rpcrouter_create_server_cdev(struct rr_server *server)
 	dev_vers = server->vers;
 #endif
 
-	server->device_number =
-		MKDEV(MAJOR(msm_rpcrouter_devno), next_minor++);
+	server->device_number = MKDEV(MAJOR(msm_rpcrouter_devno), next_minor++);
 
 	server->device =
-		device_create(msm_rpcrouter_class, rpcrouter_device,
-			      server->device_number, NULL, "%.8x:%.8x",
-			      server->prog, dev_vers);
+	    device_create(msm_rpcrouter_class, rpcrouter_device,
+			  server->device_number, NULL, "%.8x:%.8x",
+			  server->prog, dev_vers);
 	if (IS_ERR(server->device)) {
 		printk(KERN_ERR
 		       "rpcrouter: Unable to create device (%ld)\n",
@@ -281,8 +277,7 @@ int msm_rpcrouter_create_server_cdev(struct rr_server *server)
 
 	rc = cdev_add(&server->cdev, server->device_number, 1);
 	if (rc < 0) {
-		printk(KERN_ERR
-		       "rpcrouter: Unable to add chrdev (%d)\n", rc);
+		printk(KERN_ERR "rpcrouter: Unable to add chrdev (%d)\n", rc);
 		device_destroy(msm_rpcrouter_class, server->device_number);
 		return rc;
 	}
@@ -295,8 +290,7 @@ int msm_rpcrouter_create_server_cdev(struct rr_server *server)
  */
 int msm_rpcrouter_create_server_pdev(struct rr_server *server)
 {
-	sprintf(server->pdev_name, "rs%.8x:%.8x",
-		server->prog,
+	sprintf(server->pdev_name, "rs%.8x:%.8x", server->prog,
 #if !defined(CONFIG_MSM_LEGACY_7X00A_AMSS)
 		(server->vers & RPC_VERSION_MODE_MASK) ? server->vers :
 		(server->vers & RPC_VERSION_MAJOR_MASK));
@@ -323,14 +317,12 @@ int msm_rpcrouter_init_devices(void)
 	msm_rpcrouter_class = class_create(THIS_MODULE, "oncrpc");
 	if (IS_ERR(msm_rpcrouter_class)) {
 		rc = -ENOMEM;
-		printk(KERN_ERR
-		       "rpcrouter: failed to create oncrpc class\n");
+		printk(KERN_ERR "rpcrouter: failed to create oncrpc class\n");
 		goto fail;
 	}
 
 	rc = alloc_chrdev_region(&msm_rpcrouter_devno, 0,
-				 RPCROUTER_MAX_REMOTE_SERVERS + 1,
-				 "oncrpc");
+				 RPCROUTER_MAX_REMOTE_SERVERS + 1, "oncrpc");
 	if (rc < 0) {
 		printk(KERN_ERR
 		       "rpcrouter: Failed to alloc chardev region (%d)\n", rc);
@@ -355,14 +347,14 @@ int msm_rpcrouter_init_devices(void)
 
 	return 0;
 
-fail_destroy_device:
+ fail_destroy_device:
 	device_destroy(msm_rpcrouter_class, msm_rpcrouter_devno);
-fail_unregister_cdev_region:
+ fail_unregister_cdev_region:
 	unregister_chrdev_region(msm_rpcrouter_devno,
 				 RPCROUTER_MAX_REMOTE_SERVERS + 1);
-fail_destroy_class:
+ fail_destroy_class:
 	class_destroy(msm_rpcrouter_class);
-fail:
+ fail:
 	return rc;
 }
 
@@ -374,4 +366,3 @@ void msm_rpcrouter_exit_devices(void)
 				 RPCROUTER_MAX_REMOTE_SERVERS + 1);
 	class_destroy(msm_rpcrouter_class);
 }
-

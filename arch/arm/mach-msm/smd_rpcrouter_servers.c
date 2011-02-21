@@ -112,7 +112,7 @@ static int rpc_send_accepted_void_reply(struct msm_rpc_endpoint *client,
 	struct rpc_reply_hdr *reply = (struct rpc_reply_hdr *)reply_buf;
 
 	reply->xid = cpu_to_be32(xid);
-	reply->type = cpu_to_be32(1); /* reply */
+	reply->type = cpu_to_be32(1);	/* reply */
 	reply->reply_stat = cpu_to_be32(RPCMSG_REPLYSTAT_ACCEPTED);
 
 	reply->data.acc_hdr.accept_stat = cpu_to_be32(accept_status);
@@ -122,8 +122,7 @@ static int rpc_send_accepted_void_reply(struct msm_rpc_endpoint *client,
 	rc = msm_rpc_write(client, reply_buf, sizeof(reply_buf));
 	if (rc < 0)
 		printk(KERN_ERR
-		       "%s: could not write response: %d\n",
-		       __FUNCTION__, rc);
+		       "%s: could not write response: %d\n", __FUNCTION__, rc);
 
 	return rc;
 }
@@ -138,7 +137,7 @@ static int rpc_servers_thread(void *data)
 	for (;;) {
 		wake_unlock(&rpc_servers_wake_lock);
 		rc = wait_event_interruptible(endpoint->wait_q,
-						!list_empty(&endpoint->read_q));
+					      !list_empty(&endpoint->read_q));
 		wake_lock(&rpc_servers_wake_lock);
 		rc = msm_rpc_read(endpoint, &buffer, -1, -1);
 		if (rc < 0) {
@@ -162,9 +161,8 @@ static int rpc_servers_thread(void *data)
 		if (req->type != 0)
 			continue;
 		if (!server) {
-			rpc_send_accepted_void_reply(
-				endpoint, req->xid,
-				RPC_ACCEPTSTAT_PROG_UNAVAIL);
+			rpc_send_accepted_void_reply(endpoint, req->xid,
+						     RPC_ACCEPTSTAT_PROG_UNAVAIL);
 			continue;
 		}
 
@@ -172,14 +170,12 @@ static int rpc_servers_thread(void *data)
 
 		switch (rc) {
 		case 0:
-			rpc_send_accepted_void_reply(
-				endpoint, req->xid,
-				RPC_ACCEPTSTAT_SUCCESS);
+			rpc_send_accepted_void_reply(endpoint, req->xid,
+						     RPC_ACCEPTSTAT_SUCCESS);
 			break;
 		default:
-			rpc_send_accepted_void_reply(
-				endpoint, req->xid,
-				RPC_ACCEPTSTAT_PROG_UNAVAIL);
+			rpc_send_accepted_void_reply(endpoint, req->xid,
+						     RPC_ACCEPTSTAT_PROG_UNAVAIL);
 			break;
 		}
 
@@ -210,11 +206,11 @@ static int rpcservers_probe(struct platform_device *pdev)
 }
 
 static struct platform_driver rpcservers_driver = {
-	.probe	= rpcservers_probe,
-	.driver	= {
-		.name	= "oncrpc_router",
-		.owner	= THIS_MODULE,
-	},
+	.probe = rpcservers_probe,
+	.driver = {
+		   .name = "oncrpc_router",
+		   .owner = THIS_MODULE,
+		   },
 };
 
 static int __init rpc_servers_init(void)

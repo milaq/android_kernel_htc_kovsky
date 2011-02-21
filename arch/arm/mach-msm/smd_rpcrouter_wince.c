@@ -140,7 +140,7 @@ static int rpcrouter_send_control_msg(union rr_control_msg *msg)
 	     || msg->cmd == RPCROUTER_CTRL_CMD_BYE) && !initialized) {
 		printk(KERN_ERR "rpcrouter_send_control_msg(): Warning, "
 		       "router not initialized\n");
-              return -EINVAL;
+		return -EINVAL;
 	}
 
 	hdr.version = RPCROUTER_VERSION;
@@ -485,8 +485,8 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 			 * if we get a NEW_SERVER notification
 			 */
 			if (!rpcrouter_lookup_remote_endpoint(msg->srv.cid)) {
-				rc = rpcrouter_create_remote_endpoint(msg->srv.
-								      cid);
+				rc = rpcrouter_create_remote_endpoint(msg->
+								      srv.cid);
 				if (rc < 0)
 					printk(KERN_ERR
 					       "rpcrouter:Client create"
@@ -768,6 +768,7 @@ int msm_rpc_close(struct msm_rpc_endpoint *ept)
 {
 	return msm_rpcrouter_destroy_local_endpoint(ept);
 }
+
 EXPORT_SYMBOL(msm_rpc_close);
 
 static int msm_rpc_write_pkt(struct msm_rpc_endpoint *ept,
@@ -869,9 +870,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		}
 		hdr.dst_pid = ept->dst_pid;
 		hdr.dst_cid = ept->dst_cid;
-		IO("CALL on ept %p to %08x:%08x @ %d:%08x (%d bytes) (xid %x proc %x)\n", ept,
-		be32_to_cpu(rq->prog), be32_to_cpu(rq->vers), ept->dst_pid, ept->dst_cid, count,
-		be32_to_cpu(rq->xid), be32_to_cpu(rq->procedure));
+		IO("CALL on ept %p to %08x:%08x @ %d:%08x (%d bytes) (xid %x proc %x)\n", ept, be32_to_cpu(rq->prog), be32_to_cpu(rq->vers), ept->dst_pid, ept->dst_cid, count, be32_to_cpu(rq->xid), be32_to_cpu(rq->procedure));
 	} else {
 		/* RPC REPLY */
 		/* TODO: locking */
@@ -1003,7 +1002,7 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 	if (!ept) {
 		D("%s: ept is NULL\n", __func__);
 		return -EINVAL;
-    }
+	}
 	if (ept->dst_pid == 0xffffffff)
 		return -ENOTCONN;
 
@@ -1014,7 +1013,7 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 	req->vers = ept->dst_vers;
 	req->procedure = cpu_to_be32(proc);
 
-    /* Allow replys to be added to the queue */
+	/* Allow replys to be added to the queue */
 	ept->flags |= MSM_RPC_ENABLE_RECEIVE;
 
 	rc = msm_rpc_write(ept, req, request_size);
@@ -1063,7 +1062,7 @@ int msm_rpc_call_reply(struct msm_rpc_endpoint *ept, uint32_t proc,
 	}
 	kfree(reply);
 
-error:
+ error:
 	ept->flags &= ~MSM_RPC_ENABLE_RECEIVE;
 	wake_unlock(&ept->read_q_wake_lock);
 
@@ -1178,6 +1177,7 @@ struct msm_rpc_endpoint *msm_rpc_connect(uint32_t prog, uint32_t vers,
 
 	return ept;
 }
+
 EXPORT_SYMBOL(msm_rpc_connect);
 
 uint32_t msm_rpc_get_vers(struct msm_rpc_endpoint * ept)
@@ -1186,7 +1186,6 @@ uint32_t msm_rpc_get_vers(struct msm_rpc_endpoint * ept)
 }
 
 EXPORT_SYMBOL(msm_rpc_get_vers);
-
 
 /* TODO: permission check? */
 int msm_rpc_register_server(struct msm_rpc_endpoint *ept,
@@ -1227,9 +1226,9 @@ int msm_rpc_unregister_server(struct msm_rpc_endpoint *ept,
 	if (!server)
 		return -ENOENT;
 
-    ept->flags &= ~MSM_RPC_ENABLE_RECEIVE;
+	ept->flags &= ~MSM_RPC_ENABLE_RECEIVE;
 	wake_unlock(&ept->read_q_wake_lock);
-    rpcrouter_destroy_server(server);
+	rpcrouter_destroy_server(server);
 	return 0;
 }
 
@@ -1266,16 +1265,14 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 
 	queue_work(rpcrouter_workqueue, &work_read_data);
 
-
-//	msg.cmd = RPCROUTER_CTRL_CMD_BYE;
-//	rpcrouter_send_control_msg(&msg);
-//	msleep(50);
+//      msg.cmd = RPCROUTER_CTRL_CMD_BYE;
+//      rpcrouter_send_control_msg(&msg);
+//      msleep(50);
 
 	// wince rpc init
 	msg.cmd = RPCROUTER_CTRL_CMD_HELLO;
-//	rpcrouter_send_control_msg(&msg);
-//	msleep(50);
-
+//      rpcrouter_send_control_msg(&msg);
+//      msleep(50);
 
 	process_control_msg(&msg, sizeof(msg));
 	msleep(100);

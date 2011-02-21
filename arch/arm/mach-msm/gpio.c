@@ -25,7 +25,7 @@
 #ifndef CONFIG_MSM_AMSS_VERSION_WINCE
 #include "proc_comm.h"
 #else
-#include "proc_comm_wince.h"
+#include "dex_comm.h"
 #endif
 
 enum {
@@ -688,7 +688,7 @@ int gpio_tlmm_config(unsigned config, enum msm_gpio_state enable)
 		return -EINVAL;
 	}
 
-	if (GPIO_PIN(config) < 16 || GPIO_PIN(config) > 42) {
+	if (gpio < 16 || gpio > 42) {
 		addr = (void __iomem *)(MSM_GPIOCFG1_BASE + 0x20);
 		addr2 = (void __iomem *)(MSM_GPIOCFG1_BASE + 0x24);
 	}	
@@ -709,7 +709,7 @@ int gpio_tlmm_config(unsigned config, enum msm_gpio_state enable)
 	    (GPIO_PULL(config));
 	writel(cfg, addr2);
 
-	printk("msm_gpio_set_function(%x, %x)\n", gpio, cfg);
+	//printk("msm_gpio_set_function(%x, %x)\n", gpio, cfg);
 	if (readl(addr) != gpio)
 		printk(KERN_WARNING "%s: could not set alt func %u => %u\n",
 		       __func__, gpio, GPIO_FUNC(config));
