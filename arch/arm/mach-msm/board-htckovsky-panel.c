@@ -30,7 +30,7 @@
 #include <mach/vreg.h>
 
 #include "board-htckovsky.h"
-#include "proc_comm_wince.h"
+#include "dex_comm.h"
 #include "devices.h"
 
 struct mddi_table {
@@ -444,20 +444,20 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 
 		printk(KERN_DEBUG "%s: enabled panel power\n", __func__);
 
-		dex.cmd = PCOM_PMIC_REG_ON;
+		dex.cmd = DEX_PMIC_REG_ON;
 		dex.has_data = 1;
 		dex.data = 0x80;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 		mdelay(50);
 		printk(KERN_DEBUG "%s: enabled register 0x80\n", __func__);
 
 		dex.data = 0x40000;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 		mdelay(50);
 		printk(KERN_DEBUG "%s: enabled register 0x40000\n", __func__);
 
 		dex.data = 0x400000;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 		mdelay(50);
 		printk(KERN_DEBUG "%s: enabled register 0x400000\n", __func__);
 		mdelay(500);
@@ -468,20 +468,20 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 
 		printk(KERN_DEBUG "%s: +shutting down panel\n", __func__);
 
-		dex.cmd = PCOM_PMIC_REG_OFF;
+		dex.cmd = DEX_PMIC_REG_OFF;
 		dex.has_data = 1;
 		dex.data = 0x400000;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 		mdelay(50);
 		printk(KERN_DEBUG "%s: disabled register 0x400000\n", __func__);
 
 		dex.data = 0x40000;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 		mdelay(50);
 		printk(KERN_DEBUG "%s: disabled register 0x40000\n", __func__);
 
 		dex.data = 0x80;
-		msm_proc_comm_wince(&dex, 0);
+		msm_dex_comm(&dex, 0);
 		mdelay(50);
 		printk(KERN_DEBUG "%s: disabled register 0x80\n", __func__);
 

@@ -30,6 +30,8 @@
 #include <linux/pda_power.h>
 #include <linux/gpio_keys.h>
 #include <linux/microp-keypad.h>
+#include <linux/microp-htckovsky.h>
+#include <linux/microp-ng.h>
 #include <linux/ds2746_battery.h>
 
 #include <asm/mach-types.h>
@@ -52,12 +54,13 @@
 #include <mach/msm_serial_hs.h>
 #include <mach/msm_ts.h>
 #include <mach/vreg.h>
+#include <mach/amss/amss_5225.h>
 
 #ifdef CONFIG_HTC_HEADSET
 #include <mach/htc_headset.h>
 #endif
 
-#include "proc_comm_wince.h"
+#include "dex_comm.h"
 #include "devices.h"
 #include "board-htckovsky.h"
 #include "clock-msm-a11.h"
@@ -302,6 +305,36 @@ static struct ds2746_platform_data kovsky_battery_data = {
 };
 
 /******************************************************************************
+ * MicroP
+ ******************************************************************************/
+static bool htckovsky_is_microp_supported(void) {
+	uint8_t version[2];
+	
+	int ret = microp_ng_read(MICROP_VERSION_REG_KOVS, version, 2);
+	if (ret < 0) {
+	  printk(KERN_ERR "%s: error reading microp version %d\n", __func__, ret);
+	  return false;
+	}
+	printk("%s: version %x%x\n", __func__, version[0], version[1]);
+	return ((version[0] << 8) | version[1]) == 0x787;
+}
+
+static struct platform_device htckovsky_microp_leds = {
+  .id = -1,
+  .name = "htckovsky-microp-leds",
+};
+
+static struct platform_device* htckovsky_microp_clients[] = {
+    &htckovsky_microp_leds,
+};
+
+static struct microp_platform_data htckovsky_microp_pdata = {
+	.is_supported = htckovsky_is_microp_supported,
+	.clients = htckovsky_microp_clients,
+	.nclients = ARRAY_SIZE(htckovsky_microp_clients),
+};
+
+/******************************************************************************
  * I2C
  ******************************************************************************/
 static struct i2c_board_info i2c_devices[] = {
@@ -315,9 +348,11 @@ static struct i2c_board_info i2c_devices[] = {
 	.platform_data = &kovsky_battery_data,
 	},
 	{
-	// LED & Backlight controller
-	I2C_BOARD_INFO("microp-klt", 0x66),
-	},
+	 // LED & Backlight controller
+	 .type = "microp-ng",
+	 .addr = 0x66,
+	 .platform_data = &htckovsky_microp_pdata,
+	 },
 //	{
 //	// Keyboard controller
 //	I2C_BOARD_INFO("microp-ksc", 0x67),
@@ -372,16 +407,16 @@ static struct snd_endpoint snd_endpoints_list[] = {
 
 #undef SND
 
-static struct msm_snd_endpoints raphael_snd_endpoints = {
+static struct msm_snd_endpoints htckovsky_snd_endpoints = {
 	.endpoints = snd_endpoints_list,
 	.num = ARRAY_SIZE(snd_endpoints_list),
 };
 
-static struct platform_device raphael_snd = {
+static struct platform_device htckovsky_snd = {
 	.name = "msm_snd",
 	.id = -1,
 	.dev = {
-		.platform_data = &raphael_snd_endpoints,
+		.platform_data = &htckovsky_snd_endpoints,
 		},
 };
 
@@ -605,12 +640,12 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 static void kovsky_af_vdd(int on)
 {
 	struct msm_dex_command dex = {
-		.cmd = on ? PCOM_PMIC_REG_ON : PCOM_PMIC_REG_OFF,
+		.cmd = on ? DEX_PMIC_REG_ON : DEX_PMIC_REG_OFF,
 		.has_data = 1,
 		.data = 0x100,
 	};
 
-	msm_proc_comm_wince(&dex, 0);
+	msm_dex_comm(&dex, 0);
 }
 
 /* This is needed to control the lens position*/
@@ -797,15 +832,24 @@ static struct msm_pmem_setting htckovsky_pmem_settings = {
 	.ram_console_size = KOVS110_RAMCONSOLE_SIZE,
 };
 
+static struct platform_device amss_device = {
+	.name = "msm_adsp_5225",
+	.id = -1,
+};
+
+struct smd_overrides smd_overrides_5225 = {
+	.amss_values = amss_5225_para,
+	.n_amss_values = ARRAY_SIZE(amss_5225_para),
+};
+
 static struct platform_device *devices[] __initdata = {
-//	&htckovsky_keypad,
-	&htckovsky_sd_slot,
-	&htckovsky_gpio_keys,
-//      &raphael_rfkill,
 	&msm_device_smd,
-//      &msm_device_nand,
+	&amss_device,
+	&htckovsky_snd,
 	&msm_device_i2c,
 	&htckovsky_rtc,
+	&htckovsky_sd_slot,
+	&htckovsky_gpio_keys,
 #ifdef CONFIG_SERIAL_MSM_HS
 //      &msm_device_uart_dm2,
 #endif
@@ -818,10 +862,7 @@ static struct platform_device *devices[] __initdata = {
 //      &msm_camera_sensor_mt9t012vc,
 #endif
 	&msm_device_touchscreen,
-//      &raphael_snd,
-#ifdef CONFIG_HTC_HEADSET
-//      &kovsky_headset,
-#endif
+	&htckovsky_keypad,
 };
 
 extern struct sys_timer msm_timer;
@@ -847,8 +888,8 @@ static struct msm_serial_hs_platform_data msm_uart_dm2_pdata = {
 
 static void htcraphael_reset(void)
 {
-	struct msm_dex_command dex = {.cmd = PCOM_NOTIFY_ARM9_REBOOT };
-	msm_proc_comm_wince(&dex, 0);
+	struct msm_dex_command dex = {.cmd = DEX_NOTIFY_ARM9_REBOOT };
+	msm_dex_comm(&dex, 0);
 	mdelay(0x15e);
 	gpio_request(25, "MSM Reset");
 	msm_gpio_set_flags(25, GPIOF_OWNER_ARM11);
@@ -861,14 +902,14 @@ static void htcraphael_set_vibrate(uint32_t val)
 	struct msm_dex_command vibra;
 
 	if (val == 0) {
-		vibra.cmd = PCOM_VIBRA_OFF;
-		msm_proc_comm_wince(&vibra, 0);
+		vibra.cmd = DEX_VIBRA_OFF;
+		msm_dex_comm(&vibra, 0);
 	} else if (val > 0) {
 		if (val == 1 || val > 0xb22)
 			val = 0xb22;
 		writel(val, MSM_SHARED_RAM_BASE + 0xfc130);
-		vibra.cmd = PCOM_VIBRA_ON;
-		msm_proc_comm_wince(&vibra, 0);
+		vibra.cmd = DEX_VIBRA_ON;
+		msm_dex_comm(&vibra, 0);
 	}
 }
 
@@ -877,7 +918,7 @@ static void __init htckovsky_init(void)
 	int i;
 
 	msm_acpu_clock_init(&htckovsky_clock_data);
-	msm_proc_comm_wince_init();
+	msm_dex_comm_init();
 	msm_add_mem_devices(&htckovsky_pmem_settings);
 
 	// Register hardware reset hook
@@ -890,16 +931,13 @@ static void __init htckovsky_init(void)
 #endif
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
 
-
-	msm_init_pmic_vibrator();
+	//do it before anything rpc kicks in
+	amss_set_overrides(&smd_overrides_5225);
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 
 	// Register I2C devices
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
-
-	// Initialize SD controllers
-	//init_mmc();
 
 	/* A little vibrating welcome */
 	for (i = 0; i < 2; i++) {
