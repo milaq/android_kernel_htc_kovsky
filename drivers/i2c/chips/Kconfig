@@ -13,20 +13,8 @@ config SENSORS_MT9T013
 	help
 	 MT9T013 Camera Driver implemented by HTC.
 
-config SENSORS_MICROP_KSC
-        tristate "MicroP-KEY i2c Chip Driver"
-        depends on I2C_MSM && SENSORS_MICROP_KLT
-        default y
-        help
-          If you say yes here you get support for the MicroP-KEY chip
-          driver that reads scancodes from a keyboard found on some HTC
-          devices.
-
-          This driver can also be built as a module.  If so, the module
-          will be called microp-ksc.
-
-config SENSORS_MICROP_KLT
-        tristate "MicroP-LED i2c Chip Driver"
+config SENSORS_MICROP_NG
+        tristate "MicroP driver for HTC Phones"
         depends on I2C_MSM
         default y
         help
@@ -35,7 +23,8 @@ config SENSORS_MICROP_KLT
           on some HTC devices.
 
           This driver can also be built as a module.  If so, the module
-          will be called microp-klt.
+          will be called microp-ng.
+
 
 config SENSORS_KXSD9
 	tristate "Kionix KXSD9 i2c Chip Driver"
