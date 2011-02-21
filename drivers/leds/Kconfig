@@ -309,6 +309,17 @@ config LEDS_MC13783
 	  This option enable support for on-chip LED drivers found
 	  on Freescale Semiconductor MC13783 PMIC.
 
+config LEDS_MICROP_HTCKOVSKY
+        tristate "LED Support for HTC Kovsky MicroP1"
+        depends on SENSORS_MICROP_NG
+        default y
+        help
+          If you say yes here you get support for the leds on the first
+	  MicroP on HTC Kovsky
+
+          This driver can also be built as a module.  If so, the module
+          will be called leds-microp-htckovsky.
+
 config LEDS_TRIGGERS
 	bool "LED Trigger support"
 	help
