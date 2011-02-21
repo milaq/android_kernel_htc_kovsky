@@ -504,6 +504,8 @@ void __init msm_init_irq(void)
 		/* select IRQ for all INTs */
 		writel(0, VIC_INT_SELECT(n));
 
+		/* clear interrupts */
+		writel(0xffffffff, VIC_INT_CLEAR(n));
 		/* disable all INTs */
 		writel(0, VIC_INT_EN(n));
 	}
