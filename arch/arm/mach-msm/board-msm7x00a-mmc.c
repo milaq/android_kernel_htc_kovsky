@@ -216,8 +216,8 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 
 	for (i = 0; i < ARRAY_SIZE(mmc_vdd_table); i++) {
 		if (mmc_vdd_table[i].mask == (1 << vdd)) {
-			printk("%s: Setting level to %u\n",
-			__func__, mmc_vdd_table[i].level);
+			//printk("%s: Setting level to %u\n",
+			//__func__, mmc_vdd_table[i].level);
 			if (sdcc_data[sdcc_id] && sdcc_data[sdcc_id]->set_voltage)
 				rc = sdcc_data[sdcc_id]->set_voltage(!!vdd);
 			if (rc) {
