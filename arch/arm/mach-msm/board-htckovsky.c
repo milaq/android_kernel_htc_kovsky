@@ -309,7 +309,7 @@ static struct ds2746_platform_data kovsky_battery_data = {
  ******************************************************************************/
 static bool htckovsky_is_microp_supported(void) {
 	uint8_t version[2];
-	
+
 	int ret = microp_ng_read(MICROP_VERSION_REG_KOVS, version, 2);
 	if (ret < 0) {
 	  printk(KERN_ERR "%s: error reading microp version %d\n", __func__, ret);
@@ -959,14 +959,23 @@ static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
 				char **cmdline, struct meminfo *mi)
 {
 	int i;
-	mi->nr_banks = 2;
+	mi->nr_banks = 1;
 	mi->bank[0].start = PAGE_ALIGN(PHYS_OFFSET);
 	mi->bank[0].node = PHYS_TO_NID(mi->bank[0].start);
+#ifdef CONFIG_HOLES_IN_ZONE
 	mi->bank[0].size = 107 * 1024 * 1024;
+#else
+	mi->bank[0].size = 104 << 20;
+#endif
 
+	mi->nr_banks++;
 	mi->bank[1].start = PAGE_ALIGN(PHYS_OFFSET + 0x10000000);
 	mi->bank[1].node = PHYS_TO_NID(mi->bank[1].start);
+#ifdef CONFIG_HOLES_IN_ZONE
 	mi->bank[1].size = (128 - 50) * 1024 * 1024;
+#else
+	mi->bank[1].size = 76 << 20;
+#endif
 	printk(KERN_INFO "fixup: nr_banks = %d\n", mi->nr_banks);
 
 	for (i = 0; i < mi->nr_banks; i++) {
