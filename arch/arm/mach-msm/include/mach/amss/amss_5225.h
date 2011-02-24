@@ -8,10 +8,6 @@ static struct amss_value amss_5225_para[] = {
 	{AMSS_AUDMGR_VERS, AMSS_VAL_UINT, { .value = 0x0}},
 	{AMSS_AUDMGR_CB_PROG, AMSS_VAL_UINT, {.value = 0x31000013}},
 	{AMSS_AUDMGR_CB_VERS, AMSS_VAL_UINT, { .value = 0x5fa922a9}},
-	{AMSS_SND_SET_DEVICE_PROC, AMSS_VAL_UINT, { .value = 1}},
-	{AMSS_SND_SET_VOLUME_PROC, AMSS_VAL_UINT, { .value = 2}},
-	{AMSS_RPC_SND_PROG, AMSS_VAL_UINT, { .value = 0x30000002}},
-	{AMSS_RPC_SND_VERS, AMSS_VAL_UINT, { .value = 0x0}},
 };
 
 #define	ADSP_RTOS_ATOM_PROG_5225	0x3000000a
@@ -23,5 +19,9 @@ static struct amss_value amss_5225_para[] = {
 #define	ADSP_RTOS_ATOM_PROC_5225	0x1
 #define	ADSP_RTOS_MTOA_PROC_5225	0x1
 #define ADSP_RTOS_MTOA_EP_5225		0xfadefade
+#define ADSP_RTOS_SND_PROG_5225		0x30000002
+#define ADSP_RTOS_SND_VERS_5225		0
+#define ADSP_RTOS_SND_DEV_PROC_5225		1
+#define ADSP_RTOS_SND_VOL_PROC_5225		2
 
 #endif

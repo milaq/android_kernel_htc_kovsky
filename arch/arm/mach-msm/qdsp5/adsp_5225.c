@@ -296,6 +296,11 @@ static struct adsp_info info = {
 	.mtoa_prog = ADSP_RTOS_MTOA_PROG_5225,
 	.atom_prog = ADSP_RTOS_ATOM_PROG_5225,
 	.mtoa_endpoint = ADSP_RTOS_MTOA_EP_5225,
+	.snd_prog = ADSP_RTOS_SND_PROG_5225,
+	.snd_vers = ADSP_RTOS_SND_VERS_5225,
+	.snd_device_proc = ADSP_RTOS_SND_DEV_PROC_5225,
+	.snd_volume_proc = ADSP_RTOS_SND_VOL_PROC_5225,
+
 	.irq_adsp = INT_ADSP_A11,
 };
 

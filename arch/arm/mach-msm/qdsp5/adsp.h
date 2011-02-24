@@ -124,6 +124,10 @@ struct adsp_info {
 	uint32_t mtoa_prog;
 	uint32_t atom_prog;
 	uint32_t mtoa_endpoint;
+	uint32_t snd_prog;
+	uint32_t snd_vers;
+	uint32_t snd_device_proc;
+	uint32_t snd_volume_proc;
 
 #if CONFIG_MSM_AMSS_VERSION >= 6350
 	/* rpc_client for init_info */
@@ -133,6 +137,7 @@ struct adsp_info {
 	unsigned init_info_state;
 #endif
 };
+extern struct adsp_info *adsp_info;
 
 int msm_adsp_probe(struct adsp_info *new_adsp_info);
 

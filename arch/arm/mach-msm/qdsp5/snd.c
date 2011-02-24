@@ -28,12 +28,13 @@
 #include <mach/board.h>
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_smd.h>
+#include "adsp.h"
 
 struct snd_ctxt {
 	struct mutex lock;
 	int opened;
 	struct msm_rpc_endpoint *ept;
-	struct msm_snd_platform_data *snd_epts;
+	struct msm_snd_platform_data *snd_pdata;
 };
 
 static struct snd_ctxt the_snd;
@@ -85,14 +86,14 @@ static int get_endpoint(struct snd_ctxt *snd, unsigned long arg)
 	}
 
 	index = ept.id;
-	if (index < 0 || index >= snd->snd_epts->num) {
+	if (index < 0 || index >= snd->snd_pdata->num_endpoints) {
 		pr_err("snd_ioctl get endpoint: invalid index!\n");
 		return -EINVAL;
 	}
 
-	ept.id = snd->snd_epts->endpoints[index].id;
+	ept.id = snd->snd_pdata->endpoints[index].id;
 	strncpy(ept.name,
-		snd->snd_epts->endpoints[index].name,
+		snd->snd_pdata->endpoints[index].name,
 		sizeof(ept.name));
 
 	if (copy_to_user((void __user *)arg, &ept, sizeof(ept))) {
@@ -112,17 +113,6 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	struct snd_ctxt *snd = file->private_data;
 	int rc = 0;
 
-	uint32_t device_proc, volume_proc;
-	if (!amss_get_num_value(AMSS_SND_SET_DEVICE_PROC, &device_proc)) {
-		printk(KERN_ERR "%s: unable to get SND_SET_DEVICE_PROC\n", __func__);
-		return -EINVAL;
-	}
-
-	if (!amss_get_num_value(AMSS_SND_SET_VOLUME_PROC, &volume_proc)) {
-		printk(KERN_ERR "%s: unable to get SND_SET_VOLUME_PROC\n", __func__);
-		return -EINVAL;
-	}
-
 	mutex_lock(&snd->lock);
 	switch (cmd) {
 	case SND_SET_DEVICE:
@@ -131,6 +121,9 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
+
+		if (the_snd.snd_pdata->device_hook)
+			the_snd.snd_pdata->device_hook(&dev);
 
 		dmsg.args.device = cpu_to_be32(dev.device);
 		dmsg.args.ear_mute = cpu_to_be32(dev.ear_mute);
@@ -148,7 +141,7 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						 dev.ear_mute, dev.mic_mute);
 
 		rc = msm_rpc_call(snd->ept,
-			device_proc,
+			adsp_info->snd_device_proc,
 			&dmsg, sizeof(dmsg), 5 * HZ);
 		break;
 
@@ -159,8 +152,8 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		//FIXME
-		vol.device = 0xd;
+		if (the_snd.snd_pdata->volume_hook)
+			the_snd.snd_pdata->volume_hook(&vol);
 
 		vmsg.args.device = cpu_to_be32(vol.device);
 		vmsg.args.method = cpu_to_be32(vol.method);
@@ -178,13 +171,13 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 						vol.method, vol.volume);
 
 		rc = msm_rpc_call(snd->ept,
-			volume_proc,
+			adsp_info->snd_volume_proc,
 			&vmsg, sizeof(vmsg), 5 * HZ);
 		break;
 
 	case SND_GET_NUM_ENDPOINTS:
 		if (copy_to_user((void __user *)arg,
-				&snd->snd_epts->num, sizeof(unsigned))) {
+				&snd->snd_pdata->num_endpoints, sizeof(unsigned))) {
 			pr_err("snd_ioctl get endpoint: invalid pointer.\n");
 			rc = -EFAULT;
 		}
@@ -219,20 +212,10 @@ static int snd_open(struct inode *inode, struct file *file)
 	struct snd_ctxt *snd = &the_snd;
 	int rc = 0;
 
-	uint32_t snd_vers, snd_prog;
-	if (!amss_get_num_value(AMSS_RPC_SND_VERS, &snd_vers)) {
-		printk(KERN_ERR "%s: unable to get RPC_SND_VERS\n", __func__);
-		return -EINVAL;
-	}
-	if (!amss_get_num_value(AMSS_RPC_SND_PROG, &snd_prog)) {
-		printk(KERN_ERR "%s: unable to get RPC_SND_PROG\n", __func__);
-		return -EINVAL;
-	}
-
 	mutex_lock(&snd->lock);
 	if (snd->opened == 0) {
 		if (snd->ept == NULL) {
-			snd->ept = msm_rpc_connect(snd_prog, snd_vers,
+			snd->ept = msm_rpc_connect(adsp_info->snd_prog, adsp_info->snd_vers,
 					MSM_RPC_UNINTERRUPTIBLE);
 			if (IS_ERR(snd->ept)) {
 				rc = PTR_ERR(snd->ept);
@@ -271,9 +254,20 @@ static int snd_probe(struct platform_device *pdev)
 	int rc;
 	struct snd_ctxt *snd = &the_snd;
 	printk("+%s()\n", __func__);
+	if (!adsp_info) {
+		printk(KERN_ERR "%s: ADSP is not registered, aborting\n", __func__);
+		rc = -ENODEV;
+		goto ret;
+	}
 	mutex_init(&snd->lock);
-	snd->snd_epts = (struct msm_snd_platform_data *)pdev->dev.platform_data;
+	snd->snd_pdata = (struct msm_snd_platform_data *)pdev->dev.platform_data;
+	if (snd->snd_pdata->plat_init) {
+		rc = snd->snd_pdata->plat_init();
+		if (rc)
+			goto ret;
+	}
 	rc = misc_register(&snd_misc);
+ret:
 	printk("-%s() rc=%d\n", __func__, rc);
 	return rc;
 }

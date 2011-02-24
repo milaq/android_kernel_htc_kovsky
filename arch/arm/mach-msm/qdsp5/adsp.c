@@ -50,7 +50,7 @@ static inline void allow_suspend(void)
 #include <mach/msm_iomap.h>
 #include "adsp.h"
 
-static struct adsp_info *adsp_info;
+struct adsp_info *adsp_info;
 static struct msm_rpc_endpoint *rpc_cb_server_client;
 static struct msm_adsp_module *adsp_modules;
 static int adsp_open_count;
