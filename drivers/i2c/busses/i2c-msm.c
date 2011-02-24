@@ -481,7 +481,7 @@ msm_i2c_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dev);
 
 	//Claim gpios
-	msm_set_i2c_mux(true, NULL, NULL);
+	msm_set_i2c_mux(true, &i2c_clk, &i2c_clk);
 	//Disable until actually used
 	msm_set_i2c_mux(false, NULL, NULL);
 
