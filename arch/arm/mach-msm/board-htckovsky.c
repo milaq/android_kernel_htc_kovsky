@@ -834,6 +834,8 @@ static struct msm_pmem_setting htckovsky_pmem_settings = {
 	.ram_console_size = KOVS110_RAMCONSOLE_SIZE,
 };
 
+//TODO: move all amss-specific stuff to a platform device
+
 static struct platform_device amss_device = {
 	.name = "msm_adsp_5225",
 	.id = -1,
@@ -853,6 +855,12 @@ static struct msm_smd_platform_data smd_pdata_5225 = {
 	.n_amss_values = ARRAY_SIZE(amss_5225_para),
 	.early_servers = smd_5225_early_servers,
 	.n_early_servers = ARRAY_SIZE(smd_5225_early_servers),
+};
+
+static const struct smd_tty_channel_desc smd_5225_tty_channels[] = {
+	{.id = 0,.name = "SMD_DS"},
+	{.id = 1,.name = "SMD_DIAG"},
+	{.id = 7,.name = "SMD_DATA1"},
 };
 
 static struct platform_device *devices[] __initdata = {
@@ -945,6 +953,7 @@ static void __init htckovsky_init(void)
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
 
 	//do it before anything rpc kicks in
+	smd_set_channel_list(smd_5225_tty_channels, ARRAY_SIZE(smd_5225_tty_channels));
 	msm_device_smd.dev.platform_data = &smd_pdata_5225;
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
