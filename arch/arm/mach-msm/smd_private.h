@@ -71,6 +71,9 @@ struct smsm_interrupt_info
 	uint32_t interrupt_mask;
 	uint32_t pending_interrupts;
 	uint32_t wakeup_reason;
+//	#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+//	uint32_t padding;
+//	#endif
 };
 #else
 #define DEM_MAX_PORT_NAME_LEN (20)
@@ -232,7 +235,7 @@ typedef enum
 	SMEM_SMEM_LOG_POWER_WRAP,
 	SMEM_SMEM_LOG_POWER_EVENTS,
 	SMEM_ERR_CRASH_LOG,
-	SMEM_ERR_F3_TRACE_LOG,	
+	SMEM_ERR_F3_TRACE_LOG,
 	SMEM_NUM_ITEMS,
 } smem_mem_type;
 
@@ -281,7 +284,7 @@ struct smd_shared_v1 {
 struct smd_shared_v2 {
 	struct smd_half_channel ch0;
 	struct smd_half_channel ch1;
-};	
+};
 
 struct smd_channel {
 	volatile struct smd_half_channel *send;

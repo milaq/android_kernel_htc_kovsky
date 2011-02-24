@@ -105,6 +105,7 @@ static void do_create_rpcrouter_pdev(struct work_struct *work);
 static DECLARE_WORK(work_read_data, do_read_data);
 static DECLARE_WORK(work_create_pdevs, do_create_pdevs);
 static DECLARE_WORK(work_create_rpcrouter_pdev, do_create_rpcrouter_pdev);
+static atomic_t rpcrouter_pdev_created = ATOMIC_INIT(0);
 
 #define RR_STATE_IDLE    0
 #define RR_STATE_HEADER  1
@@ -124,6 +125,8 @@ static struct platform_device rpcrouter_pdev = {
 	.name = "oncrpc_router",
 	.id = -1,
 };
+
+static struct msm_smd_platform_data *pdata = NULL;
 
 static int rpcrouter_send_control_msg(union rr_control_msg *msg)
 {
@@ -376,19 +379,19 @@ static struct rr_remote_endpoint *rpcrouter_lookup_remote_endpoint(uint32_t cid)
 	return NULL;
 }
 
-static void new_server(uint32_t prog, uint32_t vers)
+static void early_server(struct msm_early_server *srv)
 {
 
 	int rc;
 	union rr_control_msg msg;
 
 	msg.srv.cmd = RPCROUTER_CTRL_CMD_NEW_SERVER;
-	msg.srv.pid = 1;
-	msg.srv.cid = 0xfadefade;
-	msg.srv.prog = prog;
-	msg.srv.vers = vers;
+	msg.srv.pid = srv->pid;
+	msg.srv.cid = srv->cid;
+	msg.srv.prog = srv->prog;
+	msg.srv.vers = srv->vers;
 	rc = rpcrouter_send_control_msg(&msg);
-	RR("x NEW_SERVER %x\n", prog);
+	RR("x EARLY_SERVER %x\n", srv->prog);
 
 }
 
@@ -397,7 +400,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 	union rr_control_msg ctl;
 	struct rr_server *server;
 	struct rr_remote_endpoint *r_ept;
-	int rc = 0;
+	int rc = 0, i;
 	unsigned long flags;
 
 	if (len != sizeof(*msg)) {
@@ -422,7 +425,10 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 
 		initialized = 1;
 
-		new_server(0x3000fffe, 1);
+		if (pdata) {
+			for (i = 0; i < pdata->n_early_servers; i++)
+					early_server(&pdata->early_servers[i]);
+		}
 
 		/* Send list of servers one at a time */
 		ctl.cmd = RPCROUTER_CTRL_CMD_NEW_SERVER;
@@ -443,7 +449,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 			rpcrouter_send_control_msg(&ctl);
 		}
 		spin_unlock_irqrestore(&server_list_lock, flags);
-		
+
 		queue_work(rpcrouter_workqueue, &work_create_rpcrouter_pdev);
 		break;
 
@@ -489,7 +495,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 			}
 			schedule_work(&work_create_pdevs);
 			wake_up(&newserver_wait);
-			
+
 		} else {
 			if ((server->pid == msg->srv.pid) &&
 			    (server->cid == msg->srv.cid)) {
@@ -540,6 +546,7 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 
 static void do_create_rpcrouter_pdev(struct work_struct *work)
 {
+	if (atomic_cmpxchg(&rpcrouter_pdev_created, 0, 1) == 0)
 	platform_device_register(&rpcrouter_pdev);
 }
 
@@ -919,7 +926,7 @@ int msm_rpc_write(struct msm_rpc_endpoint *ept, void *buffer, int count)
 		hdr.confirm_rx = 0;
 		hdr.size = xfer + sizeof(uint32_t);
 
-		/* total == count -> must be first packet 
+		/* total == count -> must be first packet
 		 * xfer == count -> must be last packet
 		 */
 		pacmark = PACMARK(xfer, mid, (total == count), (xfer == count));
@@ -1233,6 +1240,8 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 {
 	int rc;
 	union rr_control_msg msg = { 0 };
+
+	pdata = pdev->dev.platform_data;
 
 	/* Initialize what we need to start processing */
 	INIT_LIST_HEAD(&local_endpoints);

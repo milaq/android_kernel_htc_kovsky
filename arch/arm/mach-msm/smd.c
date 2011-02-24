@@ -31,6 +31,7 @@
 #include <mach/msm_smd.h>
 #include <mach/msm_iomap.h>
 #include <mach/system.h>
+#include <mach/amss/amss_fallback.h>
 
 #include "smd_private.h"
 #include "proc_comm.h"
@@ -63,6 +64,8 @@ static unsigned dummy_state[SMSM_STATE_COUNT];
 static struct shared_info smd_info = {
 	.state = (unsigned)&dummy_state,
 };
+
+static struct msm_smd_platform_data *pdata = NULL;
 
 module_param_named(debug_mask, msm_smd_debug_mask,
 		   int, S_IRUGO | S_IWUSR | S_IWGRP);
@@ -625,7 +628,7 @@ static int smd_alloc_v2(struct smd_channel *ch)
 
 	shared2 = smem_alloc(SMEM_SMD_BASE_ID + ch->n, sizeof(struct smd_shared_v2));
 	if (!shared2) {
-		pr_err("%s cid %d does not exists\n", __func__, ch->n);
+		pr_err("%s cid %d does not exist\n", __func__, ch->n);
 		return -1;
 	}
 
@@ -634,7 +637,7 @@ static int smd_alloc_v2(struct smd_channel *ch)
 		pr_err("%s cid %d fifo not found\n", __func__, ch->n);
 		return -1;
 	}
-	
+
 	if (!buffer_sz) {
 		pr_err("%s: cid %d buffer size = 0\n", __func__, ch->n);
 		return -1;
@@ -714,6 +717,7 @@ static int smd_alloc_channel(const char *name, uint32_t cid, uint32_t type)
 	ch->name[23] = 0;
 	ch->pdev.name = ch->name;
 	ch->pdev.id = -1;
+	ch->pdev.dev.platform_data = pdata;
 
 	pr_info("smd_alloc_channel() cid=%02d size=%05d '%s'\n",
 		ch->n, ch->fifo_size, ch->name);
@@ -1072,9 +1076,95 @@ int smd_core_init(void)
 
 extern void msm_init_last_radio_log(struct module *);
 
+static bool amss_get_pdata_num_value(enum amss_id id, uint32_t * out)
+{
+	int i;
+	if (!pdata) {
+		//we should not ever get here.
+		//but leave it here until it is tested
+		printk(KERN_ERR "%s: adsp_info is NULL\n", __func__);
+		return false;
+	}
+
+	for (i = 0; i < pdata->n_amss_values; i++) {
+		if (pdata->amss_values[i].id == id
+		    && pdata->amss_values[i].type == AMSS_VAL_UINT) {
+			*out = pdata->amss_values[i].value;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool amss_get_num_value(enum amss_id id, uint32_t *out) {
+	int i;
+	if (amss_get_pdata_num_value(id, out)) {
+		return true;
+	}
+	else {
+		printk(KERN_INFO
+				"%s: could not look up value %d, falling back to default\n",
+				__func__, id);
+	}
+
+	for (i = 0; i < n_amss_fallback_params; i++) {
+		if (amss_fallback_params[i].id == id
+		    && amss_fallback_params[i].type == AMSS_VAL_UINT) {
+			*out = amss_fallback_params[i].value;
+			return true;
+		}
+	}
+
+	return false;
+}
+EXPORT_SYMBOL(amss_get_num_value);
+
+static const char *amss_get_pdata_str_value(enum amss_id id)
+{
+	int i;
+	if (!pdata) {
+		//we should not ever get here.
+		//but leave it here until it is tested
+		printk(KERN_ERR "%s: adsp_info is NULL\n", __func__);
+		return NULL;
+	}
+	for (i = 0; i < pdata->n_amss_values; i++) {
+		if (pdata->amss_values[i].id == id
+		    && pdata->amss_values[i].type == AMSS_VAL_STRING)
+			return pdata->amss_values[i].string;
+	}
+	return NULL;
+}
+
+const char *amss_get_str_value(enum amss_id id) {
+	int i;
+	char* ret = NULL;
+	if ((ret = amss_get_pdata_str_value(id))) {
+		return ret;
+	}
+	else {
+		printk(KERN_INFO
+				"%s: could not look up value %d, falling back to default\n",
+				__func__, id);
+	}
+
+	for (i = 0; i < n_amss_fallback_params; i++) {
+		if (amss_fallback_params[i].id == id
+		    && amss_fallback_params[i].type == AMSS_VAL_STRING) {
+			return amss_fallback_params[i].string;
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(amss_get_str_value);
+
 static int msm_smd_probe(struct platform_device *pdev)
 {
-	pr_info("smd_init()\n");
+	struct msm_smd_platform_data *smd_pdata = pdev->dev.platform_data;
+	if (smd_pdata)
+		pdata = smd_pdata;
+	pr_info("+%s\n", __func__);
 
 	init_waitqueue_head(&rpccall_wait);
 	INIT_WORK(&probe_work, smd_channel_probe_worker);

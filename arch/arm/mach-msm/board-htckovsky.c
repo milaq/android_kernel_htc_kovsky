@@ -33,6 +33,7 @@
 #include <linux/microp-htckovsky.h>
 #include <linux/microp-ng.h>
 #include <linux/ds2746_battery.h>
+#include <linux/msm_audio.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -52,6 +53,7 @@
 #include <mach/msm_fb.h>
 #include <mach/msm_hsusb.h>
 #include <mach/msm_serial_hs.h>
+#include <mach/msm_smd.h>
 #include <mach/msm_ts.h>
 #include <mach/vreg.h>
 #include <mach/amss/amss_5225.h>
@@ -360,7 +362,7 @@ static struct i2c_board_info i2c_devices[] = {
 };
 
 #define SND(num, desc) { .name = desc, .id = num }
-static struct snd_endpoint snd_endpoints_list[] = {
+static struct msm_snd_endpoint snd_endpoints_list[] = {
 	SND(0, "HANDSET"),
 	SND(1, "SPEAKER"),
 	SND(2, "HEADSET"),
@@ -407,7 +409,7 @@ static struct snd_endpoint snd_endpoints_list[] = {
 
 #undef SND
 
-static struct msm_snd_endpoints htckovsky_snd_endpoints = {
+static struct msm_snd_platform_data htckovsky_snd_pdata = {
 	.endpoints = snd_endpoints_list,
 	.num = ARRAY_SIZE(snd_endpoints_list),
 };
@@ -416,7 +418,7 @@ static struct platform_device htckovsky_snd = {
 	.name = "msm_snd",
 	.id = -1,
 	.dev = {
-		.platform_data = &htckovsky_snd_endpoints,
+		.platform_data = &htckovsky_snd_pdata,
 		},
 };
 
@@ -697,9 +699,9 @@ static struct platform_device msm_camera_sensor_mt9t012vc = {
  ******************************************************************************/
 static struct gpio_keys_button htckovsky_button_table[] = {
 	/*KEY   GPIO    ACTIVE_LOW      DESCRIPTION     type    wakeup  debounce */
-	{KEY_UP, 39, 1, "Volume Up", EV_KEY, 0, 0},
-	{KEY_DOWN, 40, 1, "Volume Down", EV_KEY, 0, 0},
-	{KEY_ENTER, 83, 1, "Power button", EV_KEY, 1, 0},
+	{KEY_VOLUMEUP, 39, 1, "Volume Up", EV_KEY, 0, 0},
+	{KEY_OK, 40, 1, "Volume Down", EV_KEY, 0, 0},
+	{KEY_POWER, 83, 1, "Power button", EV_KEY, 1, 0},
 	{KEY_MENU, 42, 1, "Camera half press", EV_KEY, 0, 10},
 	{KEY_HOME, 41, 1, "Camera full press", EV_KEY, 0, 0},
 };
@@ -837,9 +839,20 @@ static struct platform_device amss_device = {
 	.id = -1,
 };
 
-struct smd_overrides smd_overrides_5225 = {
+static struct msm_early_server smd_5225_early_servers[] = {
+	{
+		.pid = 1,
+		.cid = 0xfadefade,
+		.prog = 0x3000fffe,
+		.vers = 1,
+	}
+};
+
+static struct msm_smd_platform_data smd_pdata_5225 = {
 	.amss_values = amss_5225_para,
 	.n_amss_values = ARRAY_SIZE(amss_5225_para),
+	.early_servers = smd_5225_early_servers,
+	.n_early_servers = ARRAY_SIZE(smd_5225_early_servers),
 };
 
 static struct platform_device *devices[] __initdata = {
@@ -932,7 +945,7 @@ static void __init htckovsky_init(void)
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
 
 	//do it before anything rpc kicks in
-	amss_set_overrides(&smd_overrides_5225);
+	msm_device_smd.dev.platform_data = &smd_pdata_5225;
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 
