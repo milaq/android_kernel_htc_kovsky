@@ -52,10 +52,8 @@
 #include <mach/msm_fb.h>
 #include <mach/msm_hsusb.h>
 #include <mach/msm_serial_hs.h>
-#include <mach/msm_smd.h>
 #include <mach/msm_ts.h>
 #include <mach/vreg.h>
-#include <mach/amss/amss_5225.h>
 
 #ifdef CONFIG_HTC_HEADSET
 #include <mach/htc_headset.h>
@@ -774,34 +772,11 @@ static struct msm_pmem_setting htckovsky_pmem_settings = {
  * AMSS-specific stuff
  ******************************************************************************/
 static struct platform_device amss_device = {
-	.name = "msm_adsp_5225",
+	.name = "amss_5225",
 	.id = -1,
 };
 
-static struct msm_early_server smd_5225_early_servers[] = {
-	{
-		.pid = 1,
-		.cid = 0xfadefade,
-		.prog = 0x3000fffe,
-		.vers = 1,
-	}
-};
-
-static struct msm_smd_platform_data smd_pdata_5225 = {
-	.amss_values = amss_5225_para,
-	.n_amss_values = ARRAY_SIZE(amss_5225_para),
-	.early_servers = smd_5225_early_servers,
-	.n_early_servers = ARRAY_SIZE(smd_5225_early_servers),
-};
-
-static const struct smd_tty_channel_desc smd_5225_tty_channels[] = {
-	{.id = 0,.name = "SMD_DS"},
-	{.id = 1,.name = "SMD_DIAG"},
-	{.id = 7,.name = "SMD_DATA1"},
-};
-
 static struct platform_device *devices[] __initdata = {
-	&msm_device_smd,
 	&amss_device,
 	&htckovsky_snd,
 	&msm_device_i2c,
@@ -889,9 +864,6 @@ static void __init htckovsky_init(void)
 #endif
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
 
-	//do it before anything rpc kicks in
-	smd_set_channel_list(smd_5225_tty_channels, ARRAY_SIZE(smd_5225_tty_channels));
-	msm_device_smd.dev.platform_data = &smd_pdata_5225;
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 

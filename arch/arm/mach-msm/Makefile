@@ -1,5 +1,5 @@
 obj-$(CONFIG_MSM_AMSS_VERSION_ANDROID) += proc_comm.o
-obj-$(CONFIG_MSM_AMSS_VERSION_WINCE) += dex_comm.o
+obj-$(CONFIG_MSM_AMSS_VERSION_WINCE) += dex_comm.o amss_5225.o
 obj-y += io.o irq.o timer.o dma.o memory.o
 obj-y += vreg.o
 obj-y += pmic.o
