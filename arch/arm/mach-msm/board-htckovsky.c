@@ -49,7 +49,6 @@
 #include <mach/msm_iomap.h>
 #include <mach/board.h>
 #include <mach/board_htc.h>
-#include <mach/msm7x00a_mmc.h>
 #include <mach/msm_fb.h>
 #include <mach/msm_hsusb.h>
 #include <mach/msm_serial_hs.h>
@@ -361,6 +360,9 @@ static struct i2c_board_info i2c_devices[] = {
 //	},
 };
 
+/******************************************************************************
+ * Sound driver settings
+ ******************************************************************************/
 #define SND(num, desc) { .name = desc, .id = num }
 static struct msm_snd_endpoint snd_endpoints_list[] = {
 	SND(0, "HANDSET"),
@@ -744,76 +746,9 @@ static struct msm_ts_platform_data htckovsky_ts_pdata = {
 /******************************************************************************
  * SD Card slot
  ******************************************************************************/
-static struct vreg *vreg_sdslot = NULL;
-
-static int htckovsky_sdslot_init(struct device *dev) {
-	int ret;
-
-	ret = gpio_request(KOVS100_SD_STATUS, "HTC Kovsky SD Status");
-	if (ret)
-		goto fail_sd_status;
-
-	ret = gpio_direction_input(KOVS100_SD_STATUS);
-	if (ret)
-		goto fail_gpio_in;
-
-	vreg_sdslot = vreg_get(0, "gp6");
-	if (IS_ERR(vreg_sdslot)) {
-		ret = PTR_ERR(vreg_sdslot);
-		goto fail_vreg;
-	}
-	return 0;
-
-fail_vreg:
-	vreg_sdslot = NULL;
-fail_gpio_in:
-	gpio_free(KOVS100_SD_STATUS);
-fail_sd_status:
-	return ret;
-}
-
-static void htckovsky_sdslot_exit(struct device *dev) {
-	gpio_free(KOVS100_SD_STATUS);
-	vreg_put(vreg_sdslot);
-	vreg_sdslot = NULL;
-}
-
-static int htckovsky_sdslot_set_power(unsigned int vdd) {
-	int rc = 0;
-	switch (vdd) {
-	case 0:
-		rc = vreg_disable(vreg_sdslot);
-		break;
-	case 1:
-		rc = vreg_enable(vreg_sdslot);
-		break;
-	default:
-		rc = vreg_set_level(vreg_sdslot, vdd);
-		break;
-	}
-	return rc;
-}
-
-static int htckovsky_sdslot_get_status(void) {
-	int ret = !gpio_get_value(KOVS100_SD_STATUS);
-	return ret;
-}
-
-static struct msm7x00a_mmc_platform_data htckovsky_sdslot_data = {
-	.sdcc_id = 3,
-	.sd_irq = MSM_GPIO_TO_INT(KOVS100_SD_STATUS),
-	.init = htckovsky_sdslot_init,
-	.exit = htckovsky_sdslot_exit,
-	.set_voltage = htckovsky_sdslot_set_power,
-	.get_status = htckovsky_sdslot_get_status,
-};
-
-static struct platform_device htckovsky_sd_slot = {
-	.name = "msm7x00a-mmc",
-	.dev = {
-		.platform_data = &htckovsky_sdslot_data,
-	},
-	.id = 0,
+static struct platform_device htckovsky_sdcc = {
+	.name = "htckovsky-mmc",
+	.id = -1,
 };
 
 /******************************************************************************
@@ -835,7 +770,9 @@ static struct msm_pmem_setting htckovsky_pmem_settings = {
 };
 
 //TODO: move all amss-specific stuff to a platform device
-
+/******************************************************************************
+ * AMSS-specific stuff
+ ******************************************************************************/
 static struct platform_device amss_device = {
 	.name = "msm_adsp_5225",
 	.id = -1,
@@ -869,7 +806,7 @@ static struct platform_device *devices[] __initdata = {
 	&htckovsky_snd,
 	&msm_device_i2c,
 	&htckovsky_rtc,
-	&htckovsky_sd_slot,
+	&htckovsky_sdcc,
 	&htckovsky_gpio_keys,
 #ifdef CONFIG_SERIAL_MSM_HS
 //      &msm_device_uart_dm2,
