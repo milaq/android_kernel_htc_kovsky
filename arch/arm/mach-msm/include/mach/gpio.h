@@ -52,7 +52,7 @@ static inline int gpio_to_irq(unsigned gpio)
  * and facilitete group operations provided by msm_gpios_xxx()
  */
 struct msm_gpio {
-	u32 gpio_cfg;
+	uint32_t gpio_cfg;
 	const char *label;
 };
 
