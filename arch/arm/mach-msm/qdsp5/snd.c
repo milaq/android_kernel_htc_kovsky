@@ -27,15 +27,13 @@
 #include <asm/ioctls.h>
 #include <mach/board.h>
 #include <mach/msm_rpcrouter.h>
-#include <mach/smd.h>
-
-#define RPC_SND_PROG    0x30000002
+#include <mach/msm_smd.h>
 
 struct snd_ctxt {
 	struct mutex lock;
 	int opened;
 	struct msm_rpc_endpoint *ept;
-	struct msm_snd_endpoints *snd_epts;
+	struct msm_snd_platform_data *snd_epts;
 };
 
 static struct snd_ctxt the_snd;
@@ -68,7 +66,7 @@ struct snd_set_volume_msg {
 	struct rpc_snd_set_volume_args args;
 };
 
-struct snd_endpoint *get_snd_endpoints(int *size);
+struct msm_snd_endpoint *get_msm_snd_endpoints(int *size);
 
 static inline int check_mute(int mute)
 {
@@ -161,9 +159,12 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
+		//FIXME
+		vol.device = 0xd;
+
 		vmsg.args.device = cpu_to_be32(vol.device);
 		vmsg.args.method = cpu_to_be32(vol.method);
-		if (vol.method != SND_METHOD_VOICE) {
+		if (vol.method != SND_METHOD_VOICE && vol.method != SND_METHOD_AUDIO) {
 			pr_err("snd_ioctl set volume: invalid method.\n");
 			rc = -EINVAL;
 			break;
@@ -218,16 +219,20 @@ static int snd_open(struct inode *inode, struct file *file)
 	struct snd_ctxt *snd = &the_snd;
 	int rc = 0;
 
-	uint32_t snd_vers;
+	uint32_t snd_vers, snd_prog;
 	if (!amss_get_num_value(AMSS_RPC_SND_VERS, &snd_vers)) {
 		printk(KERN_ERR "%s: unable to get RPC_SND_VERS\n", __func__);
+		return -EINVAL;
+	}
+	if (!amss_get_num_value(AMSS_RPC_SND_PROG, &snd_prog)) {
+		printk(KERN_ERR "%s: unable to get RPC_SND_PROG\n", __func__);
 		return -EINVAL;
 	}
 
 	mutex_lock(&snd->lock);
 	if (snd->opened == 0) {
 		if (snd->ept == NULL) {
-			snd->ept = msm_rpc_connect(RPC_SND_PROG, snd_vers,
+			snd->ept = msm_rpc_connect(snd_prog, snd_vers,
 					MSM_RPC_UNINTERRUPTIBLE);
 			if (IS_ERR(snd->ept)) {
 				rc = PTR_ERR(snd->ept);
@@ -264,10 +269,10 @@ struct miscdevice snd_misc = {
 static int snd_probe(struct platform_device *pdev)
 {
 	int rc;
-	printk("+%s()\n", __func__);
 	struct snd_ctxt *snd = &the_snd;
+	printk("+%s()\n", __func__);
 	mutex_init(&snd->lock);
-	snd->snd_epts = (struct msm_snd_endpoints *)pdev->dev.platform_data;
+	snd->snd_epts = (struct msm_snd_platform_data *)pdev->dev.platform_data;
 	rc = misc_register(&snd_misc);
 	printk("-%s() rc=%d\n", __func__, rc);
 	return rc;

@@ -50,8 +50,6 @@ static inline void allow_suspend(void)
 #include <mach/msm_iomap.h>
 #include "adsp.h"
 
-#define INT_ADSP INT_ADSP_A9_A11
-
 static struct adsp_info *adsp_info;
 static struct msm_rpc_endpoint *rpc_cb_server_client;
 static struct msm_adsp_module *adsp_modules;
@@ -62,8 +60,6 @@ static DEFINE_MUTEX(adsp_open_lock);
 static spinlock_t adsp_cmd_lock;
 
 static uint32_t current_image = -1;
-static uint32_t mtoa_vers = 0;
-static uint32_t atom_vers = 0;
 
 void adsp_set_image(struct adsp_info *info, uint32_t image)
 {
@@ -115,9 +111,9 @@ static int rpc_adsp_rtos_app_to_modem(uint32_t cmd, uint32_t module,
 	struct rpc_reply_hdr *rpc_rsp;
 
 	msm_rpc_setup_req(&rpc_req.hdr,
-			  RPC_ADSP_RTOS_ATOM_PROG,
+			  adsp_info->atom_prog,
 			  msm_rpc_get_vers(adsp_module->rpc_client),
-			  RPC_ADSP_RTOS_APP_TO_MODEM_PROC);
+			  adsp_info->atom_proc);
 
 	rpc_req.gotit = cpu_to_be32(1);
 	rpc_req.cmd = cpu_to_be32(cmd);
@@ -197,8 +193,8 @@ static int adsp_rpc_init(struct msm_adsp_module *adsp_module)
 	/* remove the original connect once compatible support is complete */
 
 	adsp_module->rpc_client = msm_rpc_connect(
-			RPC_ADSP_RTOS_ATOM_PROG,
-			atom_vers,
+			adsp_info->atom_prog,
+			adsp_info->atom_vers,
 			MSM_RPC_UNINTERRUPTIBLE | MSM_RPC_ENABLE_RECEIVE);
 
 	if (IS_ERR(adsp_module->rpc_client)) {
@@ -222,8 +218,8 @@ static void  msm_get_init_info(void)
 	struct rpc_adsp_rtos_app_to_modem_args_t rpc_req;
 
 	adsp_info->init_info_rpc_client = msm_rpc_connect(
-			RPC_ADSP_RTOS_ATOM_PROG,
-			atom_vers,
+			adsp_info->atom_prog,
+			adsp_info->atom_vers,
 			MSM_RPC_UNINTERRUPTIBLE | MSM_RPC_ENABLE_RECEIVE);
 	if (IS_ERR(adsp_info->init_info_rpc_client)) {
 		rc = PTR_ERR(adsp_info->init_info_rpc_client);
@@ -233,9 +229,9 @@ static void  msm_get_init_info(void)
 	}
 
 	msm_rpc_setup_req(&rpc_req.hdr,
-			RPC_ADSP_RTOS_ATOM_PROG,
+			adsp_info->atom_prog,
 			msm_rpc_get_vers(adsp_info->init_info_rpc_client),
-			RPC_ADSP_RTOS_APP_TO_MODEM_PROC);
+			adsp_info->atom_proc);
 
 	rpc_req.gotit = cpu_to_be32(1);
 	rpc_req.cmd = cpu_to_be32(RPC_ADSP_RTOS_CMD_GET_INIT_INFO);
@@ -282,7 +278,7 @@ int msm_adsp_get(const char *name, struct msm_adsp_module **out,
 
 	mutex_lock(&adsp_open_lock);
 	if (adsp_open_count++ == 0) {
-		enable_irq(INT_ADSP);
+		enable_irq(adsp_info->irq_adsp);
 		prevent_suspend();
 	}
 	mutex_unlock(&adsp_open_lock);
@@ -314,7 +310,7 @@ int msm_adsp_get(const char *name, struct msm_adsp_module **out,
 done:
 	mutex_lock(&adsp_open_lock);
 	if (rc && --adsp_open_count == 0) {
-		disable_irq(INT_ADSP);
+		disable_irq(adsp_info->irq_adsp);
 		allow_suspend();
 	}
 	if (rc && --module->open_count == 0 && module->clk)
@@ -353,7 +349,7 @@ void msm_adsp_put(struct msm_adsp_module *module)
 		msm_rpc_close(module->rpc_client);
 		module->rpc_client = 0;
 		if (--adsp_open_count == 0) {
-			disable_irq(INT_ADSP);
+			disable_irq(adsp_info->irq_adsp);
 			allow_suspend();
 			pr_info("adsp: disable interrupt\n");
 		}
@@ -735,21 +731,19 @@ static void handle_adsp_rtos_mtoa_app(struct rpc_request_hdr *req)
 
 static int handle_adsp_rtos_mtoa(struct rpc_request_hdr *req)
 {
-	switch (req->procedure) {
-	case RPC_ADSP_RTOS_MTOA_NULL_PROC:
+	if (req->procedure == adsp_info->mtoa_null_proc) {
 		rpc_send_accepted_void_reply(rpc_cb_server_client,
 					     req->xid,
 					     RPC_ACCEPTSTAT_SUCCESS);
-		break;
-	case RPC_ADSP_RTOS_MODEM_TO_APP_PROC:
+	}
+	else if (req->procedure == adsp_info->mtoa_proc) {
 		handle_adsp_rtos_mtoa_app(req);
-		break;
-	default:
+	}
+	else {
 		pr_err("adsp: unknowned proc %d\n", req->procedure);
 		rpc_send_accepted_void_reply(
 			rpc_cb_server_client, req->xid,
 			RPC_ACCEPTSTAT_PROC_UNAVAIL);
-		break;
 	}
 	return 0;
 }
@@ -780,9 +774,9 @@ static int adsp_rpc_thread(void *data)
 			goto bad_rpc;
 		if (req->rpc_vers != 2)
 			goto bad_rpc;
-		if (req->prog != RPC_ADSP_RTOS_MTOA_PROG)
+		if (req->prog != adsp_info->mtoa_prog)
 			goto bad_rpc;
-		if (req->vers != mtoa_vers)
+		if (req->vers != adsp_info->mtoa_vers)
 			goto bad_rpc;
 
 		handle_adsp_rtos_mtoa(req);
@@ -1075,18 +1069,6 @@ int msm_adsp_probe(struct adsp_info *new_adsp_info)
 
 	adsp_info = new_adsp_info;
 
-	if (!amss_get_num_value(AMSS_RPC_ADSP_RTOS_MTOA_VERS, &mtoa_vers)) {
-		printk(KERN_ERR "%s: RTOS_MTOA_VERS not found\n", __func__);
-		rc = -EINVAL;
-		goto fail_adsp_info;
-	}
-
-	if (!amss_get_num_value(AMSS_RPC_ADSP_RTOS_ATOM_VERS, &atom_vers)) {
-		printk(KERN_ERR "%s: RTOS_MTOA_VERS not found\n", __func__);
-		rc = -EINVAL;
-		goto fail_adsp_info;
-	}
-
 	wake_lock_init(&adsp_wake_lock, WAKE_LOCK_SUSPEND, "adsp");
 #if CONFIG_MSM_AMSS_VERSION >= 6350
 	adsp_info->init_info_ptr = kzalloc(
@@ -1118,11 +1100,11 @@ int msm_adsp_probe(struct adsp_info *new_adsp_info)
 
 	spin_lock_init(&adsp_cmd_lock);
 
-	rc = request_irq(INT_ADSP, adsp_irq_handler, IRQF_TRIGGER_RISING,
+	rc = request_irq(adsp_info->irq_adsp, adsp_irq_handler, IRQF_TRIGGER_RISING,
 			 "adsp", 0);
 	if (rc < 0)
 		goto fail_request_irq;
-	disable_irq(INT_ADSP);
+	disable_irq(adsp_info->irq_adsp);
 
 	rpc_cb_server_client = msm_rpc_open();
 	if (IS_ERR(rpc_cb_server_client)) {
@@ -1132,9 +1114,13 @@ int msm_adsp_probe(struct adsp_info *new_adsp_info)
 		goto fail_rpc_open;
 	}
 
+	if (adsp_info->mtoa_endpoint) {
+		rpc_cb_server_client->cid = adsp_info->mtoa_endpoint;
+	}
+
 	rc = msm_rpc_register_server(rpc_cb_server_client,
-				     RPC_ADSP_RTOS_MTOA_PROG,
-				     mtoa_vers);
+				     adsp_info->mtoa_prog,
+				     adsp_info->mtoa_vers);
 	if (rc) {
 		pr_err("adsp: could not register callback server (%d)\n", rc);
 		goto fail_rpc_register;
@@ -1177,8 +1163,8 @@ fail_rpc_register:
 	msm_rpc_close(rpc_cb_server_client);
 	rpc_cb_server_client = NULL;
 fail_rpc_open:
-	disable_irq(INT_ADSP);
-	free_irq(INT_ADSP, 0);
+	disable_irq(adsp_info->irq_adsp);
+	free_irq(adsp_info->irq_adsp, 0);
 fail_request_irq:
 	kfree(adsp_modules);
 #if CONFIG_MSM_AMSS_VERSION >= 6350

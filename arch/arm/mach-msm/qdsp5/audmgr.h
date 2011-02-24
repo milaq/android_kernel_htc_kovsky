@@ -1,6 +1,6 @@
 /* arch/arm/mach-msm/qdsp5/audmgr.h
  *
- * Copyright 2008 (c) QUALCOMM Incorporated. 
+ * Copyright 2008 (c) QUALCOMM Incorporated.
  * Copyright (C) 2008 Google, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
@@ -131,25 +131,37 @@ struct rpc_audmgr_enable_client_args {
 	uint32_t cb_func;
 	uint32_t client_data;
 };
-	
-#define AUDMGR_ENABLE_CLIENT			2
-#define AUDMGR_DISABLE_CLIENT			3
-#define AUDMGR_SUSPEND_EVENT_RSP		4
-#define AUDMGR_REGISTER_OPERATION_LISTENER	5
-#define AUDMGR_UNREGISTER_OPERATION_LISTENER	6
-#define AUDMGR_REGISTER_CODEC_LISTENER		7
-#define AUDMGR_GET_RX_SAMPLE_RATE		8
-#define AUDMGR_GET_TX_SAMPLE_RATE		9
-#define AUDMGR_SET_DEVICE_MODE			10
+
+//FIXME: make it dynamic
+#if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
+	#define AUDMGR_ENABLE_CLIENT			1
+	#define AUDMGR_DISABLE_CLIENT			2
+	#define AUDMGR_SUSPEND_EVENT_RSP		3
+#else
+	#define AUDMGR_ENABLE_CLIENT			2
+	#define AUDMGR_DISABLE_CLIENT			3
+	#define AUDMGR_SUSPEND_EVENT_RSP		4
+	#define AUDMGR_REGISTER_OPERATION_LISTENER	5
+	#define AUDMGR_UNREGISTER_OPERATION_LISTENER	6
+	#define AUDMGR_REGISTER_CODEC_LISTENER		7
+	#define AUDMGR_GET_RX_SAMPLE_RATE		8
+	#define AUDMGR_GET_TX_SAMPLE_RATE		9
+	#define AUDMGR_SET_DEVICE_MODE			10
+#endif
 
 struct rpc_audmgr_cb_func_ptr {
 	uint32_t cb_id;
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	uint32_t status;
+	uint32_t set_to_one;
+#else
 	uint32_t set_to_one;
 	uint32_t status;
+#endif
 	union {
 		uint32_t handle;
 		uint32_t volume;
-		
+
 	} u;
 };
 

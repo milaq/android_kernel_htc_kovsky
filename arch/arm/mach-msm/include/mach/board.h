@@ -84,16 +84,6 @@ struct msm_camera_sensor_info {
 	uint8_t num_resources;
 };
 
-struct snd_endpoint {
-	int id;
-	const char *name;
-};
-
-struct msm_snd_endpoints {
-	struct snd_endpoint *endpoints;
-	unsigned num;
-};
-
 struct clk;
 
 /* common init routines for use by arch/arm/mach-msm/board-*.c */

@@ -22,7 +22,8 @@
 #include <linux/msm_adsp.h>
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_adsp.h>
-#include <mach/smd.h>
+#include <mach/msm_smd.h>
+#include "../smd_rpcrouter.h"
 
 int adsp_pmem_fixup(struct msm_adsp_module *module, void **addr,
 		    unsigned long len);
@@ -111,7 +112,19 @@ struct adsp_info {
 	/* stats */
 	uint32_t events_received;
 	uint32_t event_backlog_max;
-	
+
+	/* RPC */
+	int irq_adsp;
+	uint32_t mtoa_vers;
+	uint32_t atom_vers;
+	uint32_t atom_proc;
+	uint32_t mtoa_proc;
+	uint32_t atom_null_proc;
+	uint32_t mtoa_null_proc;
+	uint32_t mtoa_prog;
+	uint32_t atom_prog;
+	uint32_t mtoa_endpoint;
+
 #if CONFIG_MSM_AMSS_VERSION >= 6350
 	/* rpc_client for init_info */
 	struct msm_rpc_endpoint *init_info_rpc_client;
@@ -122,13 +135,6 @@ struct adsp_info {
 };
 
 int msm_adsp_probe(struct adsp_info *new_adsp_info);
-
-#define RPC_ADSP_RTOS_ATOM_PROG 0x3000000a
-#define RPC_ADSP_RTOS_MTOA_PROG 0x3000000b
-#define RPC_ADSP_RTOS_ATOM_NULL_PROC 0
-#define RPC_ADSP_RTOS_MTOA_NULL_PROC 0
-#define RPC_ADSP_RTOS_APP_TO_MODEM_PROC 2
-#define RPC_ADSP_RTOS_MODEM_TO_APP_PROC 2
 
 enum rpc_adsp_rtos_proc_type {
 	RPC_ADSP_RTOS_PROC_NONE = 0,
