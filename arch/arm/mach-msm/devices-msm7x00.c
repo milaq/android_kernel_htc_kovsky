@@ -199,25 +199,38 @@ struct platform_device msm_device_i2c = {
 
 #define GPIO_I2C_CLK 60
 #define GPIO_I2C_DAT 61
+static struct msm_gpio i2c_on_gpio_table[] = {
+    { .gpio_cfg = GPIO_CFG(GPIO_I2C_CLK, 1, GPIO_CFG_OUTPUT,
+						 GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+						 .label = "I2C_SCL" },
+	{ .gpio_cfg = GPIO_CFG(GPIO_I2C_DAT, 1, GPIO_CFG_OUTPUT,
+						 GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+						 .label = "I2C_SDA" },
+};
+
+static struct msm_gpio i2c_off_gpio_table[] = {
+    { .gpio_cfg = GPIO_CFG(GPIO_I2C_CLK, 1, GPIO_CFG_INPUT,
+						 GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+						 .label = "I2C_SCL" },
+	{ .gpio_cfg = GPIO_CFG(GPIO_I2C_DAT, 1, GPIO_CFG_INPUT,
+						 GPIO_CFG_NO_PULL, GPIO_CFG_8MA),
+						 .label = "I2C_SDA" },
+};
+
 void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
 {
-	unsigned config;
+	int rc;
 	if (gpio) {
-		config = GPIO_CFG(GPIO_I2C_CLK, 0, GPIO_CFG_OUTPUT,
-				   GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
-		gpio_tlmm_config(config, 0);
-		config = GPIO_CFG(GPIO_I2C_DAT, 0, GPIO_CFG_OUTPUT,
-				   GPIO_CFG_NO_PULL, GPIO_CFG_2MA);
-		gpio_tlmm_config(config, 0);
+		rc = msm_gpios_request_enable(i2c_on_gpio_table,
+										ARRAY_SIZE(i2c_on_gpio_table));
+		if (rc) {
+			printk(KERN_ERR "%s: unable to request/enable gpios\n", __func__);
+		}
 		*gpio_clk = GPIO_I2C_CLK;
 		*gpio_dat = GPIO_I2C_DAT;
 	} else {
-		config = GPIO_CFG(GPIO_I2C_CLK, 1, GPIO_CFG_INPUT,
-				   GPIO_CFG_NO_PULL, GPIO_CFG_8MA);
-		gpio_tlmm_config(config, 0);
-		config = GPIO_CFG(GPIO_I2C_DAT , 1, GPIO_CFG_INPUT,
-				   GPIO_CFG_NO_PULL, GPIO_CFG_8MA);
-		gpio_tlmm_config(config, 0);
+		msm_gpios_disable_free(i2c_off_gpio_table,
+								ARRAY_SIZE(i2c_off_gpio_table));
 	}
 }
 
