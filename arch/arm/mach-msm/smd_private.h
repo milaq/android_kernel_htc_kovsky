@@ -71,9 +71,6 @@ struct smsm_interrupt_info
 	uint32_t interrupt_mask;
 	uint32_t pending_interrupts;
 	uint32_t wakeup_reason;
-//	#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
-//	uint32_t padding;
-//	#endif
 };
 #else
 #define DEM_MAX_PORT_NAME_LEN (20)
@@ -257,6 +254,14 @@ struct smd_alloc_elm {
 	char name[20];
 	uint32_t cid;
 	uint32_t ctype;
+	uint32_t ref_count;
+};
+
+struct smd_alloc_elm_v2 {
+	char name[20];
+	uint32_t cid;
+	uint32_t ctype;
+	uint32_t unknown1;
 	uint32_t ref_count;
 };
 

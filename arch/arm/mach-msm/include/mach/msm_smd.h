@@ -158,6 +158,7 @@ struct msm_smd_platform_data {
 		int n_amss_values;
 		struct msm_early_server *early_servers;
 		int n_early_servers;
+		bool use_v2_alloc_elm;
 };
 
 extern bool amss_get_num_value(enum amss_id, uint32_t* out);

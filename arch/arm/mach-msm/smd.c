@@ -209,6 +209,45 @@ static void smd_channel_probe_worker(struct work_struct *work)
 	wake_up(&rpccall_wait);
 }
 
+static void smd_channel_probe_worker_v2(struct work_struct *work)
+{
+	struct smd_alloc_elm_v2 *shared;
+	unsigned ctype;
+	unsigned type;
+	unsigned n;
+
+	shared = smem_find(ID_CH_ALLOC_TBL, sizeof(*shared) * 64);
+	if (!shared) {
+		pr_err("smd: cannot find allocation table\n");
+		return;
+	}
+	for (n = 0; n < 64; n++) {
+		if (smd_ch_allocated[n])
+			continue;
+		if (!shared[n].ref_count)
+			continue;
+		if (!shared[n].name[0])
+			continue;
+		ctype = shared[n].ctype;
+		type = ctype & SMD_TYPE_MASK;
+
+		/* DAL channels are stream but neither the modem,
+		 * nor the DSP correctly indicate this.  Fixup manually.
+		 */
+		if (!memcmp(shared[n].name, "DAL", 3))
+			ctype = (ctype & (~SMD_KIND_MASK)) | SMD_KIND_STREAM;
+
+		type = shared[n].ctype & SMD_TYPE_MASK;
+		if ((type == SMD_TYPE_APPS_MODEM) ||
+		    (type == SMD_TYPE_APPS_DSP))
+			if (!smd_alloc_channel
+			    (shared[n].name, shared[n].cid, ctype))
+				smd_ch_allocated[n] = 1;
+	}
+	rpccall_done = 1;
+	wake_up(&rpccall_wait);
+}
+
 /* how many bytes are available for reading */
 static int smd_stream_read_avail(struct smd_channel *ch)
 {
@@ -1167,7 +1206,10 @@ static int msm_smd_probe(struct platform_device *pdev)
 	pr_info("+%s\n", __func__);
 
 	init_waitqueue_head(&rpccall_wait);
-	INIT_WORK(&probe_work, smd_channel_probe_worker);
+	if (pdata && pdata->use_v2_alloc_elm)
+		INIT_WORK(&probe_work, smd_channel_probe_worker_v2);
+	else
+		INIT_WORK(&probe_work, smd_channel_probe_worker);
 
 	if (smd_core_init()) {
 		pr_err("smd_core_init() failed\n");
