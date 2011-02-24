@@ -220,10 +220,10 @@ static void htckovsky_set_charge(int flags)
 {
 	switch (flags) {
 	case PDA_POWER_CHARGE_USB:
-		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
+//		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
 		break;
 	case PDA_POWER_CHARGE_AC:
-		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
+//		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
 		break;
 	default:
 		gpio_set_value(KOVS100_N_CHG_ENABLE, 1);
@@ -235,7 +235,7 @@ static void htckovsky_set_charge(int flags)
 static int htckovsky_power_init(struct device *dev)
 {
 	int rc = 0;
-	printk(KERN_DEBUG "[KOVSKY]: POWER INIT\n");
+//	printk(KERN_DEBUG "[KOVSKY]: POWER INIT\n");
 
 	rc = gpio_request(KOVS100_N_CHG_ENABLE, "HTC Kovsky Power Supply");
 	if (rc)
@@ -409,9 +409,57 @@ static struct msm_snd_endpoint snd_endpoints_list[] = {
 
 #undef SND
 
+static void htckovsky_snd_device_hook(struct msm_snd_device_config *snd_dev) {
+	printk("%s: ear_mute=%d, device=%d, mic_mute=%d\n",
+			__func__, snd_dev->ear_mute, snd_dev->device, snd_dev->mic_mute);
+	//FIXME
+	if (snd_dev->device == SND_DEVICE_SPEAKER) {
+		gpio_set_value(KOVS100_SPK_AMP, 1);
+	}
+	else {
+		gpio_set_value(KOVS100_SPK_AMP, 0);
+	}
+
+	if (snd_dev->device == SND_DEVICE_HEADSET) {
+		gpio_set_value(KOVS100_HP_AMP, 1);
+	}
+	else {
+		gpio_set_value(KOVS100_HP_AMP, 0);
+	}
+}
+
+static void htckovsky_snd_volume_hook(struct msm_snd_volume_config *vol_cfg) {
+	printk("%s: device=%d method=%d volume=%d\n",
+			__func__,
+			vol_cfg->device, vol_cfg->method, vol_cfg->volume);
+}
+
+static int htckovsky_snd_init(void) {
+	int rc;
+	rc = gpio_request(KOVS100_SPK_AMP, "Kovsky speaker amplifier");
+	if (rc)
+		goto ret;
+
+	rc = gpio_request(KOVS100_HP_AMP, "Kovsky headphone amplifier");
+	if (rc)
+		goto fail_hp_amp;
+
+	gpio_direction_output(KOVS100_SPK_AMP, 0);
+	gpio_direction_output(KOVS100_HP_AMP, 0);
+
+	return 0;
+fail_hp_amp:
+	gpio_free(KOVS100_SPK_AMP);
+ret:
+	return rc;
+}
+
 static struct msm_snd_platform_data htckovsky_snd_pdata = {
 	.endpoints = snd_endpoints_list,
-	.num = ARRAY_SIZE(snd_endpoints_list),
+	.num_endpoints = ARRAY_SIZE(snd_endpoints_list),
+	.device_hook = htckovsky_snd_device_hook,
+	.volume_hook = htckovsky_snd_volume_hook,
+	.plat_init = htckovsky_snd_init,
 };
 
 static struct platform_device htckovsky_snd = {
