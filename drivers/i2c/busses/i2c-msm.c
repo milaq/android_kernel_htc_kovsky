@@ -480,6 +480,9 @@ msm_i2c_probe(struct platform_device *pdev)
 	wake_lock_init(&dev->wakelock, WAKE_LOCK_SUSPEND, "i2c");
 	platform_set_drvdata(pdev, dev);
 
+	//Claim gpios
+	msm_set_i2c_mux(true, NULL, NULL);
+	//Disable until actually used
 	msm_set_i2c_mux(false, NULL, NULL);
 
 	clk_enable(clk);
