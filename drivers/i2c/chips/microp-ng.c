@@ -17,21 +17,20 @@
 #include <linux/i2c.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/slab.h>
 #include <linux/microp-ng.h>
 
 #define I2C_READ_RETRY_TIMES 10
 #define I2C_WRITE_RETRY_TIMES 10
 
-static struct i2c_client *client_ptr = NULL;
-
-int microp_ng_write(uint8_t *sendbuf, int len)
+int microp_ng_write(struct i2c_client *client_ptr, uint8_t *sendbuf, int len)
 {
 	int rc;
 	int retry;
 
-	struct i2c_msg msg[] = {
+	struct i2c_msg msgs[] = {
 		{
-		 .addr = client_ptr->addr,
+		 .addr = 0,
 		 .flags = 0,
 		 .len = len,
 		 .buf = sendbuf,
@@ -39,14 +38,14 @@ int microp_ng_write(uint8_t *sendbuf, int len)
 	};
 
 	if (!client_ptr) {
-		printk(KERN_ERR "%s: i2c_client is NULL\n", __func__);
+		printk(KERN_ERR "%s: client_ptr is null\n", __func__);
 		return -EIO;
 	}
 
-	msg[0].addr = client_ptr->addr;
+	msgs[0].addr = client_ptr->addr;
 
 	for (retry = 0; retry <= I2C_WRITE_RETRY_TIMES; retry++) {
-		rc = i2c_transfer(client_ptr->adapter, msg, 1);
+		rc = i2c_transfer(client_ptr->adapter, msgs, 1);
 		if (rc == 1) {
 			rc = 0;
 			goto exit;
@@ -55,10 +54,12 @@ int microp_ng_write(uint8_t *sendbuf, int len)
 		printk(KERN_WARNING "microp_ng, i2c write retry\n");
 	}
 
-	if (retry >= I2C_WRITE_RETRY_TIMES)
+	if (retry >= I2C_WRITE_RETRY_TIMES) {
 		printk(KERN_ERR
 		       "microp_ng_write, i2c_write_block retry over %d\n",
 		       I2C_WRITE_RETRY_TIMES);
+		rc = -ETIMEDOUT;
+	}
 
 exit:
 	return rc;
@@ -66,7 +67,7 @@ exit:
 
 EXPORT_SYMBOL(microp_ng_write);
 
-int microp_ng_read(uint8_t id, uint8_t *buf, int len)
+int microp_ng_read(struct i2c_client *client_ptr, uint8_t id, uint8_t *buf, int len)
 {
 	int retry;
 	int rc;
@@ -87,7 +88,7 @@ int microp_ng_read(uint8_t id, uint8_t *buf, int len)
 	};
 
 	if (!client_ptr) {
-		printk(KERN_ERR "%s: i2c_client is NULL\n", __func__);
+		printk(KERN_ERR "%s: client_ptr is null\n", __func__);
 		return -EIO;
 	}
 
@@ -116,8 +117,26 @@ EXPORT_SYMBOL(microp_ng_read);
 
 static int microp_ng_remove(struct i2c_client *client)
 {
-	client_ptr = NULL;
+	struct microp_platform_data *data = NULL;
+	int i;
+	data = (struct microp_platform_data*)client->dev.platform_data;
+	for (i = data->nclients - 1; i >= 0; i--) {
+		dev_set_drvdata(&data->clients[i]->dev, NULL);
+		platform_device_unregister(data->clients[i]);
+	}
 	return 0;
+}
+
+static uint16_t microp_ng_get_version(struct i2c_client *client, unsigned char reg) {
+	uint8_t version[2];
+
+	int ret = microp_ng_read(client, reg, version, 2);
+	if (ret < 0) {
+	  printk(KERN_ERR "%s: error reading microp version %d\n", __func__, ret);
+	  return false;
+	}
+	printk("%s: version %x%x\n", __func__, version[0], version[1]);
+	return ((version[0] << 8) | version[1]);
 }
 
 static int microp_ng_probe(struct i2c_client *client,
@@ -125,6 +144,8 @@ static int microp_ng_probe(struct i2c_client *client,
 {
 	struct microp_platform_data *data = NULL;
 	int r, i = 0;
+	uint16_t version;
+	bool found = 0;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
 		printk(KERN_ERR "%s: i2c bus not supported\n", __func__);
@@ -139,34 +160,49 @@ static int microp_ng_probe(struct i2c_client *client,
 	}
 
 	data = (struct microp_platform_data *)(client->dev.platform_data);
-	client_ptr = client;
-	
+
 	if (!data->nclients) {
 	  printk(KERN_ERR "%s: platform did not specify any clients\n", __func__);
 	  r = -EINVAL;
 	  goto fail;
 	}
 
-	if (!data->is_supported()) {
-		printk(KERN_WARNING
-		       "%s: This hardware is not yet supported\n",
-		       __func__);
-		r = -ENOTSUPP;
+	if (!data->comp_versions || !data->n_comp_versions) {
+		printk(KERN_ERR "%s: platform did not specify compatible versions\n",
+				 __func__);
+		r = -EINVAL;
 		goto fail;
 	}
-	
+
+	version = microp_ng_get_version(client, data->version_reg);
+	for (i = 0; i < data->n_comp_versions; i++) {
+		if (data->comp_versions[i] == version) {
+			found = true;
+			break;
+		}
+	}
+
+	if (!found) {
+		printk(KERN_ERR "%s: no compatible version was found\n",
+				 __func__);
+		r = -EINVAL;
+		goto fail;
+	}
+
 	for (i = 0; i < data->nclients; i++) {
-	  r = platform_device_register(data->clients[i]);
-	  if (r)
-	    goto fail;
+		dev_set_drvdata(&data->clients[i]->dev, client);
+		r = platform_device_register(data->clients[i]);
+		if (r)
+			goto fail_pdev;
 	}
 
 	return 0;
-fail:
+fail_pdev:
 	for (i--; i >= 0; i--) {
-	  platform_device_unregister(data->clients[i]);
+		dev_set_drvdata(&data->clients[i]->dev, NULL);
+		platform_device_unregister(data->clients[i]);
 	}
-	client_ptr = NULL;
+fail:
 	return r;
 }
 
@@ -200,6 +236,6 @@ static void __exit microp_ng_exit(void)
 MODULE_AUTHOR("Alexander Tarasikov <alexander.tarasikov@gmail.com>");
 MODULE_DESCRIPTION("MicroP manager driver");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("0.2");
+MODULE_VERSION("0.3");
 module_init(microp_ng_init);
 module_exit(microp_ng_exit);

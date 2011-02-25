@@ -42,6 +42,7 @@ static void htckovsky_set_brightness_color(struct led_classdev*, enum led_bright
 static DECLARE_DELAYED_WORK(colorled_wq, htckovsky_update_color_leds);
 static DECLARE_DELAYED_WORK(backlight_wq, htckovsky_update_backlight);
 static DECLARE_DELAYED_WORK(buttonlight_wq, htckovsky_update_button_light);
+static struct i2c_client *client = NULL;
 
 enum kovsky_led {RED, GREEN, BLUE, LCD, BUTTONS};
 
@@ -105,15 +106,15 @@ static void htckovsky_set_pattern(char *cmd, size_t count)
 	if (count != 0x47)
 		return;
 
-	microp_ng_write(off_cmd, ARRAY_SIZE(off_cmd));
-	microp_ng_write(cmd, count);
-	microp_ng_write(on_cmd, ARRAY_SIZE(on_cmd));
+	microp_ng_write(client, off_cmd, ARRAY_SIZE(off_cmd));
+	microp_ng_write(client, cmd, count);
+	microp_ng_write(client, on_cmd, ARRAY_SIZE(on_cmd));
 }
 
 static void htckovsky_update_color_leds(struct work_struct* work) {
 	char buf[2] = {0x20, (!!kovsky_leds[RED].brightness)
 	| ((!!kovsky_leds[GREEN].brightness) << 1) | ((!!kovsky_leds[BLUE].brightness) << 2) | 0x80};
-	microp_ng_write(buf, 2);	
+	microp_ng_write(client, buf, 2);
 }
 
 static void htckovsky_update_backlight(struct work_struct* work) {
@@ -123,19 +124,19 @@ static void htckovsky_update_backlight(struct work_struct* work) {
 		buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
 		buffer[1] = LED_FULL;
 		buffer[2] = brightness;
-		microp_ng_write(buffer, 3);
+		microp_ng_write(client, buffer, 3);
 	}
 	else {
 		buffer[1] = buffer[2] = 0;
 
 		buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
-		microp_ng_write(buffer, 3);
+		microp_ng_write(client, buffer, 3);
 
 		buffer[0] = 0x11;
-		microp_ng_write(buffer, 3);
-		
+		microp_ng_write(client, buffer, 3);
+
 		buffer[0] = 0x13;
-		microp_ng_write(buffer, 3);
+		microp_ng_write(client, buffer, 3);
 	}
 }
 
@@ -146,7 +147,7 @@ static void htckovsky_update_button_light(struct work_struct* work) {
 		buffer[1] = 0x94;
 		buffer[2] = brightness >> 2;
 	}
-	microp_ng_write(buffer, 3);
+	microp_ng_write(client, buffer, 3);
 }
 
 static void htckovsky_set_brightness_color(struct led_classdev *led_cdev,
@@ -171,8 +172,9 @@ static int htckovsky_microp_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	int i;
-	
+
 	printk(KERN_INFO "+%s\n", __func__);
+	client = dev_get_drvdata(&pdev->dev);
 
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
 		ret = led_classdev_register(&pdev->dev, &kovsky_leds[i]);
@@ -197,6 +199,7 @@ static int htckovsky_microp_remove(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
 		led_classdev_unregister(&kovsky_leds[i]);
 	}
+	client = NULL;
 	return 0;
 }
 

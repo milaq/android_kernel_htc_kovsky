@@ -306,18 +306,6 @@ static struct ds2746_platform_data kovsky_battery_data = {
 /******************************************************************************
  * MicroP
  ******************************************************************************/
-static bool htckovsky_is_microp_supported(void) {
-	uint8_t version[2];
-
-	int ret = microp_ng_read(MICROP_VERSION_REG_KOVS, version, 2);
-	if (ret < 0) {
-	  printk(KERN_ERR "%s: error reading microp version %d\n", __func__, ret);
-	  return false;
-	}
-	printk("%s: version %x%x\n", __func__, version[0], version[1]);
-	return ((version[0] << 8) | version[1]) == 0x787;
-}
-
 static struct platform_device htckovsky_microp_leds = {
   .id = -1,
   .name = "htckovsky-microp-leds",
@@ -327,10 +315,16 @@ static struct platform_device* htckovsky_microp_clients[] = {
     &htckovsky_microp_leds,
 };
 
+static uint16_t micropklt_compatible_versions[] = {
+	0x787,
+};
+
 static struct microp_platform_data htckovsky_microp_pdata = {
-	.is_supported = htckovsky_is_microp_supported,
+	.version_reg = MICROP_VERSION_REG_KOVS,
 	.clients = htckovsky_microp_clients,
 	.nclients = ARRAY_SIZE(htckovsky_microp_clients),
+	.comp_versions = micropklt_compatible_versions,
+	.n_comp_versions = ARRAY_SIZE(micropklt_compatible_versions),
 };
 
 /******************************************************************************
