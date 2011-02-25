@@ -17,7 +17,7 @@
 #ifndef __ARCH_ARM_MACH_MSM_PM_H
 #define __ARCH_ARM_MACH_MSM_PM_H
 
-#include <asm/arch/msm_iomap.h>
+#include <mach/msm_iomap.h>
 
 #define A11S_CLK_SLEEP_EN_ADDR MSM_CSR_BASE + 0x11c
 
@@ -28,4 +28,7 @@
 #define CLK_SLEEP_EN_PBUS	0x10
 #define CLK_SLEEP_EN_DEBUG_TIME	0x20
 #define CLK_SLEEP_EN_GP_TIMER	0x40
+
+extern void msm_register_halt_hook(void(*)(void));
+
 #endif

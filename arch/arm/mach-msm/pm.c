@@ -138,6 +138,9 @@ static uint32_t *msm_pm_reset_vector;
 
 static uint32_t msm_pm_max_sleep_time;
 
+static void(*plat_halt_hook)(void) = NULL;
+
+
 #ifdef CONFIG_MSM_IDLE_STATS
 enum msm_pm_time_stats_id {
 	MSM_PM_STAT_REQUESTED_IDLE,
@@ -196,7 +199,7 @@ msm_pm_wait_state(uint32_t wait_all_set, uint32_t wait_all_clear,
 
 	for (i = 0; i < 100000; i++) {
 		state = smsm_get_state(PM_SMSM_READ_STATE);
-		if (((wait_all_set || wait_all_clear) && 
+		if (((wait_all_set || wait_all_clear) &&
 		     !(~state & wait_all_set) && !(state & wait_all_clear)) ||
 		    (state & wait_any_set) || (~state & wait_any_clear))
 			return 0;
@@ -590,6 +593,9 @@ static uint32_t restart_reason = 0;
 
 static void msm_pm_power_off(void)
 {
+	if (plat_halt_hook) {
+		plat_halt_hook();
+	}
 #if defined(CONFIG_MSM_AMSS_VERSION_ANDROID)
 	msm_proc_comm(PCOM_POWER_DOWN, 0, 0);
 #endif
@@ -631,7 +637,7 @@ static void msm_pm_restart(char str)
 	 */
 	if ((restart_reason == 0x776655AA) && msm_hw_reset_hook) {
 		msm_hw_reset_hook();
-	} 
+	}
 #if defined(CONFIG_MSM_AMSS_VERSION_ANDROID)
 else {
 		msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
@@ -729,8 +735,8 @@ void msm_pm_set_max_sleep_time(int64_t max_sleep_time_ns)
 
 	if (msm_pm_debug_mask & MSM_PM_DEBUG_SUSPEND)
 		printk("%s: Requested %lldns (%lldbs), Giving %ubs\n",
-		       __func__, max_sleep_time_ns, 
-		       max_sleep_time_bs, 
+		       __func__, max_sleep_time_ns,
+		       max_sleep_time_bs,
 		       msm_pm_max_sleep_time);
 }
 EXPORT_SYMBOL(msm_pm_set_max_sleep_time);
@@ -753,6 +759,10 @@ static struct early_suspend axi_screen_suspend = {
 	.resume = axi_late_resume,
 };
 #endif
+
+void msm_register_halt_hook(void(*halt_hook)(void)) {
+	plat_halt_hook = halt_hook;
+}
 
 static void __init msm_pm_axi_init(void)
 {
