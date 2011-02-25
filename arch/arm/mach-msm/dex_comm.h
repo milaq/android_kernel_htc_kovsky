@@ -96,5 +96,6 @@ struct msm_dex_command {
 
 int msm_dex_comm(struct msm_dex_command *in, unsigned *out);
 int msm_dex_comm_init(void);
+void dex_vibrate(uint32_t val);
 
 #endif
