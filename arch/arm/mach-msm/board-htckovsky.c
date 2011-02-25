@@ -861,33 +861,6 @@ static struct msm_serial_hs_platform_data msm_uart_dm2_pdata = {
 };
 #endif
 
-static void htcraphael_reset(void)
-{
-	struct msm_dex_command dex = {.cmd = DEX_NOTIFY_ARM9_REBOOT };
-	msm_dex_comm(&dex, 0);
-	mdelay(0x15e);
-	gpio_request(25, "MSM Reset");
-	msm_gpio_set_flags(25, GPIOF_OWNER_ARM11);
-	gpio_direction_output(25, 0);
-	printk(KERN_INFO "%s: Soft reset done.\n", __func__);
-}
-
-static void htcraphael_set_vibrate(uint32_t val)
-{
-	struct msm_dex_command vibra;
-
-	if (val == 0) {
-		vibra.cmd = DEX_VIBRA_OFF;
-		msm_dex_comm(&vibra, 0);
-	} else if (val > 0) {
-		if (val == 1 || val > 0xb22)
-			val = 0xb22;
-		writel(val, MSM_SHARED_RAM_BASE + 0xfc130);
-		vibra.cmd = DEX_VIBRA_ON;
-		msm_dex_comm(&vibra, 0);
-	}
-}
-
 static void __init htckovsky_init(void)
 {
 	int i;
@@ -895,9 +868,6 @@ static void __init htckovsky_init(void)
 	msm_acpu_clock_init(&htckovsky_clock_data);
 	msm_dex_comm_init();
 	msm_add_mem_devices(&htckovsky_pmem_settings);
-
-	// Register hardware reset hook
-	msm_hw_reset_hook = htcraphael_reset;
 
 	msm_device_hsusb.dev.platform_data = &htckovsky_hsusb_pdata;
 
@@ -914,9 +884,9 @@ static void __init htckovsky_init(void)
 
 	/* A little vibrating welcome */
 	for (i = 0; i < 2; i++) {
-		htcraphael_set_vibrate(1);
+		dex_vibrate(1);
 		mdelay(150);
-		htcraphael_set_vibrate(0);
+		dex_vibrate(0);
 		mdelay(75);
 	}
 }
