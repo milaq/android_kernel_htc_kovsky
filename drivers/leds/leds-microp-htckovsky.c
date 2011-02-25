@@ -39,9 +39,9 @@ static void htckovsky_set_backlight(struct led_classdev*, enum led_brightness);
 static void htckovsky_set_button_light(struct led_classdev*, enum led_brightness);
 static void htckovsky_set_brightness_color(struct led_classdev*, enum led_brightness);
 
-static DECLARE_DELAYED_WORK(colorled_wq, htckovsky_update_color_leds);
-static DECLARE_DELAYED_WORK(backlight_wq, htckovsky_update_backlight);
-static DECLARE_DELAYED_WORK(buttonlight_wq, htckovsky_update_button_light);
+static DECLARE_WORK(colorled_wq, htckovsky_update_color_leds);
+static DECLARE_WORK(backlight_wq, htckovsky_update_backlight);
+static DECLARE_WORK(buttonlight_wq, htckovsky_update_button_light);
 static struct i2c_client *client = NULL;
 
 enum kovsky_led {RED, GREEN, BLUE, LCD, BUTTONS};
@@ -153,19 +153,19 @@ static void htckovsky_update_button_light(struct work_struct* work) {
 static void htckovsky_set_brightness_color(struct led_classdev *led_cdev,
 					 enum led_brightness brightness)
 {
-	schedule_delayed_work(&colorled_wq, HZ);
+	schedule_work(&colorled_wq);
 }
 
 static void htckovsky_set_button_light(struct led_classdev *led_cdev,
 					       enum led_brightness brightness)
 {
-	schedule_delayed_work(&buttonlight_wq, HZ);
+	schedule_work(&buttonlight_wq);
 }
 
 static void htckovsky_set_backlight(struct led_classdev *led_cdev,
 					 enum led_brightness brightness)
 {
-	schedule_delayed_work(&backlight_wq, HZ);
+	schedule_work(&backlight_wq);
 }
 
 static int htckovsky_microp_probe(struct platform_device *pdev)
