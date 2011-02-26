@@ -101,6 +101,14 @@ struct vreg *vreg_get(struct device *dev, const char *id)
 	return ERR_PTR(-ENOENT);
 }
 
+struct vreg *vreg_get_by_id(struct device *dev, int id)
+{
+	int n;
+	if (id < ARRAY_SIZE(vregs))
+		return vregs + id;
+	return ERR_PTR(-ENOENT);
+}
+
 void vreg_put(struct vreg *vreg)
 {
 }
@@ -162,9 +170,9 @@ int vreg_set_level(struct vreg *vreg, unsigned mv)
 
 
 #if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
-	struct msm_dex_command dex = { 
+	struct msm_dex_command dex = {
 		.cmd = DEX_PMIC_REG_VOLTAGE,
-		.has_data = 1, 
+		.has_data = 1,
 		.data = (1U << id) };
 	// This reg appears to only be used by vreg_set_level()
 	writel(mv, MSM_SHARED_RAM_BASE + 0xfc130);
