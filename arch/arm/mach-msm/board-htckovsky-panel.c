@@ -30,7 +30,6 @@
 #include <mach/vreg.h>
 
 #include "board-htckovsky.h"
-#include "dex_comm.h"
 #include "devices.h"
 
 struct mddi_table {
@@ -62,6 +61,7 @@ static struct spi_table epson_spi_init_table[] = {
 	{0x2a, 0x666},
 	{0x100, 0x33},
 	{0x101, 0x3},
+	{0x102, 0x3700},
 	{0x300, 0x7777},
 	{0x301, 0x2116},
 	{0x302, 0xc114},
@@ -383,6 +383,7 @@ static inline void htckovsky_process_toshiba_spi_table(struct msm_mddi_client_da
 }
 */
 
+static struct vreg *vreg_26v = NULL, *vreg_18v = NULL, *vreg_aux2 = NULL;
 
 static inline void htckovsky_process_epson_spi_table(struct msm_mddi_client_data *client_data,
 					struct spi_table *table,
@@ -399,20 +400,27 @@ static inline void htckovsky_process_epson_spi_table(struct msm_mddi_client_data
 	}
 }
 
-static void htckovsky_process_mddi_table(struct msm_mddi_client_data *client_data,
-					  struct mddi_table *table,
-					  size_t count) {
+static void htckovsky_process_mddi_table(struct msm_mddi_client_data
+					 *client_data, struct mddi_table *table,
+					 size_t count)
+{
 	int i;
 	for (i = 0; i < count; i++) {
 		uint32_t reg = table[i].reg;
 		uint32_t value = table[i].value;
 
-		if (reg == 0)
+		switch (reg) {
+		case 0:
 			udelay(value);
-		else if (reg == 1)
+			break;
+
+		case 1:
 			mdelay(value);
-		else
+			break;
+
+		default:
 			client_data->remote_write(client_data, value, reg);
+		}
 	}
 }
 
@@ -429,64 +437,35 @@ static void htckovsky_mddi_bridge_reset(int reset_asserted) {
 		else {
 				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
 				gpio_direction_output(KOVS100_MDDI_PWR, 0);
-				mdelay(5);
+				mdelay(1);
 		}
 }
 
 static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data, int on) {
-	struct msm_dex_command dex;
-
 	return;
 	printk("htckovsky_mddi_power_client(%d)\n", on);
 	if (on) {
 		printk(KERN_DEBUG "%s: +powering up panel\n", __func__);
 		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
-
 		printk(KERN_DEBUG "%s: enabled panel power\n", __func__);
 
-		dex.cmd = DEX_PMIC_REG_ON;
-		dex.has_data = 1;
-		dex.data = 0x80;
-		msm_dex_comm(&dex, 0);
-		mdelay(50);
-		printk(KERN_DEBUG "%s: enabled register 0x80\n", __func__);
-
-		dex.data = 0x40000;
-		msm_dex_comm(&dex, 0);
-		mdelay(50);
-		printk(KERN_DEBUG "%s: enabled register 0x40000\n", __func__);
-
-		dex.data = 0x400000;
-		msm_dex_comm(&dex, 0);
-		mdelay(50);
-		printk(KERN_DEBUG "%s: enabled register 0x400000\n", __func__);
-		mdelay(500);
+		vreg_enable(vreg_18v);
+		vreg_enable(vreg_26v);
+		vreg_enable(vreg_aux2);
+		msleep(5);
+		htckovsky_mddi_bridge_reset(1);
 
 		printk(KERN_DEBUG "%s: enabled mddi bridge power\n", __func__);
 		printk(KERN_DEBUG "%s: -powering up panel\n", __func__);
 	} else {
 
 		printk(KERN_DEBUG "%s: +shutting down panel\n", __func__);
-
-		dex.cmd = DEX_PMIC_REG_OFF;
-		dex.has_data = 1;
-		dex.data = 0x400000;
-		msm_dex_comm(&dex, 0);
-		mdelay(50);
-		printk(KERN_DEBUG "%s: disabled register 0x400000\n", __func__);
-
-		dex.data = 0x40000;
-		msm_dex_comm(&dex, 0);
-		mdelay(50);
-		printk(KERN_DEBUG "%s: disabled register 0x40000\n", __func__);
-
-		dex.data = 0x80;
-		msm_dex_comm(&dex, 0);
-		mdelay(50);
-		printk(KERN_DEBUG "%s: disabled register 0x80\n", __func__);
-
+		htckovsky_mddi_bridge_reset(0);
+		vreg_disable(vreg_aux2);
+		vreg_disable(vreg_26v);
+		vreg_disable(vreg_18v);
 		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 0);
-		mdelay(10);
+		msleep(10);
 		printk(KERN_DEBUG "%s: disabled panel power\n", __func__);
 		printk(KERN_DEBUG "%s: -shutting down panel\n", __func__);
 	}
@@ -514,37 +493,17 @@ static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data *br
 
 }
 
-static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data *bridge_data,
-				       struct msm_mddi_client_data *client_data) {
+static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data
+				      *bridge_data,
+				      struct msm_mddi_client_data *client_data)
+{
 	printk(KERN_DEBUG "%s: +blank panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
-        htckovsky_process_mddi_table(client_data,
-        		mddi_epson_deinit_table,
-        		ARRAY_SIZE(mddi_epson_deinit_table));
+	htckovsky_process_mddi_table(client_data,
+				     mddi_epson_deinit_table,
+				     ARRAY_SIZE(mddi_epson_deinit_table));
 	client_data->auto_hibernate(client_data, 1);
 	printk(KERN_DEBUG "%s: -blank panel\n", __func__);
-	return 0;
-}
-
-static int htckovsky_mddi_panel_init(struct msm_mddi_bridge_platform_data *bridge_data,
-				       struct msm_mddi_client_data *client_data) {
-	printk(KERN_DEBUG "%s: +init panel\n", __func__);
-	htckovsky_mddi_power_client(client_data, 1);
-	htckovsky_mddi_bridge_reset(1);
-	htckovsky_mddi_panel_unblank(bridge_data, client_data);
-	printk(KERN_DEBUG "%s: -init panel\n", __func__);
-
-	return 0;
-}
-
-static int htckovsky_mddi_panel_uninit(struct msm_mddi_bridge_platform_data *bridge_data,
-				       struct msm_mddi_client_data *client_data) {
-
-	printk(KERN_DEBUG "%s: +uninit panel\n", __func__);
-	htckovsky_mddi_panel_blank(bridge_data, client_data);
-	htckovsky_mddi_bridge_reset(0);
-	htckovsky_mddi_power_client(client_data, 0);
-	printk(KERN_DEBUG "%s: -uninit panel\n", __func__);
 	return 0;
 }
 
@@ -562,6 +521,8 @@ static struct msm_mddi_bridge_platform_data epson_client_data = {
 	.blank = htckovsky_mddi_panel_blank,
 	.unblank = htckovsky_mddi_panel_unblank,
 	.fb_data = {
+		    .width = 38,
+		    .height = 65,
 		    .xres = 480,
 		    .yres = 800,
 		    .output_format = 0,
@@ -588,7 +549,7 @@ static struct msm_mddi_platform_data mddi_pdata = {
 
 int __init htckovsky_init_panel(void)
 {
-	int rc;
+	int ret;
 
 	printk(KERN_INFO "%s: Initializing panel\n", __func__);
 
@@ -597,20 +558,59 @@ int __init htckovsky_init_panel(void)
 		return 0;
 	}
 
-	rc = gpio_request(KOVS100_LCD_VSYNC, "vsync");
-	if (rc)
-		return rc;
-	rc = gpio_direction_input(KOVS100_LCD_VSYNC);
-	if (rc)
-		return rc;
+	vreg_18v = vreg_get_by_id(0, 7);
+	if (IS_ERR(vreg_18v)) {
+		printk(KERN_ERR "%s: couldn't request vreg_18v\n", __func__);
+		ret = PTR_ERR(vreg_18v);
+		goto fail_vreg_18v;
+	}
 
-	rc = platform_device_register(&msm_device_mdp);
-	if (rc)
-		return rc;
+	vreg_26v = vreg_get_by_id(0, 18);
+	if (IS_ERR(vreg_26v)) {
+		printk(KERN_ERR "%s: couldn't request vreg_26v\n", __func__);
+		ret = PTR_ERR(vreg_26v);
+		goto fail_vreg_26v;
+	}
 
-	writel(0xa19, MSM_CLK_CTL_BASE + 0x8c);
+	vreg_aux2 = vreg_get_by_id(0, 22);
+	if (IS_ERR(vreg_aux2)) {
+		printk(KERN_ERR "%s: couldn't request vreg_aux2\n", __func__);
+		ret = PTR_ERR(vreg_aux2);
+		goto fail_vreg_aux2;
+	}
+
+	ret = gpio_request(KOVS100_LCD_VSYNC, "vsync");
+	if (ret)
+		goto fail_gpio;
+	ret = gpio_direction_input(KOVS100_LCD_VSYNC);
+	if (ret)
+		goto fail_direction;
+
+	ret = platform_device_register(&msm_device_mdp);
+	if (ret)
+		goto fail_mdp;
+
+	writel(0x19, MSM_CLK_CTL_BASE + 0x8c);
 	msm_device_mddi0.dev.platform_data = &mddi_pdata;
-	return platform_device_register(&msm_device_mddi0);
+	ret = platform_device_register(&msm_device_mddi0);
+	if (ret)
+		goto fail_mddi;
+
+	return 0;
+
+fail_mddi:
+	platform_device_unregister(&msm_device_mdp);
+fail_mdp:
+fail_direction:
+	gpio_free(KOVS100_LCD_VSYNC);
+fail_gpio:
+	vreg_put(vreg_aux2);
+fail_vreg_aux2:
+	vreg_put(vreg_26v);
+fail_vreg_26v:
+	vreg_put(vreg_18v);
+fail_vreg_18v:
+	return ret;
 }
 
 device_initcall(htckovsky_init_panel);
