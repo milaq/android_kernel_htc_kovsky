@@ -203,7 +203,7 @@ static struct microp_platform_data htckovsky_microp_keypad_pdata = {
  * Power Supply
  ******************************************************************************/
 static char *supplicants[] = {
-	"ds2746_battery",	//hardcoded in ds2746_battery driver for now
+	"ds2746-battery",	//hardcoded in ds2746_battery driver for now
 };
 
 static struct resource htckovsky_power_resources[] = {
@@ -222,26 +222,27 @@ static struct resource htckovsky_power_resources[] = {
 static int htckovsky_is_usb_online(void)
 {
 	int vbus_state = readl(MSM_SHARED_RAM_BASE + 0xfc00c);
-	printk(KERN_DEBUG "[KOVSKY]: is usb online == %d\n", vbus_state);
 	msm_hsusb_set_vbus_state(vbus_state);
 	return vbus_state;
 }
 
 static int htckovsky_is_ac_online(void)
 {
-	int ret = !gpio_get_value(KOVS100_AC_DETECT);
-	printk(KERN_DEBUG "[KOVSKY]: is ac online == %d\n", ret);
-	return ret;
+	int vbus_state = readl(MSM_SHARED_RAM_BASE + 0xfc00c);
+	int cable_in = !gpio_get_value(KOVS100_AC_DETECT);
+	printk(KERN_DEBUG "[KOVSKY]: gpio_ac_detect=%d\n", cable_in);
+	printk(KERN_DEBUG "[KOVSKY]: vbus=%d\n", cable_in);
+	return cable_in & !vbus_state;
 }
 
 static void htckovsky_set_charge(int flags)
 {
 	switch (flags) {
 	case PDA_POWER_CHARGE_USB:
-//		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
+		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
 		break;
 	case PDA_POWER_CHARGE_AC:
-//		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
+		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
 		break;
 	default:
 		gpio_set_value(KOVS100_N_CHG_ENABLE, 1);
@@ -255,11 +256,11 @@ static int htckovsky_power_init(struct device *dev)
 	int rc = 0;
 //	printk(KERN_DEBUG "[KOVSKY]: POWER INIT\n");
 
-	rc = gpio_request(KOVS100_N_CHG_ENABLE, "HTC Kovsky Power Supply");
+	rc = gpio_request(KOVS100_N_CHG_ENABLE, "HTC Kovsky charger disable");
 	if (rc)
 		goto err;
 
-	rc = gpio_request(KOVS100_AC_DETECT, "HTC Kovsky Power Supply");
+	rc = gpio_request(KOVS100_AC_DETECT, "HTC Kovsky charger detection");
 	if (rc)
 		goto err;
 
@@ -297,28 +298,11 @@ static struct platform_device htckovsky_powerdev = {
 		},
 };//End of power supply
 
-static void ds2746_set_charge(int enable)
-{
-	if (!enable) {
-		htckovsky_set_charge(0);
-		return;
-	}
-
-	if (htckovsky_is_ac_online())
-		htckovsky_set_charge(PDA_POWER_CHARGE_AC);
-	else if (htckovsky_is_usb_online())
-		htckovsky_set_charge(PDA_POWER_CHARGE_USB);
-	else
-		htckovsky_set_charge(0);
-
-};
-
 static struct ds2746_platform_data kovsky_battery_data = {
 	.resistance = 1500,
 	.capacity = 1660,
 	.high_voltage = 4200,
 	.low_voltage = 3600,
-	.set_charge = ds2746_set_charge,
 };
 
 /******************************************************************************
