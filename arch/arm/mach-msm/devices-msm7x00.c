@@ -265,7 +265,7 @@ static struct msm_gpio msm72k_usb_off_table[] = {
 
 struct msm_hsusb_platform_data *msm_hsusb_board_pdata = NULL;
 
-static void msm72k_usb_ulpi_config(int enable)
+static void msm72k_usb_connected(int enable)
 {
 	static bool gpios_requested = false;
 	int rc;
@@ -296,7 +296,7 @@ static void msm72k_usb_phy_reset(void) {
 			msm_hsusb_board_pdata->phy_reset();
 }
 
-static void msm72k_usb_hw_reset(int enable) {
+static void msm72k_usb_hw_reset(bool enable) {
 		if (msm_hsusb_board_pdata && msm_hsusb_board_pdata->hw_reset)
 			msm_hsusb_board_pdata->hw_reset(enable);
 }
@@ -313,7 +313,7 @@ static struct msm_hsusb_platform_data msm_hsusb_pdata = {
 	.phy_init_seq = usb_phy_init_seq_msm72k,
 	.phy_reset = msm72k_usb_phy_reset,
 	.hw_reset = msm72k_usb_hw_reset,
-	.usb_connected = msm72k_usb_ulpi_config,
+	.usb_connected = msm72k_usb_connected,
 };
 
 static struct resource resources_hsusb[] = {
