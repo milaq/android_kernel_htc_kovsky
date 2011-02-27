@@ -167,6 +167,7 @@ static void htckovsky_exit_microp_keypad(struct device *dev) {
 
 static struct microp_keypad_platform_data htckovsky_keypad_data = {
 	.read_modifiers = true,
+	.gpio_clamshell = -1,
 	.init = htckovsky_init_microp_keypad,
 	.exit = htckovsky_exit_microp_keypad,
 	.irq_keypress = MSM_GPIO_TO_INT(KOVS100_SLIDER_IRQ_GPIO),

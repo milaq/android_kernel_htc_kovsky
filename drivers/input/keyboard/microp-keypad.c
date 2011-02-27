@@ -12,20 +12,19 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/slab.h>
-#include <linux/interrupt.h>
-#include <linux/irq.h>
-#include <linux/gpio.h>
-#include <linux/input.h>
+#include <linux/platform_device.h>
+
 #include <linux/delay.h>
 #include <linux/mutex.h>
 #include <linux/workqueue.h>
-#include <linux/platform_device.h>
-#include <linux/i2c.h>
-#include <linux/microp-ng.h>
-#include <asm/io.h>
-#include <asm/gpio.h>
+#include <linux/input.h>
 
+#include <linux/gpio.h>
+#include <linux/i2c.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+
+#include <linux/microp-ng.h>
 #include <linux/microp-keypad.h>
 
 #define MODULE_NAME "microp-keypad"
@@ -40,17 +39,23 @@
 
 static struct microp_keypad_t {
 	struct mutex lock;
-	struct work_struct keypad_work;
+	struct i2c_client *client;
 	struct input_dev *input;
 	struct microp_keypad_platform_data *pdata;
+	struct work_struct keypad_work;
+	struct work_struct clamshell_work;
 	struct platform_device *pdev;
-	struct i2c_client *client;
 } microp_keypad;
 
 static irqreturn_t microp_keypad_interrupt(int irq, void *handle)
 {
-//	disable_irq_nosync(microp_keypad.pdata->irq_keypress);
 	schedule_work(&microp_keypad.keypad_work);
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t microp_clamshell_interrupt(int irq, void *handle)
+{
+	schedule_work(&microp_keypad.clamshell_work);
 	return IRQ_HANDLED;
 }
 
@@ -58,7 +63,7 @@ static void microp_keypad_work(struct work_struct *work)
 {
 	uint8_t buffer[3] = "\0\0\0";
 	uint8_t key = 0;
-	uint8_t clamshell;
+	uint8_t slider_open = 1;
 	bool isdown;
 	static uint8_t last_key = 0;
 	mutex_lock(&microp_keypad.lock);
@@ -67,26 +72,34 @@ static void microp_keypad_work(struct work_struct *work)
 	microp_ng_read(microp_keypad.client, MICROP_KSC_ID_SCANCODE, buffer, 2);
 
 	key = buffer[0] & MICROP_KSC_SCANCODE_MASK;
-	isdown = !(buffer[0] & MICROP_KSC_RELEASED_BIT);
+	isdown = !(buffer[0] & MICROP_KSC_RELEASED_MASK);
 
-#if 0
 	if (microp_keypad.pdata->read_modifiers) {
 		microp_ng_read(microp_keypad.client, MICROP_KSC_ID_MODIFIER, buffer, 2);
-		clamshell = (buffer[1] & MICROP_KSC_RELEASED_BIT) == 0;
+		slider_open = (buffer[1] & MICROP_KSC_CLAMSHELL_MASK);
+		input_report_switch(microp_keypad.input, SW_LID, slider_open);
 	}
-#endif
 
 	input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
 		if (key < microp_keypad.pdata->keypad_scancodes_size) {
 			input_report_key(microp_keypad.input,
 							last_key = microp_keypad.pdata->keypad_scancodes[key],
 							isdown);
-			input_sync(microp_keypad.input);
 		}
 	} while (key);
-
+	input_sync(microp_keypad.input);
 	mutex_unlock(&microp_keypad.lock);
-//	enable_irq(microp_keypad.pdata->irq_keypress);
+}
+
+static void microp_clamshell_work(struct work_struct *work)
+{
+	int open = 1;
+
+	mutex_lock(&microp_keypad.lock);
+		open = gpio_get_value(microp_keypad.pdata->gpio_clamshell);
+		input_report_switch(microp_keypad.input, SW_LID, !open);
+		input_sync(microp_keypad.input);
+	mutex_unlock(&microp_keypad.lock);
 }
 
 static int microp_keypad_probe(struct platform_device *pdev)
@@ -128,7 +141,7 @@ static int microp_keypad_probe(struct platform_device *pdev)
 	// Initialize input device
 	input = input_allocate_device();
 	if (!input)
-		goto fail_input_device;
+		goto fail_input_alloc;
 
 	input->name = MODULE_NAME;
 
@@ -136,11 +149,16 @@ static int microp_keypad_probe(struct platform_device *pdev)
 	set_bit(EV_KEY, input->evbit);
 
 	// Tell input subsystem to handle auto-repeat of keys for us
-//	set_bit(EV_REP, input->evbit);
+	set_bit(EV_REP, input->evbit);
 
 	// Tell input subsystem we can provide overridable scancodes
 	set_bit(EV_MSC, input->evbit);
 	set_bit(MSC_SCAN, input->mscbit);
+
+	if (pdata->read_modifiers || pdata->gpio_clamshell >= 0) {
+		set_bit(EV_SW, input->evbit);
+		input_set_capability(input, EV_SW, SW_LID);
+	}
 
 	input->keycodesize = sizeof(pdata->keypad_scancodes[0]);
 	input->keycodemax = pdata->keypad_scancodes_size;
@@ -156,7 +174,7 @@ static int microp_keypad_probe(struct platform_device *pdev)
 
 	ret = input_register_device(input);
 	if (ret)
-		goto fail_input_device;
+		goto fail_input_register;
 
 	microp_keypad.pdev = pdev;
 	microp_keypad.input = input;
@@ -165,19 +183,39 @@ static int microp_keypad_probe(struct platform_device *pdev)
 	ret = request_irq(pdata->irq_keypress, microp_keypad_interrupt,
 		IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, MODULE_NAME, NULL);
 	if (ret) {
-		printk(KERN_ERR "Couldn't request keypress IRQ %d; error: %d\n", pdata->irq_keypress, ret);
+		printk(KERN_ERR "Couldn't request keypress IRQ %d; error: %d\n",
+				 pdata->irq_keypress, ret);
 		goto fail_irq;
 	}
+
+	if (pdata->gpio_clamshell >= 0) {
+		INIT_WORK(&microp_keypad.clamshell_work, microp_clamshell_work);
+
+		ret = request_irq(pdata->irq_clamshell, microp_clamshell_interrupt,
+			IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+			"microp-keypad-sw", NULL);
+
+		if (ret) {
+			printk(KERN_ERR "Couldn't request clamshel IRQ %d; error: %d\n",
+					 pdata->irq_clamshell, ret);
+			goto fail_clamshell;
+		}
+	}
+
 	device_init_wakeup(&pdev->dev, 1);
 
 	return 0;
 
+fail_clamshell:
+	free_irq(microp_keypad.pdata->irq_keypress, pdev);
 fail_irq:
 	input_unregister_device(input);
-
 fail_init:
-fail_input_device:
-	input_free(input);
+fail_input_register:
+	input_free_device(input);
+fail_input_alloc:
+	if (pdata->exit)
+		pdata->exit(&pdev->dev);
 fail_invalid_pdata:
 	return -EINVAL;
 }
@@ -185,7 +223,8 @@ fail_invalid_pdata:
 static int microp_keypad_remove(struct platform_device *pdev)
 {
 	free_irq(microp_keypad.pdata->irq_keypress, pdev);
-	input_free(microp_keypad.input);
+	input_unregister_device(microp_keypad.input);
+	input_free_device(microp_keypad.input);
 
 	if (microp_keypad.pdata->exit)
 		microp_keypad.pdata->exit(&pdev->dev);
