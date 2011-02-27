@@ -1256,12 +1256,12 @@ static void usb_do_work(struct work_struct *w)
 
 				usb_phy_reset(ui);
 
-				if (ui->hw_reset)
-					ui->hw_reset(1);
-
 				/* power down phy, clock down usb */
 				spin_lock_irqsave(&ui->lock, iflags);
 				usb_suspend_phy(ui);
+				if (ui->hw_reset)
+					ui->hw_reset(1);
+
 				clk_disable(ui->pclk);
 				clk_disable(ui->clk);
 				if (ui->otgclk)
