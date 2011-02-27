@@ -166,6 +166,7 @@ static void htckovsky_exit_microp_keypad(struct device *dev) {
 }
 
 static struct microp_keypad_platform_data htckovsky_keypad_data = {
+	.read_modifiers = true,
 	.init = htckovsky_init_microp_keypad,
 	.exit = htckovsky_exit_microp_keypad,
 	.irq_keypress = MSM_GPIO_TO_INT(KOVS100_SLIDER_IRQ_GPIO),
@@ -179,6 +180,22 @@ static struct platform_device htckovsky_keypad = {
 	.dev = {
 		.platform_data = &htckovsky_keypad_data,
 	},
+};
+
+static struct platform_device* htckovsky_microp_keypad_clients[] = {
+    &htckovsky_keypad,
+};
+
+static uint16_t micropksc_compatible_versions[] = {
+	0x707,
+};
+
+static struct microp_platform_data htckovsky_microp_keypad_pdata = {
+	.version_reg = 0x12,
+	.clients = htckovsky_microp_keypad_clients,
+	.nclients = ARRAY_SIZE(htckovsky_microp_keypad_clients),
+	.comp_versions = micropksc_compatible_versions,
+	.n_comp_versions = ARRAY_SIZE(micropksc_compatible_versions),
 };
 
 /******************************************************************************
@@ -346,10 +363,12 @@ static struct i2c_board_info i2c_devices[] = {
 	 .addr = 0x66,
 	 .platform_data = &htckovsky_microp_pdata,
 	 },
-//	{
-//	// Keyboard controller
-//	I2C_BOARD_INFO("microp-ksc", 0x67),
-//	},
+	 {
+	 // Keyboard controller
+	 .type = "microp-ng",
+	 .addr = 0x67,
+	 .platform_data = &htckovsky_microp_keypad_pdata,
+	 },
 };
 
 /******************************************************************************
@@ -794,7 +813,6 @@ static struct platform_device *devices[] __initdata = {
 //      &msm_camera_sensor_mt9t012vc,
 #endif
 	&msm_device_touchscreen,
-	&htckovsky_keypad,
 };
 
 extern struct sys_timer msm_timer;
