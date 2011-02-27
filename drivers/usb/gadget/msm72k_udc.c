@@ -1744,6 +1744,7 @@ static int msm72k_probe(struct platform_device *pdev)
 		ui->phy_reset = pdata->phy_reset;
 		ui->phy_init_seq = pdata->phy_init_seq;
 		ui->usb_connected = pdata->usb_connected;
+		ui->hw_reset = pdata->hw_reset;
 	}
 
 	irq = platform_get_irq(pdev, 0);
