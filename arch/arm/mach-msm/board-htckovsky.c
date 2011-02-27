@@ -483,61 +483,21 @@ static struct platform_device kovsky_headset = {
 /******************************************************************************
  * USB Client
  ******************************************************************************/
-static void msm72k_usb_ulpi_config(int enable)
-{
-	int n;
-	/* Configure ULPI DATA pins */
-	for (n = 0x6f; n <= 0x76; n++) {
-		gpio_tlmm_config(GPIO_CFG(n, 1,
-					enable ? GPIO_CFG_INPUT :
-					GPIO_CFG_OUTPUT,
-					enable ? GPIO_CFG_NO_PULL :
-					GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
-	}
-	gpio_tlmm_config(GPIO_CFG(0x77, 1, GPIO_CFG_INPUT,
-				enable ? GPIO_CFG_NO_PULL :
-				GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
-	gpio_tlmm_config(GPIO_CFG
-			(0x78, 1, GPIO_CFG_INPUT,
-			enable ? GPIO_CFG_NO_PULL : GPIO_CFG_PULL_DOWN,
-			GPIO_CFG_2MA), 0);
-	gpio_tlmm_config(GPIO_CFG
-			(0x79, 1, GPIO_CFG_OUTPUT,
-			enable ? GPIO_CFG_NO_PULL : GPIO_CFG_PULL_UP,
-			GPIO_CFG_2MA), 0);
-
-}
-
-static int usb_phy_init_seq_msm72k[] = {
-	0x40, 0x31,		/* High Speed TX Boost */
-	0x1D, 0x0D,		/* Rising edge interrupts control register */
-	0x1D, 0x10,		/* Falling edge interrupts control register */
-	0x5, 0xA,		/* OTG Control register */
-	-1
-};
-
-//TODO: implement the corresponding functions
-//in the usb driver via pdata
 static int htckovsky_request_ulpi_gpios(void)
 {
 	static bool done = false;
-	int n, ret;
+	int ret;
 
 	if (done)
 		return 0;
 
-	for (n = 0x6f; n <= 0x79; n++) {
-		ret = gpio_request(n, "MSM ULPI");
-		if (ret)
-			goto free_ulpi;
-	}
 	ret = gpio_request(0x54, "MSM USB");
 	if (ret)
 		goto free_x54;
-	ret = gpio_request(0x64, "MSM USB");
+	ret = gpio_request(KOVS100_USB_1, "MSM USB");
 	if (ret)
 		goto free_x64;
-	ret = gpio_request(0x69, "MSM USB");
+	ret = gpio_request(KOVS100_USB_2, "MSM USB");
 	if (ret)
 		goto free_x69;
 
@@ -545,59 +505,56 @@ static int htckovsky_request_ulpi_gpios(void)
 	return 0;
 
 free_x69:
-	gpio_free(0x69);
+	gpio_free(KOVS100_USB_2);
 free_x64:
-	gpio_free(0x64);
+	gpio_free(KOVS100_USB_1);
 free_x54:
 	gpio_free(0x54);
 
-free_ulpi:
-	for (--n; n >= 0x6f; n--)
-		gpio_free(n);
 	return ret;
 }
 
 static inline void htckovsky_usb_disable(void)
 {
 	printk(KERN_DEBUG "[KOVSKY]: Disable USB\n");
-	htckovsky_request_ulpi_gpios();
-	gpio_set_value(0x64, 0);
-	gpio_set_value(0x69, 0);
+	gpio_set_value(KOVS100_USB_1, 0);
+	gpio_set_value(KOVS100_USB_2, 0);
 }
 
 static void htckovsky_usb_enable(void)
 {
-	htckovsky_request_ulpi_gpios();
-	htckovsky_usb_disable();
-
 	printk(KERN_DEBUG "[KOVSKY]: Enable USB\n");
 	gpio_set_value(0x54, 1);
 
 	gpio_set_value(KOVS100_BT_ROUTER, 0);
 
-	gpio_set_value(0x69, 1);
-	gpio_set_value(0x64, 0);
+	gpio_set_value(KOVS100_USB_2, 1);
+	gpio_set_value(KOVS100_USB_1, 0);
 	mdelay(3);
-	gpio_set_value(0x64, 1);
+	gpio_set_value(KOVS100_USB_1, 1);
 	mdelay(3);
-
-	msm72k_usb_ulpi_config(1);
 }
 
-static void htckovsky_usb_connected(int state)
+static void htckovsky_phy_reset(void) {
+	printk(KERN_DEBUG "[KOVSKY]: %s\n", __func__);
+	htckovsky_usb_disable();
+	htckovsky_usb_enable();
+}
+
+static void htckovsky_usb_hw_reset(bool state)
 {
 	printk(KERN_DEBUG "[KOVSKY]: %s(%d)\n", __func__, state);
-	htckovsky_request_ulpi_gpios();
-	if (!state) {
-		msm72k_usb_ulpi_config(0);
+	if (state) {
 		htckovsky_usb_disable();
+	}
+	else {
+		htckovsky_usb_enable();
 	}
 }
 
 static struct msm_hsusb_platform_data htckovsky_hsusb_pdata = {
-	.phy_init_seq = usb_phy_init_seq_msm72k,
-	.phy_reset = htckovsky_usb_enable,
-	.usb_connected = htckovsky_usb_connected,
+	.hw_reset = htckovsky_usb_hw_reset,
+	.phy_reset = htckovsky_phy_reset,
 };
 
 static struct platform_device android_usb = {
@@ -869,7 +826,8 @@ static void __init htckovsky_init(void)
 	msm_dex_comm_init();
 	msm_add_mem_devices(&htckovsky_pmem_settings);
 
-	msm_device_hsusb.dev.platform_data = &htckovsky_hsusb_pdata;
+	htckovsky_request_ulpi_gpios();
+	msm_hsusb_board_pdata = &htckovsky_hsusb_pdata;
 
 #ifdef CONFIG_SERIAL_MSM_HS
 	msm_device_uart_dm2.dev.platform_data = &msm_uart_dm2_pdata;
