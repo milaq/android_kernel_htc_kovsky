@@ -55,4 +55,8 @@ extern struct clk msm_clocks_8x50[];
 extern unsigned msm_num_clocks_8x50;
 extern struct platform_device msm_device_vidc_720p;
 
+//The board can supply additional functions here or override the entire
+//structure of msm_device_hsusb to work around the default implementation
+extern struct msm_hsusb_platform_data *msm_hsusb_board_pdata;
+
 #endif
