@@ -33,7 +33,7 @@
  *
  *	Mathew McBride <matt@mcbridematt.dhs.org>
  *	August 2010 - Made standalone
- * 
+ *
  * 	Alexander Tarasikov <alexander.tarasikov@gmail.com>
  * 	October 2010 - made generic and implemented voltage drop
 */
@@ -89,11 +89,11 @@ struct i2c_client *pclient = 0;
 
 static unsigned int battery_capacity = DEFAULT_BATTERY_RATING;
 static unsigned int current_accum_capacity = 500;
-static bool first_read_done = false;
 
 module_param(battery_capacity, int, 0644);
 MODULE_PARM_DESC(battery_capacity, "Estimated battery capacity in mAh");
 
+#define DBG(fmt, x...) printk(KERN_DEBUG fmt, ##x)
 
 struct ds2746_info {
 	u32 batt_id;		/* Battery ID from ADC */
@@ -102,7 +102,7 @@ struct ds2746_info {
 	int batt_current;	/* Battery current from ADC */
 	u32 level;		/* formula */
 	u32 charging_source;	/* 0: no cable, 1:usb, 2:AC */
-	u32 charging_enabled;	/* 0: Disable, 1: Enable */
+	bool charging_enabled;	/* 0: Disable, 1: Enable */
 	u32 full_bat;		/* Full capacity of battery (mAh) */
 	struct ds2746_platform_data bat_pdata;
 	struct power_supply *bat;	/* Hold the supply struct so it can be passed along */
@@ -118,7 +118,6 @@ struct mutex work_lock;
 
 /* Polling  */
 struct workqueue_struct *monitor_wqueue;	/* Work queue used to ping the battery */
-
 
 /* Polling periods - fast if on wall, slow if on battery */
 /* Power management API stuff */
@@ -139,10 +138,10 @@ ds2746_bat_get_property(struct power_supply *bat_ps,
 {
 	switch (psp) {
 	case POWER_SUPPLY_PROP_STATUS:
-		if (bi->batt_current < 0) {
-			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		} else {
+		if (bi->charging_enabled) {
 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+		} else {
+			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
 		}
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
@@ -171,7 +170,9 @@ ds2746_bat_get_property(struct power_supply *bat_ps,
 
 static void ds2746_ext_power_changed(struct power_supply *psy)
 {
-	power_supply_changed(psy);
+	printk("%s\n", __func__);
+	cancel_delayed_work(&bat_work);
+	queue_delayed_work(monitor_wqueue, &bat_work, 0);
 }
 
 static struct power_supply bat_ps = {
@@ -212,7 +213,6 @@ static int reading2capacity(int r)
 
 static int ds2746_battery_read_status(struct ds2746_info *b)
 {
-	static bool last_seen_charging = false;
 	signed short s;
 	int aux0, aux1;
 	int aux0r, aux1r;
@@ -297,32 +297,10 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 
 	b->batt_temp = (aux1r - 32L);
 	b->batt_temp = ((b->batt_temp * 5) / 9) + 5;
-	printk(KERN_INFO
-	       "ds2746: %dmV %dmA charge: %d/100 (%d units) aux0: %d (%d) aux1: %d (%d) / %d\n",
+	DBG("ds2746: %dmV %dmA charge: %d/100 (%d units) aux0: %d (%d) aux1: %d (%d) / %d\n",
 	       b->batt_vol, b->batt_current, b->level, s, aux0, aux0r, aux1,
 	       aux1r, b->batt_temp);
 
-
-	if ( b->batt_current > 0) {
-		if ((b->batt_vol >= (b->bat_pdata.high_voltage - 10) || battery_capacity >= b->bat_pdata.capacity )
-			&& last_seen_charging) {
-			printk(KERN_INFO "ds2746: dropping charge\n");
-			//drop fast charge if we're full or so
-			if (bi->bat_pdata.set_charge)
-				bi->bat_pdata.set_charge(0);
-			last_seen_charging = false;
-		}
-		else if (power_supply_am_i_supplied(bi->bat) && !last_seen_charging
-					&& b->level <= 96) {
-			printk(KERN_INFO "ds2746: re-enabling charge\n");
-			//re-enable charge if we're on charger and have dropped below 96%
-			if (b->bat_pdata.set_charge)
-				bi->bat_pdata.set_charge(1);
-			last_seen_charging = true;
-		}
-	}
-
-	power_supply_changed(bi->bat);
 	return 0;
 }
 
@@ -333,15 +311,21 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 static void ds2746_battery_work(struct work_struct *work)
 {
 	unsigned long next_update;
+	bool old_status = bi->charging_enabled;
 	ds2746_battery_read_status(bi);
 
-	if (bi->batt_current < 0) {
-		next_update = msecs_to_jiffies(SLOW_POLL);
-	} else {
+	bi->charging_enabled = false;
+	if (power_supply_am_i_supplied(bi->bat)) {
 		next_update = msecs_to_jiffies(FAST_POLL);
+		if (bi->level < 100 && bi->batt_vol < bi->bat_pdata.high_voltage)
+			bi->charging_enabled = true;
 	}
-	printk(KERN_INFO "ds2746: polling %s\n", bi->batt_current > 0 ? "FAST" : "SLOW");
-	next_update = msecs_to_jiffies(1000 * 30);
+	else {
+		next_update = msecs_to_jiffies(SLOW_POLL);
+	}
+
+	if (old_status != bi->charging_enabled)
+		power_supply_changed(bi->bat);
 	queue_delayed_work(monitor_wqueue, &bat_work, next_update);
 }
 
@@ -375,7 +359,7 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	current_accum_capacity = pdata.capacity * pdata.resistance;
 	current_accum_capacity /= DS2746_CURRENT_ACCUM_RES;
-	
+
 	bi->bat_pdata = pdata;
 	bi->full_bat = 100;
 
@@ -418,7 +402,7 @@ static struct i2c_device_id ds2746_idtable[] = {
 #ifdef CONFIG_PM
 static int ds2746_battery_suspend(struct i2c_client *client, pm_message_t pmesg)
 {
-	printk(KERN_DEBUG "ds2746: Cancelling scheduled reads\n");
+	DBG("ds2746: Cancelling scheduled reads\n");
 	cancel_delayed_work(&bat_work);
 	flush_workqueue(monitor_wqueue);
 	return 0;
@@ -426,7 +410,7 @@ static int ds2746_battery_suspend(struct i2c_client *client, pm_message_t pmesg)
 
 static int ds2746_battery_resume(struct i2c_client *client)
 {
-	printk(KERN_DEBUG "ds2746: Resuming scheduled reads\n");
+	DBG("ds2746: Resuming scheduled reads\n");
 	queue_delayed_work(monitor_wqueue, &bat_work, 1);
 	return 0;
 }

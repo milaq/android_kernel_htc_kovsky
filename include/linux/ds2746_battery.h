@@ -6,7 +6,6 @@ struct ds2746_platform_data {
 	unsigned short capacity;
 	unsigned short high_voltage;
 	unsigned short low_voltage;
-	void (*set_charge)(int flags);
 };
 
 #endif
