@@ -427,16 +427,13 @@ static void htckovsky_process_mddi_table(struct msm_mddi_client_data
 
 static void htckovsky_mddi_bridge_reset(int reset_asserted) {
 		if (reset_asserted) {
-				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
-				gpio_direction_output(KOVS100_MDDI_PWR, 0);
+				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
 				mdelay(10);
-				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 1);
-				gpio_direction_output(KOVS100_MDDI_PWR, 1);
+				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 				mdelay(15);
 		}
 		else {
-				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), 0);
-				gpio_direction_output(KOVS100_MDDI_PWR, 0);
+				gpio_tlmm_config(GPIO_CFG(KOVS100_MDDI_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
 				mdelay(1);
 		}
 }
@@ -446,7 +443,7 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 	printk("htckovsky_mddi_power_client(%d)\n", on);
 	if (on) {
 		printk(KERN_DEBUG "%s: +powering up panel\n", __func__);
-		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 1);
+		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
 		printk(KERN_DEBUG "%s: enabled panel power\n", __func__);
 
 		vreg_enable(vreg_18v);
@@ -464,7 +461,7 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 		vreg_disable(vreg_aux2);
 		vreg_disable(vreg_26v);
 		vreg_disable(vreg_18v);
-		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), 0);
+		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
 		msleep(10);
 		printk(KERN_DEBUG "%s: disabled panel power\n", __func__);
 		printk(KERN_DEBUG "%s: -shutting down panel\n", __func__);
