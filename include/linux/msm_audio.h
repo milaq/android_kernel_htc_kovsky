@@ -82,19 +82,6 @@ struct msm_snd_device_config {
 };
 
 #define SND_SET_DEVICE _IOW(SND_IOCTL_MAGIC, 2, struct msm_device_config *)
-#define SND_DEVICE_HANDSET 0
-#define SND_DEVICE_SPEAKER 1
-#define SND_DEVICE_HEADSET 2
-#define SND_DEVICE_BT 3
-#define SND_DEVICE_CARKIT 4
-#define SND_DEVICE_TTY_FULL 5
-#define SND_DEVICE_TTY_VCO 6
-#define SND_DEVICE_TTY_HCO 7
-#define SND_DEVICE_NO_MIC_HEADSET 8
-#define SND_DEVICE_FM_HEADSET 9
-#define SND_DEVICE_HEADSET_AND_SPEAKER 10
-#define SND_DEVICE_FM_SPEAKER 11
-#define SND_DEVICE_BT_EC_OFF 12
 
 #define SND_METHOD_VOICE 0
 #define SND_METHOD_AUDIO 1
@@ -119,9 +106,6 @@ struct msm_snd_endpoint {
 struct msm_snd_platform_data {
 	struct msm_snd_endpoint *endpoints;
 	unsigned num_endpoints;
-	void (*device_hook)(struct msm_snd_device_config*);
-	void (*volume_hook)(struct msm_snd_volume_config*);
-	int (*plat_init)(void);
 };
 
 /* Takes an index between 0 and one less than the number returned by

@@ -122,9 +122,6 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 		}
 
-		if (the_snd.snd_pdata->device_hook)
-			the_snd.snd_pdata->device_hook(&dev);
-
 		dmsg.args.device = cpu_to_be32(dev.device);
 		dmsg.args.ear_mute = cpu_to_be32(dev.ear_mute);
 		dmsg.args.mic_mute = cpu_to_be32(dev.mic_mute);
@@ -151,9 +148,6 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
-
-		if (the_snd.snd_pdata->volume_hook)
-			the_snd.snd_pdata->volume_hook(&vol);
 
 		vmsg.args.device = cpu_to_be32(vol.device);
 		vmsg.args.method = cpu_to_be32(vol.method);
@@ -261,11 +255,6 @@ static int snd_probe(struct platform_device *pdev)
 	}
 	mutex_init(&snd->lock);
 	snd->snd_pdata = (struct msm_snd_platform_data *)pdev->dev.platform_data;
-	if (snd->snd_pdata->plat_init) {
-		rc = snd->snd_pdata->plat_init();
-		if (rc)
-			goto ret;
-	}
 	rc = misc_register(&snd_misc);
 ret:
 	printk("-%s() rc=%d\n", __func__, rc);
