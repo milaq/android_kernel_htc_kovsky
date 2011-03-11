@@ -26,53 +26,52 @@
 #include <linux/debugfs.h>
 #include <linux/spi/wl12xx.h>
 
-#include <asm/mach/mmc.h>
 #include <asm/gpio.h>
 #include <asm/io.h>
 
 #include <mach/board.h>
-#include "board-htckovsky.h"
+#include <mach/mmc.h>
 #include <mach/vreg.h>
 
+#include "board-htckovsky.h"
 #include "devices.h"
 
 #define DEBUG_SDSLOT_VDD 1
 
-//WiFi
 static struct msm_gpio sdc1_on_gpio_table[] = {
-	{.gpio_cfg = GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT3"},	/* DAT3 */
-	{.gpio_cfg = GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT2"},	/* DAT2 */
-	{.gpio_cfg = GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT1"},	/* DAT1 */
-	{.gpio_cfg = GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT0"},	/* DAT0 */
-	{.gpio_cfg = GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_CMD"},	/* CMD */
-	{.gpio_cfg = GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "MMC1_CLK"},	/* CLK */
+	{.gpio_cfg = GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT3"},
+	{.gpio_cfg = GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT2"},
+	{.gpio_cfg = GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT1"},
+	{.gpio_cfg = GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT0"},
+	{.gpio_cfg = GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_CMD"},
+	{.gpio_cfg = GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "MMC1_CLK"},
 };
 
 static struct msm_gpio sdc1_off_gpio_table[] = {
-	{.gpio_cfg = GPIO_CFG(51, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT3"},	/* DAT3 */
-	{.gpio_cfg = GPIO_CFG(52, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT2"},	/* DAT2 */
-	{.gpio_cfg = GPIO_CFG(53, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT1"},	/* DAT1 */
-	{.gpio_cfg = GPIO_CFG(54, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT0"},	/* DAT0 */
-	{.gpio_cfg = GPIO_CFG(55, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_CMD"},	/* CMD */
-	{.gpio_cfg = GPIO_CFG(56, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_CLK"},	/* CLK */
+	{.gpio_cfg = GPIO_CFG(51, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT3"},
+	{.gpio_cfg = GPIO_CFG(52, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT2"},
+	{.gpio_cfg = GPIO_CFG(53, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT1"},
+	{.gpio_cfg = GPIO_CFG(54, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_DAT0"},
+	{.gpio_cfg = GPIO_CFG(55, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_CMD"},
+	{.gpio_cfg = GPIO_CFG(56, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC1_CLK"},
 };
 
 static struct msm_gpio sdc3_on_gpio_table[] = {
-	{.gpio_cfg = GPIO_CFG(88, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_CLK"},	/* CLK */
-	{.gpio_cfg = GPIO_CFG(89, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_CMD"},	/* CMD */
-	{.gpio_cfg = GPIO_CFG(90, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT3"},	/* DAT3 */
-	{.gpio_cfg = GPIO_CFG(91, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT2"},	/* DAT2 */
-	{.gpio_cfg = GPIO_CFG(92, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT1"},	/* DAT1 */
-	{.gpio_cfg = GPIO_CFG(93, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT0"},	/* DAT0 */
+	{.gpio_cfg = GPIO_CFG(88, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_CLK"},
+	{.gpio_cfg = GPIO_CFG(89, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_CMD"},
+	{.gpio_cfg = GPIO_CFG(90, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT3"},
+	{.gpio_cfg = GPIO_CFG(91, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT2"},
+	{.gpio_cfg = GPIO_CFG(92, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT1"},
+	{.gpio_cfg = GPIO_CFG(93, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC3_DAT0"},
 };
 
 static struct msm_gpio sdc3_off_gpio_table[] = {
-	{.gpio_cfg = GPIO_CFG(88, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_CLK"},	/* CLK */
-	{.gpio_cfg = GPIO_CFG(89, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_CMD"},	/* CMD */
-	{.gpio_cfg = GPIO_CFG(90, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT3"},	/* DAT3 */
-	{.gpio_cfg = GPIO_CFG(91, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT2"},	/* DAT2 */
-	{.gpio_cfg = GPIO_CFG(92, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT1"},	/* DAT1 */
-	{.gpio_cfg = GPIO_CFG(93, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT0"},	/* DAT0 */
+	{.gpio_cfg = GPIO_CFG(88, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_CLK"},
+	{.gpio_cfg = GPIO_CFG(89, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_CMD"},
+	{.gpio_cfg = GPIO_CFG(90, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT3"},
+	{.gpio_cfg = GPIO_CFG(91, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT2"},
+	{.gpio_cfg = GPIO_CFG(92, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT1"},
+	{.gpio_cfg = GPIO_CFG(93, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "MMC3_DAT0"},
 };
 
 #define MSM_MMC_VDD	MMC_VDD_165_195 | MMC_VDD_20_21 | MMC_VDD_21_22 \
@@ -84,18 +83,18 @@ static struct mmc_vdd_xlat {
 	int mask;
 	int level;
 } mmc_vdd_table[] = {
-	{
-	MMC_VDD_165_195, 1800}, {
-	MMC_VDD_20_21, 2050}, {
-	MMC_VDD_21_22, 2150}, {
-	MMC_VDD_22_23, 2250}, {
-	MMC_VDD_23_24, 2350}, {
-	MMC_VDD_24_25, 2450}, {
-	MMC_VDD_25_26, 2550}, {
-	MMC_VDD_26_27, 2650}, {
-	MMC_VDD_27_28, 2750}, {
-	MMC_VDD_28_29, 2850}, {
-MMC_VDD_29_30, 2950},};
+	{MMC_VDD_165_195, 1800},
+	{MMC_VDD_20_21, 2050},
+	{MMC_VDD_21_22, 2150},
+	{MMC_VDD_22_23, 2250},
+	{MMC_VDD_23_24, 2350},
+	{MMC_VDD_24_25, 2450},
+	{MMC_VDD_25_26, 2550},
+	{MMC_VDD_26_27, 2650},
+	{MMC_VDD_27_28, 2750},
+	{MMC_VDD_28_29, 2850},
+	{MMC_VDD_29_30, 2950},
+};
 
 /******************************************************************************
  * SD Slot
@@ -105,7 +104,7 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 {
 	int rc, i;
 	if (vdd) {
-		msm_gpios_enable(sdc3_on_gpio_table,
+		msm_gpios_disable(sdc3_on_gpio_table,
 				 ARRAY_SIZE(sdc3_on_gpio_table));
 		rc = vreg_enable(vreg_sdslot);
 		if (rc)
@@ -144,7 +143,7 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 
 static unsigned int htckovsky_sdslot_get_status(struct device *dev)
 {
-	return !gpio_get_value(KOVS100_SD_STATUS);
+	return !gpio_get_value(KOVS100_N_SD_STATUS);
 }
 
 static struct mmc_platform_data htckovsky_sdslot_data = {
@@ -158,9 +157,28 @@ static struct mmc_platform_data htckovsky_sdslot_data = {
  ******************************************************************************/
 static struct vreg *vreg_wifi = NULL;
 
+static void wifi_set_power(bool enable)
+{
+	gpio_set_value(KOVS100_WIFI_PWR, enable);
+}
+
+//Uh, that's kind of ugly, but we need to set power
+//here to actually make the transceiver work
+static struct wl12xx_platform_data wl1251_pdata = {
+	.set_power = wifi_set_power,
+};
+
 static struct sdio_embedded_func wifi_func = {
 	.f_class = SDIO_CLASS_WLAN,
 	.f_maxblksize = 512,
+};
+
+static struct platform_device wl1251_device = {
+	.id = -1,
+	.name = "wl1251_data",
+	.dev = {
+		.platform_data = &wl1251_pdata,
+	}
 };
 
 static struct embedded_sdio_data ti_wifi_emb_data = {
@@ -168,7 +186,7 @@ static struct embedded_sdio_data ti_wifi_emb_data = {
 		.vendor = 0x104c,
 		.device = 0x9066,
 		.blksize = 512,
-		.max_dtr = 11000000,
+		.max_dtr = 20000000,
 		},
 	.cccr = {
 		 .multi_block = 0,
@@ -196,23 +214,26 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 			       __func__, rc);
 			goto pwroff;
 		}
-		mdelay(50);
 
-		gpio_direction_output(KOVS100_WIFI_PWR, 0);
-		mdelay(200);
+		//We need to set power here to make the card identify
+		mdelay(100);
+		wifi_set_power(true);
+		mdelay(100);
 		return 0;
 	}
 
- pwroff:
+pwroff:
 	vreg_disable(vreg_wifi);
-	gpio_direction_output(KOVS100_WIFI_PWR, 0);
+	//We need to disable power here to save power
+	wifi_set_power(false);
 	mdelay(200);
 	msm_gpios_disable(sdc1_off_gpio_table, ARRAY_SIZE(sdc1_off_gpio_table));
 	return 0;
 }
 
 static struct mmc_platform_data htckovsky_wifi_data = {
-	.ocr_mask = MMC_VDD_28_29,
+	.built_in = 1,
+	.ocr_mask = MMC_VDD_28_29 | MMC_VDD_29_30,
 	.embedded_sdio = &ti_wifi_emb_data,
 	.translate_vdd = wifi_switchvdd,
 };
@@ -221,7 +242,7 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 {
 	int ret = -EINVAL;
 
-	ret = gpio_request(KOVS100_SD_STATUS, "HTC Kovsky SD Status");
+	ret = gpio_request(KOVS100_N_SD_STATUS, "HTC Kovsky SD Status");
 	if (ret)
 		goto fail_sd_status;
 
@@ -233,7 +254,7 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto fail_wifi_irq;
 
-	gpio_direction_input(KOVS100_SD_STATUS);
+	gpio_direction_input(KOVS100_N_SD_STATUS);
 	gpio_direction_input(KOVS100_WIFI_IRQ);
 
 	vreg_sdslot = vreg_get_by_id(0, 23);
@@ -258,24 +279,25 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto fail_gpios1;
 
-	set_irq_wake(MSM_GPIO_TO_INT(KOVS100_SD_STATUS), 1);
+	set_irq_wake(MSM_GPIO_TO_INT(KOVS100_N_SD_STATUS), 1);
 	ret =
 	    msm_add_sdcc(3, &htckovsky_sdslot_data,
-			 MSM_GPIO_TO_INT(KOVS100_SD_STATUS),
+			 MSM_GPIO_TO_INT(KOVS100_N_SD_STATUS),
 			 IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING);
 	if (ret)
 		goto fail_sdcc3;
 
-	set_irq_wake(MSM_GPIO_TO_INT(KOVS100_WIFI_IRQ), 1);
-	ret = msm_add_sdcc(1, &htckovsky_wifi_data,
-			   MSM_GPIO_TO_INT(KOVS100_WIFI_IRQ),
-			   IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING);
+	ret = msm_add_sdcc(1, &htckovsky_wifi_data, 0, 0);
 	if (ret) {
 		printk(KERN_ERR
 		       "%s: failed to register sdcc 1 for wifi, ret=%d\n",
 		       __func__, ret);
 		goto fail_sdcc1;
 	}
+
+	//Register the platform data, but do not care if it succeeds
+	//if not, we can just shut all the power off via rfkill
+	platform_device_register(&wl1251_device);
 	return 0;
 
  fail_sdcc1:
@@ -295,7 +317,7 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
  fail_wifi_irq:
 	gpio_free(KOVS100_WIFI_PWR);
  fail_wifi_pwr:
-	gpio_free(KOVS100_SD_STATUS);
+	gpio_free(KOVS100_N_SD_STATUS);
  fail_sd_status:
 	return ret;
 }
