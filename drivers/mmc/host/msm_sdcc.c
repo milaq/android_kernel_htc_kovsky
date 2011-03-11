@@ -1242,7 +1242,7 @@ msmsdcc_probe(struct platform_device *pdev)
 		}
 	} else if (plat->register_status_notify) {
 		plat->register_status_notify(msmsdcc_status_notify_cb, host);
-	} else if (!plat->status)
+	} else if (!plat->status && !plat->built_in)
 		pr_err("%s: No card detect facilities available\n",
 		       mmc_hostname(mmc));
 	else {
