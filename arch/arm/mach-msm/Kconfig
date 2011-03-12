@@ -284,6 +284,13 @@ config HTC_35MM_JACK
 	help
 	 Provides support for 3.5mm headset jack devices, like wired headsets.
 
+config HTC_HEADSET_35MM
+	tristate "HTC 35mm gpio headset driver"
+	default n
+	help
+	 Provides support for 3.5mm headsets where jack detection
+	 and headset button are connected to a gpio
+
 config TROUT_BATTCHG
 	depends on (MACH_TROUT || MACH_SAPPHIRE) && POWER_SUPPLY
 	default y
