@@ -45,6 +45,7 @@
 #include <mach/hardware.h>
 #include <mach/system.h>
 #include <mach/gpio.h>
+#include <mach/htc_headset_35mm.h>
 #include <mach/io.h>
 #include <mach/msm_iomap.h>
 #include <mach/board.h>
@@ -54,10 +55,6 @@
 #include <mach/msm_serial_hs.h>
 #include <mach/msm_ts.h>
 #include <mach/vreg.h>
-
-#ifdef CONFIG_HTC_HEADSET
-#include <mach/htc_headset.h>
-#endif
 
 #include "dex_comm.h"
 #include "devices.h"
@@ -386,22 +383,6 @@ static struct platform_device htckovsky_snd = {
 		},
 };
 
-#ifdef CONFIG_HTC_HEADSET
-static struct h2w_platform_data kovsky_headset_data = {
-	.cable_in1 = KOVS100_HEADSET_IN,
-	.headset_mic_35mm = KOVS100_EXT_MIC,
-	.jack_inverted = 1,
-};
-
-static struct platform_device kovsky_headset = {
-	.name = "htc_headset_35mm",
-	.id = -1,
-	.dev = {
-		.platform_data = &kovsky_headset_data,
-		},
-};
-#endif
-
 /******************************************************************************
  * USB Client
  ******************************************************************************/
@@ -697,6 +678,23 @@ static struct platform_device amss_device = {
 	.id = -1,
 };
 
+/******************************************************************************
+ * Headset
+ ******************************************************************************/
+static struct htc_headset_35mm_pdata htckovsky_headset_data = {
+	.gpio_detect = KOVS100_HEADSET_IN,
+	.gpio_headset_mic = KOVS100_EXT_MIC,
+	.jack_inverted = 1,
+};
+
+static struct platform_device htckovsky_headset = {
+	.name = "htc_headset_35mm",
+	.id = -1,
+	.dev = {
+		.platform_data = &htckovsky_headset_data,
+		},
+};
+
 static struct platform_device *devices[] __initdata = {
 	&amss_device,
 	&htckovsky_snd,
@@ -716,6 +714,7 @@ static struct platform_device *devices[] __initdata = {
 //      &msm_camera_sensor_mt9t012vc,
 #endif
 	&msm_device_touchscreen,
+	&htckovsky_headset,
 };
 
 extern struct sys_timer msm_timer;
