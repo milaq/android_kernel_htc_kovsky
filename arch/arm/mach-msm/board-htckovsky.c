@@ -33,7 +33,6 @@
 #include <linux/microp-htckovsky.h>
 #include <linux/mfd/microp-ng.h>
 #include <linux/ds2746_battery.h>
-#include <linux/msm_audio.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -45,6 +44,7 @@
 #include <mach/hardware.h>
 #include <mach/system.h>
 #include <mach/gpio.h>
+#include <mach/htc_acoustic_wince.h>
 #include <mach/htc_headset_35mm.h>
 #include <mach/io.h>
 #include <mach/msm_iomap.h>
@@ -351,36 +351,6 @@ static struct i2c_board_info i2c_devices[] = {
 };
 
 /******************************************************************************
- * Sound driver settings
- ******************************************************************************/
-#define SND(num, desc) { .name = desc, .id = num }
-static struct msm_snd_endpoint snd_endpoints_list[] = {
-	SND(0, "HANDSET"),
-	SND(1, "SPEAKER"),
-	SND(2, "HEADSET"),
-	SND(2, "NO_MIC_HEADSET"),
-	SND(3, "BT"),
-	SND(3, "BT_EC_OFF"),
-
-    SND(0xD, "IDLE"),
-	SND(256, "CURRENT"),
-};
-#undef SND
-
-static struct msm_snd_platform_data htckovsky_snd_pdata = {
-	.endpoints = snd_endpoints_list,
-	.num_endpoints = ARRAY_SIZE(snd_endpoints_list),
-};
-
-static struct platform_device htckovsky_snd = {
-	.name = "msm_snd",
-	.id = -1,
-	.dev = {
-		.platform_data = &htckovsky_snd_pdata,
-		},
-};
-
-/******************************************************************************
  * USB Client
  ******************************************************************************/
 static int htckovsky_request_ulpi_gpios(void)
@@ -664,7 +634,6 @@ static struct msm_pmem_setting htckovsky_pmem_settings = {
 	.ram_console_size = KOVS110_RAMCONSOLE_SIZE,
 };
 
-//TODO: move all amss-specific stuff to a platform device
 /******************************************************************************
  * AMSS-specific stuff
  ******************************************************************************/
@@ -690,9 +659,38 @@ static struct platform_device htckovsky_headset = {
 		},
 };
 
+/******************************************************************************
+ * Acoustic
+ ******************************************************************************/
+static void htckovsky_set_speaker_amp(bool enable) {
+	gpio_direction_output(KOVS100_SPK_AMP, enable);
+}
+
+static void htckovsky_set_headset_amp(bool enable) {
+	gpio_direction_output(KOVS100_HP_AMP, enable);
+}
+
+static struct htc_acoustic_wce_board_data htckovsky_acoustic_data = {
+	.set_speaker_amp = htckovsky_set_speaker_amp,
+	.set_headset_amp = htckovsky_set_headset_amp,
+};
+
+static int __init htckovsky_init_acoustic(void) {
+	int ret = gpio_request(KOVS100_SPK_AMP, "Speaker Amplifier");
+	if (ret)
+		return ret;
+
+	ret = gpio_request(KOVS100_HP_AMP, "Headset amplifier");
+	if (ret) {
+		gpio_free(KOVS100_SPK_AMP);
+		return ret;
+	}
+
+	return 0;
+}
+
 static struct platform_device *devices[] __initdata = {
 	&amss_device,
-	&htckovsky_snd,
 	&msm_device_i2c,
 	&htckovsky_rtc,
 	&htckovsky_sdcc,
@@ -748,6 +746,9 @@ static void __init htckovsky_init(void)
 	msm_device_uart_dm2.dev.platform_data = &msm_uart_dm2_pdata;
 #endif
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
+
+	if (!htckovsky_init_acoustic())
+	htc_acoustic_wce_board_data = &htckovsky_acoustic_data;
 
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
