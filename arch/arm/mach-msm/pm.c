@@ -32,10 +32,15 @@
 
 #include "smd_private.h"
 #include "acpuclock.h"
-#include "proc_comm.h"
 #include "clock.h"
 #ifdef CONFIG_HAS_WAKELOCK
 #include <linux/wakelock.h>
+#endif
+
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	#include "dex_comm.h"
+#else
+	#include "proc_comm.h"
 #endif
 
 enum {
@@ -222,6 +227,7 @@ msm_pm_enter_prep_hw(void)
 #else
 	writel(0x1f, A11S_CLK_SLEEP_EN);
 #endif
+
 	writel(1, A11S_PWRDOWN);
 	writel(0, A11S_STANDBY_CTL);
 
@@ -391,6 +397,7 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 	if (sleep_mode < MSM_PM_SLEEP_MODE_APPS_SLEEP) {
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_SMSM_STATE)
 			smsm_print_sleep_info();
+
 		saved_vector[0] = msm_pm_reset_vector[0];
 		saved_vector[1] = msm_pm_reset_vector[1];
 		msm_pm_reset_vector[0] = 0xE51FF004; /* ldr pc, 4 */
@@ -466,6 +473,17 @@ enter_failed:
 	msm_gpio_exit_sleep();
 	smd_sleep_exit();
 	clk_exit_sleep();
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	if (!from_idle
+		&& (msm_pm_debug_mask
+			& (MSM_PM_DEBUG_SUSPEND | MSM_PM_DEBUG_POWER_COLLAPSE)
+			)
+		) {
+		dex_vibrate(1);
+		mdelay(50);
+		dex_vibrate(0);
+	}
+#endif
 	return rv;
 }
 
@@ -635,13 +653,16 @@ static void msm_pm_restart(char str)
 	 * is the default, prefer that to the (slower) proc_comm
 	 * reset command.
 	 */
+#if defined(CONFIG_MSM_AMSS_VERSION_ANDROID)
 	if ((restart_reason == 0x776655AA) && msm_hw_reset_hook) {
 		msm_hw_reset_hook();
 	}
-#if defined(CONFIG_MSM_AMSS_VERSION_ANDROID)
-else {
+	else {
 		msm_proc_comm(PCOM_RESET_CHIP, &restart_reason, 0);
 	}
+#else
+	 if (msm_hw_reset_hook)
+		msm_hw_reset_hook();
 #endif
 	for (;;) ;
 }
@@ -791,6 +812,13 @@ static int __init msm_pm_init(void)
 
 	register_reboot_notifier(&msm_reboot_notifier);
 
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	//what's the better place to put it?
+	//anyway, this only seems to disable MPU for SPL
+	//and the radio is still protected
+	//so don't even care to reenable
+	writel(0, MSM_AXIGS_BASE + 0x800);
+#endif
 	msm_pm_reset_vector = ioremap(RESET_VECTOR, PAGE_SIZE);
 	if (msm_pm_reset_vector == NULL) {
 		printk(KERN_ERR "msm_pm_init: failed to map reset vector\n");
