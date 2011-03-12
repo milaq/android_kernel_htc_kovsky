@@ -601,8 +601,6 @@ static struct platform_device msm_camera_sensor_mt9t012vc = {
  ******************************************************************************/
 static struct gpio_keys_button htckovsky_button_table[] = {
 	/*KEY   GPIO    ACTIVE_LOW      DESCRIPTION     type    wakeup  debounce */
-	{KEY_VOLUMEUP, 39, 1, "Volume Up", EV_KEY, 0, 0},
-	{KEY_OK, 40, 1, "Volume Down", EV_KEY, 0, 0},
 	{KEY_POWER, 83, 1, "Power button", EV_KEY, 1, 0},
 	{KEY_MENU, 42, 1, "Camera half press", EV_KEY, 0, 10},
 	{KEY_HOME, 41, 1, "Camera full press", EV_KEY, 0, 0},
