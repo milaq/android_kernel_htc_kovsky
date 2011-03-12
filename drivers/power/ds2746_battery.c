@@ -180,7 +180,7 @@ static void ds2746_ext_power_changed(struct power_supply *psy)
 }
 
 static struct power_supply bat_ps = {
-	.name = "ds2746-battery",
+	.name = DS2746_NAME,
 	.type = POWER_SUPPLY_TYPE_BATTERY,
 	.properties = ds2746_bat_properties,
 	.num_properties = ARRAY_SIZE(ds2746_bat_properties),
@@ -393,14 +393,7 @@ static int ds2746_detach_client(struct i2c_client *client)
 }
 
 static struct i2c_device_id ds2746_idtable[] = {
-	{"ds2746", 0},
-	{"ds-2746", 1},
-	{"DS2746", 2},
-	{"DS-2746", 3},
-	{"ds2746-battery", 4},
-	{"ds-2746-battery", 5},
-	{"DS2746-battery", 6},
-	{"DS-2746-battery", 7},
+	{DS2746_NAME, 0},
 };
 
 #ifdef CONFIG_PM
@@ -432,7 +425,7 @@ static struct i2c_driver ds2746_battery_driver = {
 	.suspend = ds2746_battery_suspend,
 	.resume = ds2746_battery_resume,
 	.driver = {
-		   .name = "ds2746-battery",
+		   .name = DS2746_NAME,
 		   },
 	.id_table = ds2746_idtable,
 };
