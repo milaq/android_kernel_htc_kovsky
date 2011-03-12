@@ -200,7 +200,7 @@ static struct microp_platform_data htckovsky_microp_keypad_pdata = {
  * Power Supply
  ******************************************************************************/
 static char *supplicants[] = {
-	"ds2746-battery",	//hardcoded in ds2746_battery driver for now
+	DS2746_NAME,
 };
 
 static struct resource htckovsky_power_resources[] = {
@@ -227,8 +227,6 @@ static int htckovsky_is_ac_online(void)
 {
 	int vbus_state = readl(MSM_SHARED_RAM_BASE + 0xfc00c);
 	int cable_in = !gpio_get_value(KOVS100_AC_DETECT);
-	printk(KERN_DEBUG "[KOVSKY]: gpio_ac_detect=%d\n", cable_in);
-	printk(KERN_DEBUG "[KOVSKY]: vbus=%d\n", cable_in);
 	return cable_in & !vbus_state;
 }
 
@@ -251,7 +249,6 @@ static void htckovsky_set_charge(int flags)
 static int htckovsky_power_init(struct device *dev)
 {
 	int rc = 0;
-//	printk(KERN_DEBUG "[KOVSKY]: POWER INIT\n");
 
 	rc = gpio_request(KOVS100_N_CHG_ENABLE, "HTC Kovsky charger disable");
 	if (rc)
@@ -335,7 +332,7 @@ static struct i2c_board_info i2c_devices[] = {
 	},
 	{
 	// Battery driver
-	.type = "ds2746-battery",
+	.type = DS2746_NAME,
 	.addr = 0x36,
 	.platform_data = &kovsky_battery_data,
 	},
