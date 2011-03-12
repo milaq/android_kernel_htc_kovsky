@@ -14,14 +14,21 @@
  */
 
 #include <linux/platform_device.h>
-#include <mach/msm_smd.h>
+#include <linux/msm_audio.h>
 #include <mach/amss/amss_5225.h>
+#include <mach/htc_acoustic_wince.h>
+#include <mach/msm_iomap.h>
+#include <mach/msm_rpcrouter.h>
+#include <mach/msm_smd.h>
 
 static struct platform_device adsp_device = {
 	.name = "msm_adsp_5225",
 	.id = -1,
 };
 
+/******************************************************************************
+ * SMD driver settings
+ ******************************************************************************/
 static struct msm_early_server smd_5225_early_servers[] = {
 	{
 		.pid = 1,
@@ -52,6 +59,75 @@ static struct platform_device msm_device_smd = {
 	.id	= -1,
 };
 
+/******************************************************************************
+ * Sound driver settings
+ ******************************************************************************/
+#define SND(num, desc) { .name = desc, .id = num }
+static struct msm_snd_endpoint snd_endpoints_list[] = {
+	SND(0, "HANDSET"),
+	SND(1, "SPEAKER"),
+	SND(2, "HEADSET"),
+	SND(2, "NO_MIC_HEADSET"),
+	SND(3, "BT"),
+	SND(3, "BT_EC_OFF"),
+
+	SND(0xd, "IDLE"),
+	SND(256, "CURRENT"),
+};
+#undef SND
+
+static struct msm_snd_platform_data amss_5225_snd_pdata = {
+	.endpoints = snd_endpoints_list,
+	.num_endpoints = ARRAY_SIZE(snd_endpoints_list),
+};
+
+static struct platform_device amss_5225_snd = {
+	.name = "msm_snd",
+	.id = -1,
+	.dev = {
+		.platform_data = &amss_5225_snd_pdata,
+		},
+};
+
+/******************************************************************************
+ * Acoustic driver settings
+ ******************************************************************************/
+static struct msm_rpc_endpoint *mic_endpoint = NULL;
+
+static void amss_5225_mic_bias_callback(bool on) {
+	  struct {
+			  struct rpc_request_hdr hdr;
+			  uint32_t data;
+	  } req;
+
+	  if (!mic_endpoint)
+			  mic_endpoint = msm_rpc_connect(0x30000061, 0x0, 0);
+	  if (!mic_endpoint) {
+			  printk(KERN_ERR "%s: couldn't open rpc endpoint\n", __func__);
+			  return;
+	  }
+	  req.data=cpu_to_be32(on);
+	  msm_rpc_call(mic_endpoint, 0x1c, &req, sizeof(req), 5 * HZ);
+}
+
+static struct htc_acoustic_wce_amss_data amss_5225_acoustic_data = {
+	.volume_table = (MSM_SHARED_RAM_BASE+0xfc300),
+	.ce_table = (MSM_SHARED_RAM_BASE+0xfc600),
+	.adie_table = (MSM_SHARED_RAM_BASE+0xfd000),
+	.codec_table = (MSM_SHARED_RAM_BASE+0xfdc00),
+	.mic_offset = (MSM_SHARED_RAM_BASE+0xfed00),
+	.voc_cal_field_size = 8,
+	.mic_bias_callback = amss_5225_mic_bias_callback,
+};
+
+static struct platform_device acoustic_device = {
+	.name = "htc_acoustic_wince",
+	.id = -1,
+	.dev = {
+		.platform_data = &amss_5225_acoustic_data,
+		},
+};
+
 static int amss_5225_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -69,6 +145,18 @@ static int amss_5225_probe(struct platform_device *pdev)
 	ret = platform_device_register(&adsp_device);
 	if (ret) {
 		printk(KERN_ERR "%s: failed to register ADSP driver\n", __func__);
+		return 0;
+	}
+
+	ret = platform_device_register(&amss_5225_snd);
+	if (ret) {
+		printk(KERN_ERR "%s: failed to register SND driver\n", __func__);
+		return 0;
+	}
+
+	ret = platform_device_register(&acoustic_device);
+	if (ret) {
+		printk(KERN_ERR "%s: failed to register acoustic driver\n", __func__);
 	}
 
 	return 0;
