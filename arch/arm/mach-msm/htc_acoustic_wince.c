@@ -1,0 +1,399 @@
+/* arch/arm/mach-msm/htc_acoustic_wince.c
+ *
+ * Author: Jbruneaux
+ *
+ * Description : provide interface between userland and kernel for the
+ * acoustic management
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ */
+#include <linux/device.h>
+#include <linux/fs.h>
+#include <linux/module.h>
+#include <linux/miscdevice.h>
+#include <linux/mm.h>
+#include <linux/err.h>
+#include <linux/delay.h>
+#include <linux/kernel.h>
+#include <linux/uaccess.h>
+#include <linux/io.h>
+#include <linux/mutex.h>
+#include <linux/slab.h>
+
+#include <mach/htc_acoustic_wince.h>
+#include <mach/msm_iomap.h>
+#include "dex_comm.h"
+
+/* structs */
+struct msm_audio_path {
+	bool enable_mic;
+	bool enable_dual_mic;
+	bool enable_speaker;
+	bool enable_headset;
+};
+
+struct adie_table {
+	int table_num;
+	char *pcArray;
+};
+
+struct htc_voc_cal_table {
+	uint16_t *pArray;
+	int size;
+};
+
+enum dex_audio_cmd {
+	DEX_UPDATE_VOC = 0x2,
+	DEX_AUDIO_DONE = 0x10,
+};
+
+#define E(fmt, args...) printk(KERN_ERR "htc-acoustic_wince: "fmt, ##args)
+
+#if 0
+	#define D(fmt, args...) printk(KERN_INFO "htc-acoustic_wince: "fmt, ##args)
+#else
+	#define D(fmt, args...) do {} while (0)
+#endif
+
+#define ERR_USER_COPY(to) pr_err("%s(%d): copy %s user\n", \
+		__func__, __LINE__, ((to) ? "to" : "from"))
+#define ERR_COPY_FROM_USER() ERR_USER_COPY(0)
+#define ERR_COPY_TO_USER() ERR_USER_COPY(1)
+
+static struct mutex api_lock;
+static struct mutex rpc_connect_mutex;
+
+static struct htc_acoustic_wce_amss_data *amss_data = NULL;
+struct htc_acoustic_wce_board_data *htc_acoustic_wce_board_data = NULL;
+
+
+static void headphone_amp_power(bool status)
+{
+	if (htc_acoustic_wce_board_data)
+		htc_acoustic_wce_board_data->set_headset_amp(status);
+}
+
+static void speaker_amp_power(bool status)
+{
+	if (htc_acoustic_wce_board_data)
+		htc_acoustic_wce_board_data->set_speaker_amp(status);
+}
+
+/* Table update routines */
+static int update_volume_table(void __user * arg)
+{
+	uint16_t table[0xA0];
+
+	if (copy_from_user(&table, arg, sizeof(table))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	} else {
+		memcpy((void *)amss_data->volume_table, table, sizeof(table));
+	}
+
+	return 0;
+}
+
+static int update_ce_table(void __user * arg)
+{
+	uint16_t table[0x50];
+
+	if (copy_from_user(&table, arg, sizeof(table))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	} else {
+		memcpy((void *)amss_data->ce_table, table, sizeof(table));
+	}
+
+	return 0;
+}
+
+static int update_audio_adie_table(void __user * arg)
+{
+	struct adie_table table;
+	char pcArray[0x80];
+	int rc = -EIO;
+
+	if (copy_from_user(&table, arg, sizeof(table))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	} else {
+		if (copy_from_user(pcArray, table.pcArray, 0x80)) {
+			ERR_COPY_FROM_USER();
+			return -EFAULT;
+		}
+		memcpy((void *)(amss_data->adie_table +
+				(table.table_num * 0x80)), pcArray, 0x80);
+		rc = 0;
+	}
+
+	return rc;
+}
+
+static int update_codec_table(void __user * arg)
+{
+	struct msm_dex_command dex = {
+		.cmd = DEX_UPDATE_AUDIO,
+		.has_data = 1,
+		.data = DEX_UPDATE_VOC,
+	};
+	struct htc_voc_cal_table table;
+	uint16_t *table_array;
+	int rc = -EIO;
+
+	if (copy_from_user(&table, arg, sizeof(table))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	} else {
+		D("%s : table size = %d\n", __func__, table.size);
+		table_array = kmalloc(table.size, GFP_ATOMIC);
+		if (table_array != NULL) {
+			if (copy_from_user
+			    (table_array, table.pArray, table.size)) {
+				ERR_COPY_FROM_USER();
+				rc = -EFAULT;
+				goto free_exit;
+			}
+			msm_dex_comm(&dex, 0);
+			rc = 0;
+		}
+	}
+
+ free_exit:
+	if (table_array != NULL) {
+		kfree(table_array);
+	}
+	return rc;
+}
+
+static int dex_update_audio(void __user * arg)
+{
+	struct msm_dex_command dex = {
+		.cmd = DEX_UPDATE_AUDIO,
+		.has_data = 1
+	};
+
+	if (copy_from_user(&dex.data, arg, sizeof(uint16_t))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	}
+	msm_dex_comm(&dex, 0);
+
+	return 0;
+}
+
+static int dex_update_audio_done(void) {
+	struct msm_dex_command dex = {
+		.cmd = DEX_UPDATE_AUDIO,
+		.has_data = 1,
+		.data = DEX_AUDIO_DONE,
+	};
+	D("%s\n", __func__);
+	return msm_dex_comm(&dex, 0);
+}
+
+static int turn_mic_bias_on(bool on)
+{
+
+	D("%s(%d)\n", __func__, on);
+
+	/* enable handset mic */
+	writel(0xffff0080|(on?0x100:0), amss_data->mic_offset);
+	dex_update_audio_done();
+
+	if (amss_data->mic_bias_callback)
+		amss_data->mic_bias_callback(on);
+
+	return 0;
+}
+
+static int update_hw_audio_path(void __user * arg)
+{
+	struct msm_audio_path audio_path;
+
+	if (copy_from_user(&audio_path, arg, sizeof(audio_path))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	}
+
+	D("%s: mic=%d, dual_mic=%d, speaker=%d, headset = %d\n",
+			__func__,
+	       audio_path.enable_mic, audio_path.enable_dual_mic,
+	       audio_path.enable_speaker, audio_path.enable_headset);
+
+	/* Switch microphone on/off */
+	turn_mic_bias_on(audio_path.enable_mic);
+
+	/* Switch headset HW on/off */
+	headphone_amp_power(audio_path.enable_headset);
+
+	/* Switch Speaker HW on/off */
+	// TODO : Should depop be done here ??
+	speaker_amp_power(audio_path.enable_speaker);
+
+	return 0;
+}
+
+static int acoustic_open(struct inode *inode, struct file *file)
+{
+	D("%s\n", __func__);
+	return 0;
+}
+
+static int acoustic_release(struct inode *inode, struct file *file)
+{
+	D("%s\n", __func__);
+	return 0;
+}
+
+static long acoustic_ioctl(struct file *file, unsigned int cmd,
+			   unsigned long arg)
+{
+	int rc;
+
+	mutex_lock(&api_lock);
+
+	switch (cmd) {
+	case ACOUSTIC_ARM11_DONE:
+		rc = dex_update_audio_done();
+		D("ioctl: ACOUSTIC_ARM11_DONE %d\n", rc);
+		break;
+
+	case ACOUSTIC_UPDATE_ADIE_TABLE:
+		rc = update_audio_adie_table((void __user *)arg);
+		D("ioctl: ACOUSTIC_UPDATE_ADIE_TABLE rc %d\n", rc);
+		break;
+
+	case ACOUSTIC_UPDATE_VOLUME_TABLE:
+		rc = update_volume_table((void __user *)arg);
+		D("ioctl: ACOUSTIC_UPDATE_VOLUME_TABLE rc %d.\n", rc);
+		break;
+
+	case ACOUSTIC_UPDATE_CE_TABLE:
+		rc = update_ce_table((void __user *)arg);
+		D("ioctl: ACOUSTIC_UPDATE_CE_TABLE rc %d.\n", rc);
+		break;
+
+	case ACOUSTIC_GET_HTC_VOC_CAL_FIELD_SIZE:
+		rc = amss_data->voc_cal_field_size;
+		rc = copy_to_user((void __user *)arg, &rc, sizeof(uint16_t));
+		D("ioctl: ACOUSTIC_GET_HTC_VOC_CAL_FIELD_SIZE rc %d.\n", rc);
+		break;
+
+	case ACOUSTIC_UPDATE_HTC_VOC_CAL_CODEC_TABLE:
+		rc = update_codec_table((void __user *)arg);
+		D("ioctl: ACOUSTIC_UPDATE_HTC_VOC_CAL_CODEC_TABLE rc %d.\n",
+		  rc);
+		break;
+
+	case ACOUSTIC_DEX_UPDATE_AUDIO:
+		rc = dex_update_audio((void __user *)arg);
+		D("ioctl: ACOUSTIC_DEX_UPDATE_AUDIO called rc %d.\n", rc);
+		break;
+
+	case ACOUSTIC_SET_HW_AUDIO_PATH:
+		rc = update_hw_audio_path((void __user *)arg);
+		D("ioctl: ACOUSTIC_SET_HW_AUDIO_PATH rc %d.\n", rc);
+		break;
+
+	default:
+		E("ioctl: invalid command %d\n", cmd);
+		rc = -EINVAL;
+	}
+
+	mutex_unlock(&api_lock);
+	return rc;
+}
+
+static struct file_operations acoustic_fops = {
+	.owner = THIS_MODULE,
+	.open = acoustic_open,
+	.release = acoustic_release,
+	.unlocked_ioctl = acoustic_ioctl,
+};
+
+static struct miscdevice acoustic_wince_misc = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "htc-acoustic",
+	.fops = &acoustic_fops,
+};
+
+static int htc_acoustic_wince_probe(struct platform_device *pdev)
+{
+	void *ret;
+	struct htc_acoustic_wce_amss_data *pdata = pdev->dev.platform_data;
+	if (!pdata) {
+		E("%s: no platform data\n", __func__);
+		goto err_no_pdata;
+	}
+	ret = pdata->volume_table;
+	if (!ret)
+		goto err_pdata_incomplete;
+	ret = pdata->ce_table;
+	if (!ret)
+		goto err_pdata_incomplete;
+
+	ret = pdata->adie_table;
+	if (!ret)
+		goto err_pdata_incomplete;
+
+	ret = pdata->codec_table;
+	if (!ret)
+		goto err_pdata_incomplete;
+
+	ret = pdata->mic_offset;
+	if (!ret)
+		goto err_pdata_incomplete;
+
+	amss_data = pdata;
+	mutex_init(&api_lock);
+	mutex_init(&rpc_connect_mutex);
+
+	return misc_register(&acoustic_wince_misc);
+
+err_pdata_incomplete:
+	E("%s: offsets for some tables undefined in platform data\n", __func__);
+err_no_pdata:
+	return -EINVAL;
+}
+
+static int htc_acoustic_wince_remove(struct platform_device *pdev)
+{
+	misc_deregister(&acoustic_wince_misc);
+	amss_data = NULL;
+	return 0;
+}
+
+static struct platform_driver htc_acoustic_wince_driver = {
+	.probe		= htc_acoustic_wince_probe,
+	.remove		= htc_acoustic_wince_remove,
+	.driver		= {
+		.name		= "htc_acoustic_wince",
+		.owner		= THIS_MODULE,
+	},
+};
+
+static int __init htc_acoustic_wince_init(void)
+{
+	return platform_driver_register(&htc_acoustic_wince_driver);
+}
+
+static void __exit htc_acoustic_wince_exit(void)
+{
+	platform_driver_unregister(&htc_acoustic_wince_driver);
+}
+
+module_init(htc_acoustic_wince_init);
+module_exit(htc_acoustic_wince_exit);
+
+MODULE_AUTHOR("Jerome Bruneaux <jbruneaux@laposte.net>");
+MODULE_DESCRIPTION("HTC acoustic driver for wince based devices");
+MODULE_LICENSE("GPL");

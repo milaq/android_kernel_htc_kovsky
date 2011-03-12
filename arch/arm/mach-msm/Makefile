@@ -70,7 +70,7 @@ obj-$(CONFIG_ARCH_MSM7X30) += board-msm7x30.o devices-msm7x30.o
 obj-$(CONFIG_ARCH_QSD8X50) += board-qsd8x50.o devices-qsd8x50.o
 
 obj-$(CONFIG_ANDROID_PMEM) += pmem.o
-obj-$(CONFIG_MSM_AMSS_VERSION_WINCE) += devices-msm7x00.o
+obj-$(CONFIG_MSM_AMSS_VERSION_WINCE) += devices-msm7x00.o htc_acoustic_wince.o
 obj-$(CONFIG_MACH_HTCKOVSKY) += board-htckovsky.o board-htckovsky-panel.o board-htckovsky-mmc.o
 obj-$(CONFIG_USB_ANDROID) += board-android-usb.o
 
