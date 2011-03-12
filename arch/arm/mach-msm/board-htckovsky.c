@@ -31,7 +31,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/microp-keypad.h>
 #include <linux/microp-htckovsky.h>
-#include <linux/microp-ng.h>
+#include <linux/mfd/microp-ng.h>
 #include <linux/ds2746_battery.h>
 #include <linux/msm_audio.h>
 

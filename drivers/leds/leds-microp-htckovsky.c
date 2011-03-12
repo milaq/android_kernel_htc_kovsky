@@ -28,7 +28,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
 
-#include <linux/microp-ng.h>
+#include <linux/mfd/microp-ng.h>
 #include <linux/microp-htckovsky.h>
 
 static void htckovsky_update_color_leds(struct work_struct* work);
@@ -71,45 +71,45 @@ static struct led_classdev kovsky_leds[] = {
 };
 
 
-static unsigned char xperia_green_pattern[] = {
-	0x11,
-	0x00, 0x00, 0x00, 0xff, 0x08, 0xff, 0x10, 0xff, 0x18, 0xff,
-	0x20, 0xff, 0x28, 0xff, 0x30, 0xff, 0x38, 0xff, 0xfc, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00,
-	0x20, 0x00, 0x28, 0x00, 0x30, 0x00, 0x38, 0x00, 0xfc, 0x00,
-	0x00, 0x00, 0x00, 0xff, 0x08, 0xff, 0x10, 0xff, 0x18, 0xff,
-	0x20, 0xff, 0x28, 0xff, 0x30, 0xff, 0x38, 0xff, 0xfc, 0x00,
-	0x08, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x00,
-};
-
-static unsigned char xperia_purple_pattern[] = {
-	0x11,
-	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00,
-	0x20, 0x00, 0x28, 0x00, 0x30, 0x00, 0x38, 0x00, 0xfc, 0x00,
-	0x00, 0x00, 0x00, 0xff, 0x08, 0xff, 0x10, 0xff, 0x18, 0xff,
-	0x20, 0xff, 0x28, 0xff, 0x30, 0xff, 0x38, 0xff, 0xfc, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00,
-	0x20, 0x00, 0x28, 0x00, 0x30, 0x00, 0x38, 0x00, 0xfc, 0x00,
-	0x08, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x00,
-};
-
-static void htckovsky_set_pattern(char *cmd, size_t count)
-{
-	static unsigned char off_cmd[] = {
-		0x11, 0xfc, 1,
-	};
-
-	static unsigned char on_cmd[] = {
-		0x11, 0, 0,
-	};
-
-	if (count != 0x47)
-		return;
-
-	microp_ng_write(client, off_cmd, ARRAY_SIZE(off_cmd));
-	microp_ng_write(client, cmd, count);
-	microp_ng_write(client, on_cmd, ARRAY_SIZE(on_cmd));
-}
+//static unsigned char xperia_green_pattern[] = {
+//	0x11,
+//	0x00, 0x00, 0x00, 0xff, 0x08, 0xff, 0x10, 0xff, 0x18, 0xff,
+//	0x20, 0xff, 0x28, 0xff, 0x30, 0xff, 0x38, 0xff, 0xfc, 0x00,
+//	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00,
+//	0x20, 0x00, 0x28, 0x00, 0x30, 0x00, 0x38, 0x00, 0xfc, 0x00,
+//	0x00, 0x00, 0x00, 0xff, 0x08, 0xff, 0x10, 0xff, 0x18, 0xff,
+//	0x20, 0xff, 0x28, 0xff, 0x30, 0xff, 0x38, 0xff, 0xfc, 0x00,
+//	0x08, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x00,
+//};
+//
+//static unsigned char xperia_purple_pattern[] = {
+//	0x11,
+//	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00,
+//	0x20, 0x00, 0x28, 0x00, 0x30, 0x00, 0x38, 0x00, 0xfc, 0x00,
+//	0x00, 0x00, 0x00, 0xff, 0x08, 0xff, 0x10, 0xff, 0x18, 0xff,
+//	0x20, 0xff, 0x28, 0xff, 0x30, 0xff, 0x38, 0xff, 0xfc, 0x00,
+//	0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00,
+//	0x20, 0x00, 0x28, 0x00, 0x30, 0x00, 0x38, 0x00, 0xfc, 0x00,
+//	0x08, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x00,
+//};
+//
+//static void htckovsky_set_pattern(char *cmd, size_t count)
+//{
+//	static unsigned char off_cmd[] = {
+//		0x11, 0xfc, 1,
+//	};
+//
+//	static unsigned char on_cmd[] = {
+//		0x11, 0, 0,
+//	};
+//
+//	if (count != 0x47)
+//		return;
+//
+//	microp_ng_write(client, off_cmd, ARRAY_SIZE(off_cmd));
+//	microp_ng_write(client, cmd, count);
+//	microp_ng_write(client, on_cmd, ARRAY_SIZE(on_cmd));
+//}
 
 static void htckovsky_update_color_leds(struct work_struct* work) {
 	char buf[2] = {0x20, (!!kovsky_leds[RED].brightness)
@@ -168,7 +168,7 @@ static void htckovsky_set_backlight(struct led_classdev *led_cdev,
 	schedule_work(&backlight_wq);
 }
 
-static int htckovsky_microp_probe(struct platform_device *pdev)
+static int htckovsky_leds_probe(struct platform_device *pdev)
 {
 	int ret = 0;
 	int i;
@@ -193,7 +193,7 @@ led_fail:
 	return ret;
 }
 
-static int htckovsky_microp_remove(struct platform_device *pdev)
+static int htckovsky_leds_remove(struct platform_device *pdev)
 {
 	int i;
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
@@ -204,44 +204,56 @@ static int htckovsky_microp_remove(struct platform_device *pdev)
 }
 
 #if CONFIG_PM
-static int htckovsky_microp_suspend(struct platform_device *pdev, pm_message_t mesg)
+static int htckovsky_leds_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
-	htckovsky_set_pattern(xperia_green_pattern,
-	ARRAY_SIZE(xperia_green_pattern));
+	printk("[MICROP] +%s\n", __func__);
+	cancel_work_sync(&colorled_wq);
+	cancel_work_sync(&backlight_wq);
+	cancel_work_sync(&buttonlight_wq);
+
+//	htckovsky_set_pattern(xperia_green_pattern,
+//	ARRAY_SIZE(xperia_green_pattern));
+	printk("[MICROP] -%s\n", __func__);
 	return 0;
 }
 
-static int htckovsky_microp_resume(struct platform_device *pdev)
+static int htckovsky_leds_resume(struct platform_device *pdev)
 {
-	htckovsky_set_pattern(xperia_purple_pattern,
-        ARRAY_SIZE(xperia_purple_pattern));
+	printk("[MICROP] +%s\n", __func__);
+	schedule_work(&colorled_wq);
+	schedule_work(&backlight_wq);
+	schedule_work(&buttonlight_wq);
+
+//	htckovsky_set_pattern(xperia_purple_pattern,
+//        ARRAY_SIZE(xperia_purple_pattern));
+	printk("[MICROP] -%s\n", __func__);
 	return 0;
 }
 #else
-#define htckovsky_microp_suspend NULL
-#define htckovsky_microp_resume NULL
+#define htckovsky_leds_suspend NULL
+#define htckovsky_leds_resume NULL
 #endif
 
-static struct platform_driver htckovsky_microp_driver = {
-	.probe		= htckovsky_microp_probe,
-	.remove		= htckovsky_microp_remove,
-	.suspend	= htckovsky_microp_suspend,
-	.resume		= htckovsky_microp_resume,
+static struct platform_driver htckovsky_leds_driver = {
+	.probe		= htckovsky_leds_probe,
+	.remove		= htckovsky_leds_remove,
+	.suspend	= htckovsky_leds_suspend,
+	.resume		= htckovsky_leds_resume,
 	.driver		= {
 		.name		= "htckovsky-microp-leds",
 		.owner		= THIS_MODULE,
 	},
 };
 
-static int __init htckovsky_microp_init(void)
+static int __init htckovsky_leds_init(void)
 {
-	return platform_driver_register(&htckovsky_microp_driver);
+	return platform_driver_register(&htckovsky_leds_driver);
 }
 
-static void __exit htckovsky_microp_exit(void)
+static void __exit htckovsky_leds_exit(void)
 {
-	platform_driver_unregister(&htckovsky_microp_driver);
+	platform_driver_unregister(&htckovsky_leds_driver);
 }
 
-module_init(htckovsky_microp_init);
-module_exit(htckovsky_microp_exit)
+module_init(htckovsky_leds_init);
+module_exit(htckovsky_leds_exit)

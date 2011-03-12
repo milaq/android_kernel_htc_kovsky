@@ -30,6 +30,7 @@ extern int microp_ng_write(struct i2c_client *client, uint8_t* sendbuf, int len)
 /**
  * @param client the pointer to the i2c client. It is passed to microp clients
  * as drvdata
+ * @param id the address on the i2c device to receive data
  * @param buf the buffer to receive data
  * @param len the length of data to read
  * @return zero in case of success, negative error code otherwise

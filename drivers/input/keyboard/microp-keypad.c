@@ -24,7 +24,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 
-#include <linux/microp-ng.h>
+#include <linux/mfd/microp-ng.h>
 #include <linux/microp-keypad.h>
 
 #define MODULE_NAME "microp-keypad"
@@ -69,23 +69,25 @@ static void microp_keypad_work(struct work_struct *work)
 	mutex_lock(&microp_keypad.lock);
 
 	do {
-	microp_ng_read(microp_keypad.client, MICROP_KSC_ID_SCANCODE, buffer, 2);
+		microp_ng_read(microp_keypad.client,
+						MICROP_KSC_ID_SCANCODE, buffer, 2);
 
-	key = buffer[0] & MICROP_KSC_SCANCODE_MASK;
-	isdown = !(buffer[0] & MICROP_KSC_RELEASED_MASK);
+		key = buffer[0] & MICROP_KSC_SCANCODE_MASK;
+		isdown = !(buffer[0] & MICROP_KSC_RELEASED_MASK);
 
-	if (microp_keypad.pdata->read_modifiers) {
-		microp_ng_read(microp_keypad.client, MICROP_KSC_ID_MODIFIER, buffer, 2);
-		slider_open = (buffer[1] & MICROP_KSC_CLAMSHELL_MASK);
-		input_report_switch(microp_keypad.input, SW_LID, slider_open);
-	}
-
-	input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
-		if (key < microp_keypad.pdata->keypad_scancodes_size) {
-			input_report_key(microp_keypad.input,
-							last_key = microp_keypad.pdata->keypad_scancodes[key],
-							isdown);
+		if (microp_keypad.pdata->read_modifiers) {
+			microp_ng_read(microp_keypad.client,
+						MICROP_KSC_ID_MODIFIER, buffer, 2);
+			slider_open = (buffer[1] & MICROP_KSC_CLAMSHELL_MASK);
+			input_report_switch(microp_keypad.input, SW_LID, slider_open);
 		}
+
+		input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
+			if (key < microp_keypad.pdata->keypad_scancodes_size) {
+				input_report_key(microp_keypad.input,
+						last_key = microp_keypad.pdata->keypad_scancodes[key],
+						isdown);
+			}
 	} while (key);
 	input_sync(microp_keypad.input);
 	mutex_unlock(&microp_keypad.lock);
@@ -233,6 +235,24 @@ static int microp_keypad_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#if CONFIG_PM
+static int microp_keypad_suspend(struct platform_device *pdev, pm_message_t mesg)
+{
+	if (microp_keypad.pdata->gpio_clamshell > 0)
+		cancel_work_sync(&microp_keypad.clamshell_work);
+	cancel_work_sync(&microp_keypad.keypad_work);
+	return 0;
+}
+
+static int microp_keypad_resume(struct platform_device *pdev)
+{
+	return 0;
+}
+#else
+#define microp_keypad_suspend NULL
+#define microp_keypad_resume NULL
+#endif
+
 static struct platform_driver microp_keypad_driver = {
 	.driver = {
 		.name	= MODULE_NAME,
@@ -240,6 +260,9 @@ static struct platform_driver microp_keypad_driver = {
 	},
 	.probe = microp_keypad_probe,
 	.remove = microp_keypad_remove,
+	.suspend = microp_keypad_suspend,
+	.resume = microp_keypad_resume,
+
 };
 
 static int __init microp_keypad_init(void)

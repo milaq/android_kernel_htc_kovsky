@@ -435,7 +435,7 @@ config KEYBOARD_W90P910
 
 config KEYBOARD_MICROP_KEYPAD
         tristate "MicroP I2C Keypad"
-        depends on I2C_MSM
+        depends on MFD_MICROP_NG
         help
           Say Y here if you have an MSM device with an I2C MicroP
           keypad.
