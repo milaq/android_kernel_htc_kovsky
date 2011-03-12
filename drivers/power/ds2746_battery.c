@@ -93,7 +93,11 @@ static unsigned int current_accum_capacity = 500;
 module_param(battery_capacity, int, 0644);
 MODULE_PARM_DESC(battery_capacity, "Estimated battery capacity in mAh");
 
+#if 0
 #define DBG(fmt, x...) printk(KERN_DEBUG fmt, ##x)
+#else
+#define DBG(fmt, x...) do {} while (0)
+#endif
 
 struct ds2746_info {
 	u32 batt_id;		/* Battery ID from ADC */
