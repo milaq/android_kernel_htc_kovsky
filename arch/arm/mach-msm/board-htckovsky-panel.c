@@ -85,7 +85,7 @@ static struct mddi_table mddi_epson_init_table_1[] = {
 	{0x30, 0},
 	{0x18, 0x3BF},
 	{0x20, 0x3034},
-	{0x24, 0x4011},
+	{0x24, 0x400e}, //4011
 	{0x28, 0x32A},
 	{0x2c, 0x1},
 	{0xfffc, 0x1},
@@ -98,7 +98,7 @@ static struct mddi_table mddi_epson_init_table_1[] = {
 	{0x2c, 0x2},
 	{0x1, 0x2},
 	{0x2c, 0x3},
-	{0x100, 0x3402},
+	{0x100, 0x3401}, //3402
 	{0x104, 0x380},
 	{0x140, 0x3E},
 	{0x144, 0xEF},
@@ -528,7 +528,7 @@ static struct msm_mddi_bridge_platform_data epson_client_data = {
 
 static struct msm_mddi_platform_data mddi_pdata = {
 	.vsync_irq = MSM_GPIO_TO_INT(KOVS100_LCD_VSYNC),
-	.clk_rate = 122880000,
+	.clk_rate = 192000000,
 	.power_client = htckovsky_mddi_power_client,
 	.fb_resource = htckovsky_fb_resources,
 	.num_clients = 1,
