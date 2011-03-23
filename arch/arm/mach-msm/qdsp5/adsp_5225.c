@@ -267,6 +267,8 @@ static struct adsp_module_info module_info[] = {
 	QDSP_MODULE(VIDEOTASK, "vdc_clk", 96000000,
 		adsp_video_verify_cmd, NULL),
 	QDSP_MODULE(VDEC_LP_MODE, NULL, 0, NULL, NULL),
+	QDSP_MODULE(VIDEOENCTASK, "vdc_clk", 96000000,
+		adsp_videoenc_verify_cmd, NULL),
 };
 
 static struct adsp_info info = {
