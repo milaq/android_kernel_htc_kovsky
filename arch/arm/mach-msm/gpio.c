@@ -711,7 +711,6 @@ int gpio_tlmm_config(unsigned config, enum msm_gpio_state enable)
 	    (GPIO_PULL(config));
 	writel(cfg, addr2);
 
-	//printk("msm_gpio_set_function(%x, %x)\n", gpio, cfg);
 	if (readl(addr) != gpio)
 		printk(KERN_WARNING "%s: could not set alt func %u => %u\n",
 		       __func__, gpio, GPIO_FUNC(config));
@@ -828,6 +827,9 @@ int msm_gpios_request(const struct msm_gpio *table, int size)
 
 	return 0;
 err:
+	printk(KERN_ERR "%s: error requesting pin %d\n",
+			__func__,
+			GPIO_PIN(table[i].gpio_cfg));
 	for (i--; i >= 0;i--)
 		gpio_free(GPIO_PIN(table[i].gpio_cfg));
 	return rc;
