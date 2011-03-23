@@ -170,6 +170,10 @@
 #define MSM_GPIOCFG2_PHYS     0xA9100000
 #define MSM_GPIOCFG2_SIZE     SZ_4K
 
+#define MSM_AXI_BASE          IOMEM(0xF900D000)
+#define MSM_AXI_PHYS          0xA8200000
+#define MSM_AXI_SIZE          0x50000
+
 #if defined(CONFIG_ARCH_MSM7X30)
 #define MSM_GCC_BASE          IOMEM(0xF800D000)
 #define MSM_GCC_PHYS          0xC0182000
