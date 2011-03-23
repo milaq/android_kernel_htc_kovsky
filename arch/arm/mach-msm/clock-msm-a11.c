@@ -25,8 +25,8 @@
 #include <linux/delay.h>
 #include <linux/spinlock.h>
 #include <mach/msm_rpcrouter.h>
-
 #include <mach/msm_iomap.h>
+
 #include <asm/io.h>
 
 #include "clock.h"
@@ -55,6 +55,29 @@ static void a11_clk_disable(unsigned id);
 #else
 #define D(x...) do {} while (0)
 #endif
+
+#define MSM_GLBL_CLK_STATE      ( MSM_CLK_CTL_BASE+0x4 )
+#define MSM_CAM_MD_REG          ( MSM_CLK_CTL_BASE+0x40 )
+#define MSM_VFE_NS_REG          ( MSM_CLK_CTL_BASE+0x44 )
+#define MSM_PRPH_WEB_NS_REG     ( MSM_CLK_CTL_BASE+0x80 )
+#define MSM_GRP_NS_REG          ( MSM_CLK_CTL_BASE+0x84 )
+#define MSM_CLK_HALT_STATEA     ( MSM_CLK_CTL_BASE+0x108 )
+#define MSM_CLK_HALT_STATEB     ( MSM_CLK_CTL_BASE+0x108 )
+#define MSM_AXI_RESET           ( MSM_CLK_CTL_BASE+0x208 )
+#define MSM_APPS_RESET          ( MSM_CLK_CTL_BASE+0x210 )
+#define MSM_ROW_RESET           ( MSM_CLK_CTL_BASE+0x214 )
+#define MSM_VDD_VFE_GFS_CTL     ( MSM_CLK_CTL_BASE+0x280 )
+#define MSM_VDD_GRP_GFS_CTL     ( MSM_CLK_CTL_BASE+0x284 )
+#define MSM_VDD_VDC_GFS_CTL     ( MSM_CLK_CTL_BASE+0x288 )
+#define MSM_RAIL_CLAMP_IO       ( MSM_CLK_CTL_BASE+0x290 )
+
+#define REG_OR( reg, value ) do { u32 i = readl( (reg) ); writel( i | (value), (reg) ); } while(0)
+#define REG_AND( reg, value ) do {	u32 i = readl( reg ); writel( i & ~value, reg); } while(0)
+#define REG_AND_MASK( reg, value ) do {	u32 i = readl( reg ); writel( i & value, reg); } while(0)
+#define REG_AND_OR( reg, value_and, value_or ) do { u32 i = readl( reg ); writel( (i & ~(value_and)) | (value_or), reg); } while(0)
+#define REG_ANDM_OR( reg, value_and, value_or ) do { u32 i = readl( reg ); writel( (i & (value_and)) | (value_or), reg); } while(0)
+#define REG_AND_ADD( reg, value_and, value_add ) do { u32 i = readl( reg ); writel( (i & ~(value_and)) + (value_add), reg); } while(0)
+#define REG_SET( reg, value ) do { writel( value, reg ); } while(0)
 
 struct mdns_clock_params {
 	unsigned long freq;
@@ -190,11 +213,13 @@ struct mdns_clock_params msm_clock_freq_parameters_pll0_245[] = {
 #endif
 	MSM_CLOCK_REG(12000000, 1, 0x20, 0x10, 1, 3, 1, 1, 768000000),	/* SD, 12MHz */
 	MSM_CLOCK_REG(14745600, 3, 0x32, 0x19, 0, 2, 4, 1, 245760000),	/* BT, 921600 (*16) */
-	MSM_CLOCK_REG(19200000, 1, 0x0a, 0x05, 3, 3, 1, 1, 768000000),	/* SD, 19.2MHz */
-	MSM_CLOCK_REG(24000000, 1, 0x10, 0x08, 1, 3, 1, 1, 768000000),	/* SD, 24MHz */
-	MSM_CLOCK_REG(32000000, 1, 0x0c, 0x06, 1, 3, 1, 1, 768000000),	/* SD, 32MHz */
-	MSM_CLOCK_REG(58982400, 6, 0x19, 0x0c, 0, 2, 4, 1, 245760000),	/* BT, 3686400 (*16) */
-	MSM_CLOCK_REG(64000000, 0x19, 0x60, 0x30, 0, 2, 4, 1, 245760000),	/* BT, 4000000 (*16) */
+	MSM_CLOCK_REG(16000000,   1, 0x0c, 0x06, 0, 2, 4, 1, 245760000), /* BT, 1000000 (*16)*/
+	MSM_CLOCK_REG(19200000,   1, 0x0a, 0x05, 3, 3, 1, 1, 768000000), /* SD, 19.2MHz */
+	MSM_CLOCK_REG(24000000,   1, 0x08, 0x04, 3, 2, 1, 1, 768000000), /* SD & VFE_CLK, 24MHz */
+	MSM_CLOCK_REG(32000000,   1, 0x0c, 0x06, 1, 3, 1, 1, 768000000), /* SD, 32MHz */
+	MSM_CLOCK_REG(48000000,   1, 0x04, 0x02, 0, 2, 4, 1, 245760000), /* UART_HS, 48MHz */
+	MSM_CLOCK_REG(58982400,   6, 0x19, 0x0c, 0, 2, 4, 1, 245760000), /* BT, 3686400 (*16) */
+	MSM_CLOCK_REG(64000000,0x19, 0x60, 0x30, 0, 2, 4, 1, 245760000), /* BT, 4000000 (*16) Normal */
 	{0, 0, 0, 0, 0, 0},
 };
 
@@ -213,85 +238,193 @@ struct mdns_clock_params msm_clock_freq_parameters_pll0_196[] = {
 	{0, 0, 0, 0, 0, 0},
 };
 
-// defines from MSM7500_Core.h
+static int grp_ns = 0x99;
 
-// often used defines
-#define MSM_PRPH_WEB_NS_REG	(MSM_CLK_CTL_BASE+0x80)
-#define MSM_GRP_3D_NS_REG	(MSM_CLK_CTL_BASE+0x84)
-#define MSM_AXI_RESET 		(MSM_CLK_CTL_BASE+0x208)
-#define MSM_ROW_RESET 		(MSM_CLK_CTL_BASE+0x214)
-#define MSM_VDD_GRP_3D_GFS_CTL	(MSM_CLK_CTL_BASE+0x284)
-#define MSM_VDD_VDC_GFS_CTL	(MSM_CLK_CTL_BASE+0x288)
-#define MSM_RAIL_CLAMP_IO	(MSM_CLK_CTL_BASE+0x290)
-
-#define REG_OR(reg, value) do { u32 i = readl(reg); writel(i | (value), reg); } while(0)
-#define REG_AND(reg, value) do { u32 i = readl(reg); writel(i & ~value, reg); } while(0)
-#define REG_SET(reg, value) do { writel(value, reg); } while(0)
-
-static void set_grp_3d_clk(int on)
+static void set_grp_rail(int enable)
 {
-	static int last_status = -1;
 	int i = 0;
 	int status = 0;
-	int control;
 
-	if (on == last_status)
-		return;
-
-	if (on != 0) {
+	if (enable) {
 		REG_OR(MSM_AXI_RESET, 0x20);
 		REG_OR(MSM_ROW_RESET, 0x20000);
-		REG_SET(MSM_VDD_GRP_3D_GFS_CTL, 0x11f);
-		// very rough delay
-		mdelay(20);
+		REG_SET(MSM_VDD_GRP_GFS_CTL, 0x11f);
+		mdelay(20);	// very rough delay
 
-		REG_OR(MSM_GRP_3D_NS_REG, 0x800);
-		REG_OR(MSM_GRP_3D_NS_REG, 0x80);
-		REG_OR(MSM_GRP_3D_NS_REG, 0x200);
+		REG_AND(MSM_GRP_NS_REG, 0x7f);
+		REG_OR(MSM_GRP_NS_REG, grp_ns);
+		REG_OR(MSM_GRP_NS_REG, 0x800);
+		REG_OR(MSM_GRP_NS_REG, 0x80);
+		REG_OR(MSM_GRP_NS_REG, 0x200);
 
-		// grp idx
-		REG_OR(MSM_CLK_CTL_BASE, 0x8);
+		REG_OR(MSM_CLK_CTL_BASE, 0x8);	// grp idx
 
 		REG_AND(MSM_RAIL_CLAMP_IO, 0x4);
-		REG_AND(MSM_PRPH_WEB_NS_REG, 0x1);
+
+		REG_AND(MSM_AXI_BASE + 0x10080, 0x1);
+
 		REG_AND(MSM_AXI_RESET, 0x20);
 		REG_AND(MSM_ROW_RESET, 0x20000);
 	} else {
-		REG_OR(MSM_GRP_3D_NS_REG, 0x800);
-		REG_OR(MSM_GRP_3D_NS_REG, 0x80);
-		REG_OR(MSM_GRP_3D_NS_REG, 0x200);
+		REG_OR(MSM_GRP_NS_REG, 0x800);
+		REG_OR(MSM_GRP_NS_REG, 0x80);
+		REG_OR(MSM_GRP_NS_REG, 0x200);
 
-		//grp idx
-		REG_OR(MSM_CLK_CTL_BASE, 0x8);
+		REG_OR(MSM_CLK_CTL_BASE, 0x8);	// grp idx
 
-		//grp MD
-		REG_OR(MSM_PRPH_WEB_NS_REG, 0x1);
+		REG_OR(MSM_AXI_BASE + 0x10080, 0x1);
 
 		while (status == 0 && i < 100) {
 			i++;
-			status = readl(MSM_GRP_3D_NS_REG) & 0x1;
+			status = readl(MSM_AXI_BASE + 0x10084) & 0x1;
 		}
 
 		REG_OR(MSM_AXI_RESET, 0x20);
 		REG_OR(MSM_ROW_RESET, 0x20000);
 
-		REG_AND(MSM_GRP_3D_NS_REG, 0x800);
-		REG_AND(MSM_GRP_3D_NS_REG, 0x80);
-		REG_AND(MSM_GRP_3D_NS_REG, 0x200);
+		REG_AND(MSM_GRP_NS_REG, 0x800);
+		REG_AND(MSM_GRP_NS_REG, 0x80);
+		REG_AND(MSM_GRP_NS_REG, 0x200);
 
-		//grp clk ramp
-		REG_OR(MSM_RAIL_CLAMP_IO, 0x4);
+		REG_OR(MSM_RAIL_CLAMP_IO, 0x4);	// grp clk ramp
 
-		REG_SET(MSM_VDD_GRP_3D_GFS_CTL, 0x11f);
-
-		control = readl(MSM_VDD_VDC_GFS_CTL);
-
-		//grp idx
-		if (control & 0x100) {
-			REG_AND(MSM_CLK_CTL_BASE, 0x8);
-		}
+		REG_SET(MSM_VDD_GRP_GFS_CTL, 0x1f);
 	}
-	last_status = on;
+}
+
+static int is_vfe_on()
+{
+	int rc = 0;
+
+	if (!(readl(MSM_VFE_NS_REG) & 0x4000)) {
+		if (!(readl(MSM_CLK_HALT_STATEA) & 0x200)) {
+			rc = 1;
+		} else {
+			rc = !(readl(MSM_VFE_NS_REG) & 0x800);
+		}
+	} else {
+		rc = !(readl(MSM_VFE_NS_REG) & 0x800);
+	}
+
+	return rc;
+}
+
+static void set_vdc_rail(int on)
+{
+	int status, i;
+	static int state = 0;
+	if (state == on)
+		return;
+	state = on;
+
+	printk("+%s(%d)\n", __func__, on);
+	if (state) {
+		REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x800);
+		if (readl(MSM_CLK_CTL_BASE + 0xF0) & 0x60) {
+			REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x100);
+		}
+		REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x200);
+
+		REG_ANDM_OR(MSM_CLK_CTL_BASE + 0x34, 0x7FFFFF, 0x100000);
+		REG_OR(MSM_CLK_CTL_BASE, 0x8);
+		REG_ANDM_OR(MSM_AXI_RESET, 0x3FFF, 0x2);
+		REG_ANDM_OR(MSM_ROW_RESET, 0x7FFFFFF, 0x1);
+		REG_ANDM_OR(MSM_APPS_RESET, 0x1FFF, 0x80);
+
+		REG_SET(MSM_VDD_VDC_GFS_CTL, 0x11f);
+		mdelay(2);
+
+		REG_AND(MSM_RAIL_CLAMP_IO, 0x2);
+
+		REG_AND(MSM_AXI_BASE + 0x10080, 0x4);
+
+		REG_AND(MSM_AXI_RESET, 0x2);
+		REG_AND(MSM_ROW_RESET, 1);
+		REG_AND(MSM_APPS_RESET, 0x80);
+	} else {
+		REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x800);
+		if (readl(MSM_CLK_CTL_BASE + 0xF0) & 0x60) {
+			REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x100);
+		}
+		REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x200);
+		REG_OR(MSM_CLK_CTL_BASE, 0x8);
+
+		REG_OR(MSM_AXI_BASE + 0x10080, 0x4);
+
+		i = status = 0;
+		while (status == 0 && i < 100) {
+			i++;
+			status = readl(MSM_AXI_BASE + 0x10084) & 0x4;
+		}
+
+		REG_OR(MSM_AXI_RESET, 0x2);
+		REG_OR(MSM_ROW_RESET, 0x1);
+
+		REG_AND(MSM_AXI_BASE + 0xF0, 0x200);
+		REG_AND(MSM_AXI_BASE + 0xF0, 0x100);
+		REG_AND(MSM_AXI_BASE + 0xF0, 0x800);
+
+		REG_OR(MSM_RAIL_CLAMP_IO, 0x2);
+
+		REG_SET(MSM_VDD_VDC_GFS_CTL, 0x1f);
+	}
+	printk("-%s(%d)\n", __func__, on);
+}
+
+static void set_vfe_rail(int enable)
+{
+	int i = 0;
+	int status = 0;
+	static int is_enabled = 0;
+
+	printk("+%s(%d)\n", __func__, enable);
+	if (is_enabled == enable)
+		return;
+
+	is_enabled = enable;
+
+	if (enable) {
+		REG_ANDM_OR(MSM_AXI_RESET, 0x3FFF, 1);
+		REG_ANDM_OR(MSM_CLK_CTL_BASE + 0x210, 0x1FFF, 1);
+		REG_SET(MSM_VDD_VFE_GFS_CTL, 0x11F);
+		mdelay(20);
+
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, 1 << 9);
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, 1 << 13);
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, 1 << 11);
+		REG_AND(MSM_CLK_CTL_BASE + 0x44, (1 << 1 | 1 << 2));
+
+		REG_AND_MASK(MSM_RAIL_CLAMP_IO, 0x37);
+
+		REG_AND_MASK(MSM_AXI_BASE + 0x20080, 0xFE);
+
+		REG_AND_MASK(MSM_AXI_RESET, 0x3FFE);
+		REG_AND_MASK(MSM_APPS_RESET, 0x1FFE);
+	} else {
+		REG_ANDM_OR(MSM_CLK_CTL_BASE, 0x3FFFFFFF, 4);
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, 1 << 9);
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, 1 << 13);
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, 1 << 11);
+		REG_AND(MSM_CLK_CTL_BASE + 0x44, (1 << 1 | 1 << 2));
+
+		REG_OR(MSM_AXI_BASE + 0x20080, 0x1);
+		while (status == 0 && i < 100) {
+			i++;
+			status = readl(MSM_AXI_BASE + 0x20084) & 0x1;
+		}
+
+		REG_ANDM_OR(MSM_AXI_RESET, 0x3FFF, 1);
+		REG_ANDM_OR(MSM_APPS_RESET, 0x1FFF, 1);
+
+		REG_OR(MSM_CLK_CTL_BASE + 0x44, (1 << 1 | 1 << 2));
+		REG_AND(MSM_CLK_CTL_BASE + 0x44, 1 << 11);
+		REG_AND(MSM_CLK_CTL_BASE + 0x44, 1 << 13);
+		REG_AND(MSM_CLK_CTL_BASE + 0x44, 1 << 9);
+
+		REG_ANDM_OR(MSM_RAIL_CLAMP_IO, 0x3F, 8);
+		REG_SET(MSM_VDD_VFE_GFS_CTL, 0x1F);
+	}
+	printk("-%s(%d)\n", __func__, enable);
 }
 
 static inline struct msm_clock_params msm_clk_get_params(unsigned id)
@@ -363,10 +496,11 @@ static int set_mdns_host_clock(unsigned id, unsigned long freq)
 		       MSM_CLK_CTL_BASE + offset - 4);
 
 		if (id == VFE_CLK) {
-			writel((msm_clock_freq_parameters[n].ns & ~0x7e00) |
-			       (readl(MSM_CLK_CTL_BASE + offset)
-				& 0x7e00)
-			       , MSM_CLK_CTL_BASE + offset);
+					writel((msm_clock_freq_parameters[n].ns
+						& ~0x6a06) |
+					       (readl(MSM_CLK_CTL_BASE + offset)
+						& 0x6a06)
+					       , MSM_CLK_CTL_BASE + offset);
 		} else {
 			writel(msm_clock_freq_parameters[n].ns,
 			       MSM_CLK_CTL_BASE + offset);
@@ -486,7 +620,6 @@ static int a11_clk_enable(unsigned id)
 	case SDC3_CLK:
 	case SDC4_CLK:
 	case USB_HS_CLK:
-	case VDC_CLK:
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x800,
 		       MSM_CLK_CTL_BASE + params.offset);
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x100,
@@ -498,24 +631,30 @@ static int a11_clk_enable(unsigned id)
 
 	case IMEM_CLK:
 	case GRP_3D_CLK:
-		set_grp_3d_clk(1);
+		set_grp_rail(1);
 		done = 1;
 		break;
 
 	case MDC_CLK:
-		D("Enabling MDC clock\n");
-		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0xa01,
+		printk("Enabling MDC clock\n");
+		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x800,
+		       MSM_CLK_CTL_BASE + params.offset);
+		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x200,
 		       MSM_CLK_CTL_BASE + params.offset);
 		done = 1;
 		break;
+
 	case VFE_CLK:
+		set_vfe_rail(1);
+		done = 1;
+		break;
+
 	case VFE_MDC_CLK:
-		writel((readl(MSM_CLK_CTL_BASE + params.offset) | (1 << 13)),
-		       MSM_CLK_CTL_BASE + params.offset);
-		writel((readl(MSM_CLK_CTL_BASE + params.offset) | (1 << 9)),
-		       MSM_CLK_CTL_BASE + params.offset);
-		writel((readl(MSM_CLK_CTL_BASE + params.offset) | (1 << 11)),
-		       MSM_CLK_CTL_BASE + params.offset);
+		done = 1;
+		break;
+
+	case VDC_CLK:
+		set_vdc_rail(1);
 		done = 1;
 		break;
 
@@ -557,6 +696,7 @@ static void a11_clk_disable(unsigned id)
 	case MDP_CLK:
 		writel(readl(MSM_CLK_CTL_BASE) & 0x3ffffdff, MSM_CLK_CTL_BASE);
 		done = 1;
+		return;
 		break;
 
 	case UART1_CLK:
@@ -589,7 +729,6 @@ static void a11_clk_disable(unsigned id)
 	case SDC3_CLK:
 	case SDC4_CLK:
 	case USB_HS_CLK:
-	case VDC_CLK:
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x200,
 		       MSM_CLK_CTL_BASE + params.offset);
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x800,
@@ -629,23 +768,35 @@ static void a11_clk_disable(unsigned id)
 
 	case IMEM_CLK:
 	case GRP_3D_CLK:
-		set_grp_3d_clk(0);
+		set_grp_rail(0);
 		writel(readl(MSM_CLK_CTL_BASE) & ~(1U << params.idx),
 		       MSM_CLK_CTL_BASE);
 		done = 1;
 		break;
 
 	case MDC_CLK:
-		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0xa00,
+		D("disabling MDC clock\n");
+		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x200,
+		       MSM_CLK_CTL_BASE + params.offset);
+		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x800,
 		       MSM_CLK_CTL_BASE + params.offset);
 		done = 1;
 		break;
 
 	case VFE_CLK:
-	case VFE_MDC_CLK:
-		D("Disabling VFE clock\n");
+		set_vfe_rail(0);
 		done = 1;
 		break;
+
+	case VFE_MDC_CLK:
+		done = 1;
+		break;
+
+	case VDC_CLK:
+		set_vdc_rail(0);
+		done = 1;
+		break;
+
 
 	default:
 		break;
@@ -653,8 +804,6 @@ static void a11_clk_disable(unsigned id)
 
 	if (done)
 		return;
-
-	//XXX: D(KERN_DEBUG "%s: %d\n", __func__, id);
 
 	if (debug_mask & DEBUG_UNKNOWN_ID)
 		D("%s: FIXME! disabling a clock that doesn't have an "
@@ -785,6 +934,7 @@ void __init msm_clock_a11_fixup(void)
 		mdelay(6000);
 
 	mutex_lock(&clocks_mutex);
+
 	if (pll_get_rate(0) == 196608000) {
 		// cdma pll0 = 196 MHz
 		msm_clock_freq_parameters = msm_clock_freq_parameters_pll0_196;
@@ -795,41 +945,16 @@ void __init msm_clock_a11_fixup(void)
 	mutex_unlock(&clocks_mutex);
 }
 
-#define PMIC_API_PROG		0x30000055
-#define PMIC_API_VERS 		0x0
-#define PMIC_API_GET_KHZ_PROC	0x1
 static void msm_clock_a11_reset_imem(void)
 {
-	struct msm_rpc_endpoint *pmic_ep;
-	int rc;
-	struct {
-		struct rpc_request_hdr hdr;
-		unsigned data[1];
-	} req;
-
 	if (nand_boot)
 		return;
 
 	writel(0, MSM_IMEM_BASE);
 	pr_info("reset imem_config\n");
-//	pmic_ep = msm_rpc_connect(PMIC_API_PROG, PMIC_API_VERS, 0);
-//	if (IS_ERR(pmic_ep)) {
-//		printk("%s: init rpc failed! error: %ld\n",
-//		       __func__, PTR_ERR(pmic_ep));
-//		goto close;
-//	}
 	pr_info("IMEM OLD: VAL = %d\n", readl(MSM_IMEM_BASE));
-//	req.data[0] = cpu_to_be32(1);
-//	rc = msm_rpc_call(pmic_ep, PMIC_API_GET_KHZ_PROC, &req, sizeof(req),
-//			  5 * HZ);
-//	if (rc < 0)
-//		printk("%s: rpc call failed! (%d)\n", __func__, rc);
-
 	msleep(100);
 	pr_info("IMEM NEW: VAL = %d\n", readl(MSM_IMEM_BASE));
-
-//close:
-//	msm_rpc_close(pmic_ep);
 }
 
 struct clk_ops clk_ops_a11 = {
@@ -846,4 +971,3 @@ struct clk_ops clk_ops_a11 = {
 	.round_rate = a11_clk_round_rate,
 	.late_init_clk = msm_clock_a11_reset_imem,
 };
-

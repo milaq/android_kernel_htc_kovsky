@@ -14,8 +14,8 @@
  *
  */
 
-#ifndef __ARCH_ARM_MACH_MSM_CLOCK_WINCE_H
-#define __ARCH_ARM_MACH_MSM_CLOCK_WINCE_H
+#ifndef __ARCH_ARM_MACH_MSM_CLOCK_MSM_A11_H
+#define __ARCH_ARM_MACH_MSM_CLOCK_MSM_A11_H
 
 /* clock IDs used by the P_modem processor */
 
