@@ -43,6 +43,7 @@
 
 #include <mach/hardware.h>
 #include <mach/system.h>
+#include <mach/dma.h>
 #include <mach/gpio.h>
 #include <mach/htc_acoustic_wince.h>
 #include <mach/htc_headset_35mm.h>
@@ -643,6 +644,35 @@ static struct platform_device amss_device = {
 };
 
 /******************************************************************************
+ * Bluetooth
+ ******************************************************************************/
+struct platform_device htckovsky_rfkill = {
+	.name = "htckovsky_rfkill",
+	.id = -1,
+};
+
+static struct msm_serial_hs_platform_data msm_uart_dm2_pdata = {
+	.rx_wakeup_irq = MSM_GPIO_TO_INT(KOVS100_UART2DM_RX),
+	.inject_rx_on_wakeup = 1,
+	.rx_to_inject = 0x32,
+};
+
+static void __init htckovsky_patch_uart_dma(void) {
+	struct resource* res = msm_device_uart_dm2.resource;
+	int n = msm_device_uart_dm2.num_resources;
+	int i;
+
+	for (i = 0; i < n; i++) {
+		if (res[i].flags == IORESOURCE_DMA &&
+			res[i].end == DMOV_HSUART2_RX_CHAN) {
+			res[i].end = 9;
+			break;
+		}
+	}
+
+}
+
+/******************************************************************************
  * Headset
  ******************************************************************************/
 static struct htc_headset_35mm_pdata htckovsky_headset_data = {
@@ -695,9 +725,8 @@ static struct platform_device *devices[] __initdata = {
 	&htckovsky_rtc,
 	&htckovsky_sdcc,
 	&htckovsky_gpio_keys,
-#ifdef CONFIG_SERIAL_MSM_HS
-//      &msm_device_uart_dm2,
-#endif
+	&htckovsky_rfkill,
+	&msm_device_uart_dm2,
 	&msm_device_hsusb,
 #ifdef CONFIG_USB_ANDROID
 	&android_usb,
@@ -720,17 +749,6 @@ static struct msm_acpu_clock_platform_data htckovsky_clock_data = {
 	.wait_for_irq_khz = 122880,
 };
 
-void msm_serial_debug_init(unsigned int base, int irq,
-			const char *clkname, int signal_irq);
-
-#ifdef CONFIG_SERIAL_MSM_HS
-static struct msm_serial_hs_platform_data msm_uart_dm2_pdata = {
-	.rx_wakeup_irq = MSM_GPIO_TO_INT(21),
-	.inject_rx_on_wakeup = 1,
-	.rx_to_inject = 0x32,
-};
-#endif
-
 static void __init htckovsky_init(void)
 {
 	int i;
@@ -742,9 +760,9 @@ static void __init htckovsky_init(void)
 	htckovsky_request_ulpi_gpios();
 	msm_hsusb_board_pdata = &htckovsky_hsusb_pdata;
 
-#ifdef CONFIG_SERIAL_MSM_HS
+	htckovsky_patch_uart_dma();
 	msm_device_uart_dm2.dev.platform_data = &msm_uart_dm2_pdata;
-#endif
+
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
 
 	if (!htckovsky_init_acoustic())
