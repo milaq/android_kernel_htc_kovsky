@@ -328,8 +328,7 @@ static void ds2746_battery_work(struct work_struct *work)
 		next_update = msecs_to_jiffies(SLOW_POLL);
 	}
 
-	if (old_status != bi->charging_enabled)
-		power_supply_changed(bi->bat);
+	power_supply_changed(bi->bat);
 	queue_delayed_work(monitor_wqueue, &bat_work, next_update);
 }
 
