@@ -212,14 +212,14 @@ static const struct i2c_device_id microp_ng_ids[] = {
 };
 
 #if CONFIG_PM
-static int htckovsky_microp_suspend(struct platform_device *pdev, pm_message_t mesg)
+static int microp_ng_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	printk("[MICROP] +%s\n", __func__);
 	printk("[MICROP] -%s\n", __func__);
 	return 0;
 }
 
-static int htckovsky_microp_resume(struct platform_device *pdev)
+static int microp_ng_resume(struct platform_device *pdev)
 {
 	printk("[MICROP] +%s\n", __func__);
 	printk("[MICROP] -%s\n", __func__);
@@ -238,8 +238,8 @@ static struct i2c_driver microp_ng_driver = {
 	.id_table = microp_ng_ids,
 	.probe = microp_ng_probe,
 	.remove = microp_ng_remove,
-	.suspend	= htckovsky_microp_suspend,
-	.resume		= htckovsky_microp_resume,
+	.suspend	= microp_ng_suspend,
+	.resume		= microp_ng_resume,
 };
 
 static int __init microp_ng_init(void)
