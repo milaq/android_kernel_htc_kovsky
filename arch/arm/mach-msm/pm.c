@@ -218,6 +218,11 @@ msm_pm_wait_state(uint32_t wait_all_set, uint32_t wait_all_clear,
 static void
 msm_pm_enter_prep_hw(void)
 {
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	// tell ARM9 we are going to suspend
+	writel(1, MSM_SHARED_RAM_BASE + 0xfc100);
+	writel(readl(MSM_SHARED_RAM_BASE + 0xfc108) + 1,MSM_SHARED_RAM_BASE + 0xfc108);
+#endif
 #if defined(CONFIG_ARCH_MSM7X30)
 	writel(1, A11S_PWRDOWN);
 	writel(4, A11S_SECOP);
@@ -240,6 +245,10 @@ msm_pm_enter_prep_hw(void)
 static void
 msm_pm_exit_restore_hw(void)
 {
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	writel(0,MSM_SHARED_RAM_BASE+0xfc100);
+	writel(0,MSM_SHARED_RAM_BASE+0xfc128);
+#endif
 #if defined(CONFIG_ARCH_MSM7X30)
 	writel(0, A11S_SECOP);
 	writel(0, A11S_PWRDOWN);
@@ -407,6 +416,7 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 			       "%x %x\n", saved_vector[0], saved_vector[1],
 			       msm_pm_reset_vector[0], msm_pm_reset_vector[1]);
 		collapsed = msm_pm_collapse();
+
 		msm_pm_reset_vector[0] = saved_vector[0];
 		msm_pm_reset_vector[1] = saved_vector[1];
 		if (collapsed) {
@@ -416,6 +426,7 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 			local_fiq_enable();
 			rv = 0;
 		}
+
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_POWER_COLLAPSE)
 			printk(KERN_INFO "msm_pm_collapse(): returned %d\n",
 			       collapsed);
