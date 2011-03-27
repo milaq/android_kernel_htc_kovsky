@@ -745,8 +745,8 @@ static struct msm_acpu_clock_platform_data htckovsky_clock_data = {
 	.acpu_switch_time_us = 50,
 	.max_speed_delta_khz = 256000,
 	.vdd_switch_time_us = 62,
-	.power_collapse_khz = 122880,
-	.wait_for_irq_khz = 122880,
+	.power_collapse_khz = 19200,
+	.wait_for_irq_khz = 128000,
 };
 
 static void __init htckovsky_init(void)
