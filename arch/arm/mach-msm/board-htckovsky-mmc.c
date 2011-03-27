@@ -111,7 +111,20 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 			printk(KERN_ERR
 			       "%s: Error enabling sd slot error code %d\n",
 			       __func__, rc);
-		return 0;
+
+		for (i = 0; i < ARRAY_SIZE(mmc_vdd_table); i++) {
+			if (mmc_vdd_table[i].mask == (1 << vdd)) {
+				rc = vreg_set_level(vreg_sdslot,
+							mmc_vdd_table[i].level);
+				if (rc) {
+					printk(KERN_ERR
+						   "%s: Error setting vreg level (%d)\n",
+						   __func__, rc);
+				}
+				return rc;
+			}
+		}
+		printk(KERN_ERR "%s: Invalid VDD %d specified\n", __func__, vdd);
 	} else {
 		rc = vreg_disable(vreg_sdslot);
 		if (rc) {
@@ -123,20 +136,6 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 		msm_gpios_disable(sdc3_off_gpio_table,
 				  ARRAY_SIZE(sdc3_off_gpio_table));
 	}
-
-	for (i = 0; i < ARRAY_SIZE(mmc_vdd_table); i++) {
-		if (mmc_vdd_table[i].mask == (1 << vdd)) {
-			rc = vreg_set_level(vreg_sdslot,
-					    mmc_vdd_table[i].level);
-			if (rc) {
-				printk(KERN_ERR
-				       "%s: Error setting vreg level (%d)\n",
-				       __func__, rc);
-			}
-			return rc;
-		}
-	}
-	printk(KERN_ERR "%s: Invalid VDD %d specified\n", __func__, vdd);
 
 	return 0;
 }
@@ -157,20 +156,9 @@ static struct mmc_platform_data htckovsky_sdslot_data = {
  ******************************************************************************/
 static struct vreg *vreg_wifi = NULL;
 
-static void wifi_set_power(bool enable)
-{
-	gpio_set_value(KOVS100_WIFI_PWR, enable);
-}
-
-//Uh, that's kind of ugly, but we need to set power
-//here to actually make the transceiver work
+#include <linux/irq.h>
 static struct wl12xx_platform_data wl1251_pdata = {
-	.set_power = wifi_set_power,
-};
-
-static struct sdio_embedded_func wifi_func = {
-	.f_class = SDIO_CLASS_WLAN,
-	.f_maxblksize = 512,
+	.irq = MSM_GPIO_TO_INT(29),
 };
 
 static struct platform_device wl1251_device = {
@@ -181,12 +169,17 @@ static struct platform_device wl1251_device = {
 	}
 };
 
+static struct sdio_embedded_func wifi_func = {
+	.f_class = SDIO_CLASS_WLAN,
+	.f_maxblksize = 512,
+};
+
 static struct embedded_sdio_data ti_wifi_emb_data = {
 	.cis = {
 		.vendor = 0x104c,
 		.device = 0x9066,
 		.blksize = 512,
-		.max_dtr = 20000000,
+		.max_dtr = 24000000,
 		},
 	.cccr = {
 		 .multi_block = 0,
@@ -202,6 +195,7 @@ static struct embedded_sdio_data ti_wifi_emb_data = {
 static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 {
 	int rc;
+	printk("%s: vdd=%d\n", __func__, vdd);
 
 	if (vdd) {
 		msm_gpios_enable(sdc1_on_gpio_table,
@@ -217,15 +211,15 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 
 		//We need to set power here to make the card identify
 		mdelay(100);
-		wifi_set_power(true);
+		gpio_direction_output(KOVS100_WIFI_PWR, 1);
 		mdelay(100);
 		return 0;
 	}
 
 pwroff:
-	vreg_disable(vreg_wifi);
 	//We need to disable power here to save power
-	wifi_set_power(false);
+	vreg_disable(vreg_wifi);
+	gpio_direction_output(KOVS100_WIFI_PWR, 0);
 	mdelay(200);
 	msm_gpios_disable(sdc1_off_gpio_table, ARRAY_SIZE(sdc1_off_gpio_table));
 	return 0;
@@ -233,7 +227,7 @@ pwroff:
 
 static struct mmc_platform_data htckovsky_wifi_data = {
 	.built_in = 1,
-	.ocr_mask = MMC_VDD_28_29 | MMC_VDD_29_30,
+	.ocr_mask = MMC_VDD_28_29,
 	.embedded_sdio = &ti_wifi_emb_data,
 	.translate_vdd = wifi_switchvdd,
 };
@@ -242,15 +236,15 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 {
 	int ret = -EINVAL;
 
-	ret = gpio_request(KOVS100_N_SD_STATUS, "HTC Kovsky SD Status");
+	ret = gpio_request(KOVS100_N_SD_STATUS, "SD Status");
 	if (ret)
 		goto fail_sd_status;
 
-	ret = gpio_request(KOVS100_WIFI_PWR, "HTC Kovsky wifi power");
+	ret = gpio_request(KOVS100_WIFI_PWR, "WiFi Power");
 	if (ret)
 		goto fail_wifi_pwr;
 
-	ret = gpio_request(KOVS100_WIFI_IRQ, "wl1251 irq");
+	ret = gpio_request(KOVS100_WIFI_IRQ, "wl1251 IRQ");
 	if (ret)
 		goto fail_wifi_irq;
 
@@ -297,6 +291,7 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 
 	//Register the platform data, but do not care if it succeeds
 	//if not, we can just shut all the power off via rfkill
+	set_irq_flags(MSM_GPIO_TO_INT(KOVS100_WIFI_IRQ), IRQF_VALID | IRQF_NOAUTOEN);
 	platform_device_register(&wl1251_device);
 	return 0;
 
