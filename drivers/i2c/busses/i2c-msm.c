@@ -485,6 +485,7 @@ msm_i2c_probe(struct platform_device *pdev)
 	//Disable until actually used
 	msm_set_i2c_mux(false, NULL, NULL);
 
+	clk_set_rate(clk, 19200000);
 	clk_enable(clk);
 
 	/* I2C_HS_CLK = I2C_CLK/(3*(HS_DIVIDER_VALUE+1) */
@@ -571,7 +572,6 @@ static int msm_i2c_suspend_noirq(struct device *device)
 static int msm_i2c_resume_noirq(struct device *device) {
 	struct platform_device *pdev = to_platform_device(device);
 	struct msm_i2c_dev *dev = platform_get_drvdata(pdev);
-
 	/* Block to allow any i2c_xfers to finish */
 	i2c_lock_adapter(&dev->adapter);
 	dev->is_suspended = false;
