@@ -32,7 +32,6 @@
 #include "clock.h"
 
 static DEFINE_MUTEX(clocks_mutex);
-static HLIST_HEAD(clocks);
 
 enum {
 	DEBUG_UNKNOWN_ID = 1 << 0,
@@ -46,7 +45,7 @@ module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 int nand_boot = 0;
 module_param_named(nand_boot, nand_boot, int, 0);
 
-static int a11_clk_is_enabled(unsigned id);
+static unsigned a11_clk_is_enabled(unsigned id);
 static int a11_clk_enable(unsigned id);
 static void a11_clk_disable(unsigned id);
 
@@ -98,57 +97,48 @@ struct msm_clock_params {
 
 static int max_clk_rate[P_NR_CLKS], min_clk_rate[P_NR_CLKS];
 
-#define PLLn_BASE(n)		(MSM_CLK_CTL_BASE + 0x300 + 28 * (n))
-#define TCX0			19200000	// Hz
-#define PLL_FREQ(l, m, n)	(TCX0 * (l) + TCX0 * (m) / (n))
+enum pll {
+	TCXO = -1,
+	PLL0,
+	PLL1,
+	PLL2,
+	PLL3,
+	PLL_COUNT = PLL3 + 1,
+};
 
-static unsigned int pll_get_rate(int n)
+enum pll_src {
+	SRC_TCXO = 0,
+	SRC_PLL_1 = 1,
+	SRC_PLL_2 = 2,
+	SRC_PLL_3 = 3,
+	SRC_PLL_0 = 4,
+};
+
+#define TCXO_RATE			19200000
+#define PLLn_BASE(n)	(MSM_CLK_CTL_BASE + 0x300 + 28 * (n))
+#define PLL_FREQ(l, m, n)	(TCXO_RATE * (l) + TCXO_RATE * (m) / (n))
+
+unsigned int pll_get_rate(enum pll pll, bool dump)
 {
 	unsigned int mode, L, M, N, freq;
 
-	if (n == -1)
-		return TCX0;
-	if (n > 3)
+	if (pll == TCXO)
+		return TCXO_RATE;
+	if (pll >= PLL_COUNT)
 		return 0;
 	else {
-
-		do {
-			mode = readl(PLLn_BASE(n)) & 0x3f;
-			cpu_relax();
-			udelay(50);
-		} while (mode == 0);
-
-		mode = readl(PLLn_BASE(n) + 0x0);
-		L = readl(PLLn_BASE(n) + 0x4);
-		M = readl(PLLn_BASE(n) + 0x8);
-		N = readl(PLLn_BASE(n) + 0xc);
+		mode = readl(PLLn_BASE(pll) + 0x0);
+		L = readl(PLLn_BASE(pll) + 0x4);
+		M = readl(PLLn_BASE(pll) + 0x8);
+		N = readl(PLLn_BASE(pll) + 0xc);
 		freq = PLL_FREQ(L, M, N);
-		D("PLL%d: MODE=%08x L=%08x M=%08x N=%08x freq=%u Hz (%u MHz)\n",
-		  n, mode, L, M, N, freq, freq / 1000000);
 	}
+
+	if (dump)
+		D("PLL%d: MODE=%08x L=%08x M=%08x N=%08x freq=%u Hz (%u MHz)\n",
+				pll, mode, L, M, N, freq, freq / 1000000);
 
 	return freq;
-}
-
-static unsigned int idx2pll(unsigned idx)
-{
-	int ret;
-
-	switch (idx) {
-	case 0:		/* TCX0 */
-		ret = -1;
-		break;
-	case 1:		/* PLL1 */
-		ret = 1;
-		break;
-	case 4:		/* PLL0 */
-		ret = 0;
-		break;
-	default:
-		ret = 4;	/* invalid */
-	}
-
-	return ret;
 }
 
 /* Note that some are not used
@@ -156,13 +146,16 @@ static unsigned int idx2pll(unsigned idx)
  */
 static struct msm_clock_params msm_clock_parameters[NR_CLKS] = {
 	[ADSP_CLK] = {.offset = 0x34,.name = "ADSP_CLK",},
+	[EBI1_CLK] = {.offset = 0x2c,.name = "EBI1_CLK",},
+	[EBI2_CLK] = {.offset = 0x28,.name = "EBI2_CLK",},
+	[EMDH_CLK] = {.offset = 0x50,.name = "EMDH_CLK",},
 	[GP_CLK] = {.offset = 0x5c,.name = "GP_CLK",},
-	[GRP_3D_CLK] = {.idx = 3,.name = "GRP_3D_CLK",},
+	[GRP_3D_CLK] = {.idx = 3, offset = 0x84, .name = "GRP_3D_CLK",},
 	[IMEM_CLK] = {.idx = 3,.name = "IMEM_CLK",},
 	[I2C_CLK] = {.offset = 0x68,.setup_mdns = 1,.name = "I2C_CLK",},
 	[MDC_CLK] = {.offset = 0x7c,.name = "MDC_CLK",},
 	[MDP_CLK] = {.idx = 9,.name = "MDP_CLK",},
-	[PMDH_CLK] = {.offset = 0x8c,.setup_mdns = 0,.name = "PMDH_CLK",},
+	[PMDH_CLK] = {.offset = 0x8c,.name = "PMDH_CLK",},
 	[SDAC_CLK] = {.offset = 0x9c,.name = "SDAC_CLK",},
 	[SDC1_CLK] = {.offset = 0xa4,.setup_mdns = 1,.name = "SDC1_CLK",},
 	[SDC2_CLK] = {.offset = 0xac,.setup_mdns = 1,.name = "SDC2_CLK",},
@@ -205,12 +198,7 @@ static struct mdns_clock_params *msm_clock_freq_parameters;
 struct mdns_clock_params msm_clock_freq_parameters_pll0_245[] = {
 
 	MSM_CLOCK_REG(144000, 3, 0x64, 0x32, 3, 3, 0, 1, 19200000),	/* SD, 144kHz */
-#if 0				/* wince uses this clock setting for UART2DM */
-	MSM_CLOCK_REG(1843200, 3, 0x64, 0x32, 3, 2, 4, 1, 245760000),	/*  115200*16=1843200 */
-//      MSM_CLOCK_REG(     , 2, 0xc8, 0x64, 3, 2, 1, 1, 768888888), /* 1.92MHz for 120000 bps */
-#else
 	MSM_CLOCK_REG(7372800, 3, 0x64, 0x32, 0, 2, 4, 1, 245760000),	/*  460800*16, will be divided by 4 for 115200 */
-#endif
 	MSM_CLOCK_REG(12000000, 1, 0x20, 0x10, 1, 3, 1, 1, 768000000),	/* SD, 12MHz */
 	MSM_CLOCK_REG(14745600, 3, 0x32, 0x19, 0, 2, 4, 1, 245760000),	/* BT, 921600 (*16) */
 	MSM_CLOCK_REG(16000000,   1, 0x0c, 0x06, 0, 2, 4, 1, 245760000), /* BT, 1000000 (*16)*/
@@ -238,7 +226,75 @@ struct mdns_clock_params msm_clock_freq_parameters_pll0_196[] = {
 	{0, 0, 0, 0, 0, 0},
 };
 
-static int grp_ns = 0x99;
+static unsigned msm_gen_rate_simple_div_pll(unsigned id, unsigned freq) {
+	int pll_freqs[PLL_COUNT], divs[PLL_COUNT], i;
+	enum pll pll_idx = PLL0;
+	unsigned freq0, delta, res, d, ns_val = 0;
+
+	if (!freq)
+		return 0;
+
+	if (freq <= TCXO_RATE) {
+		pll_idx = TCXO;
+		goto set_ns;
+	}
+
+	for (i = 0; i < PLL_COUNT; i++) {
+		pll_freqs[i] = pll_get_rate(i, false);
+		divs[i] = pll_freqs[i] / freq;
+		if (divs[i] == 0)
+			divs[i] = 1;
+	}
+	freq0 = pll_freqs[pll_idx] / divs[pll_idx];
+	delta = freq0 > freq ? freq0 - freq : freq - freq0;
+
+	for (i = 1; i < PLL_COUNT; i++) {
+		res = pll_freqs[i] / divs[i];
+		d = res > freq ? res - freq : freq - res;
+		if (d < delta) {
+			pll_idx = i;
+			break;
+		}
+	}
+
+set_ns:
+	switch (pll_idx) {
+		case TCXO:
+				ns_val = (((TCXO_RATE / freq) - 1) << 3) | SRC_TCXO;
+		break;
+
+		case PLL0:
+				ns_val = ((divs[pll_idx] - 1) << 3) | SRC_PLL_0;
+		break;
+
+		case PLL1:
+				ns_val = ((divs[pll_idx] - 1) << 3) | SRC_PLL_1;
+		break;
+
+		case PLL2:
+				ns_val = ((divs[pll_idx] - 1) << 3) | SRC_PLL_2;
+		break;
+
+		case PLL3:
+				ns_val = ((divs[pll_idx] - 1) << 3) | SRC_PLL_3;
+		break;
+
+		default:
+		break;
+	}
+	return ns_val;
+}
+
+static unsigned msm_decode_rate_simple_div_pll(unsigned ns_val) {
+	unsigned div;
+	enum pll pll_idx;
+
+	pll_idx = ns_val & 7;
+	div = ((ns_val >> 3) & 15) + 1;
+	return pll_get_rate(pll_idx, false) / div;
+}
+
+static unsigned grp_ns = 0x99;
 
 static void set_grp_rail(int enable)
 {
@@ -292,7 +348,7 @@ static void set_grp_rail(int enable)
 	}
 }
 
-static int is_vfe_on()
+static int is_vfe_on(void)
 {
 	int rc = 0;
 
@@ -451,10 +507,10 @@ static inline unsigned msm_clk_reg_offset(unsigned id)
 	return params.offset;
 }
 
-static int set_mdns_host_clock(unsigned id, unsigned long freq)
+static int set_mdns_host_clock(unsigned id, unsigned freq)
 {
 	int n = 0;
-	unsigned offset;
+	unsigned offset, ns_val;
 	bool found, enabled, needs_setup;
 	struct msm_clock_params params;
 	found = false;
@@ -463,11 +519,8 @@ static int set_mdns_host_clock(unsigned id, unsigned long freq)
 	offset = params.offset;
 	needs_setup = params.setup_mdns;
 
-	if (id == EBI1_CLK)
-		return 0;
-
 	if (debug_mask & DEBUG_MDNS)
-		D("%s(%u, %lu); bitidx=%u, offset=%x\n", __func__, id, freq,
+		D("%s(%u, %u); bitidx=%u, offset=%x\n", __func__, id, freq,
 		  params.idx, params.offset);
 
 	if (!params.offset) {
@@ -479,6 +532,26 @@ static int set_mdns_host_clock(unsigned id, unsigned long freq)
 	enabled = a11_clk_is_enabled(id);
 	if (enabled)
 		a11_clk_disable(id);
+
+	switch (id) {
+		case MDP_CLK:
+		case PMDH_CLK:
+		case EBI1_CLK:
+		case EBI2_CLK:
+		case ADSP_CLK:
+		case EMDH_CLK:
+		case GP_CLK:
+			ns_val = msm_gen_rate_simple_div_pll(id, freq);
+			ns_val = (0x7f & ns_val) | (readl(MSM_CLK_CTL_BASE + offset) & ~0x7f);
+			writel(ns_val, MSM_CLK_CTL_BASE + offset);
+			goto skip_clock;
+		case GRP_3D_CLK:
+			grp_ns = msm_gen_rate_simple_div_pll(id, freq);
+			goto skip_clock;
+
+		default:
+		break;
+	}
 
 	if (!needs_setup)
 		goto skip_clock;
@@ -506,7 +579,12 @@ static int set_mdns_host_clock(unsigned id, unsigned long freq)
 			       MSM_CLK_CTL_BASE + offset);
 		}
 		if (debug_mask & DEBUG_MDNS)
-			D("%s: %u, freq=%lu calc_freq=%u pll%d=%u expected pll =%u\n", __func__, id, msm_clock_freq_parameters[n].freq, msm_clock_freq_parameters[n].calc_freq, msm_clock_freq_parameters[n].ns & 7, pll_get_rate(idx2pll(msm_clock_freq_parameters[n].ns & 7)), msm_clock_freq_parameters[n].pll_freq);
+			D("%s: %u, freq=%lu calc_freq=%u pll%d=%u expected pll =%u\n",
+				__func__, id, msm_clock_freq_parameters[n].freq,
+				msm_clock_freq_parameters[n].calc_freq,
+				msm_clock_freq_parameters[n].ns & 7,
+				pll_get_rate(msm_clock_freq_parameters[n].ns & 7), false),
+				msm_clock_freq_parameters[n].pll_freq);
 
 		found = true;
 		break;
@@ -518,23 +596,41 @@ static int set_mdns_host_clock(unsigned id, unsigned long freq)
 
 	if ((!found && needs_setup) && (debug_mask & DEBUG_UNKNOWN_FREQ)) {
 		D("FIXME! set_sdcc_host_clock could not "
-		  "find suitable parameter for freq %lu\n", freq);
+		  "find suitable parameter for freq %u\n", freq);
 	}
 
 	return 0;
 }
 
-static unsigned long get_mdns_host_clock(unsigned id)
+static unsigned get_mdns_host_clock(unsigned id)
 {
 	int n;
 	unsigned offset;
 	unsigned mdreg;
 	unsigned nsreg;
-	unsigned long freq = 0;
+	unsigned freq = 0;
 
 	offset = msm_clk_reg_offset(id);
-	if (offset == 0)
-		return -EINVAL;
+	if (!offset) {
+		D("%s: do not know how to get clock rate %d\n", __func__, id);
+		return 0;
+	}
+
+	switch (id) {
+		case MDP_CLK:
+		case PMDH_CLK:
+		case EBI1_CLK:
+		case EBI2_CLK:
+		case ADSP_CLK:
+		case EMDH_CLK:
+		case GP_CLK:
+		case GRP_3D_CLK:
+			nsreg = readl(MSM_CLK_CTL_BASE + offset);
+			return msm_decode_rate_simple_div_pll(nsreg);
+
+		default:
+		break;
+	}
 
 	mdreg = readl(MSM_CLK_CTL_BASE + offset - 4);
 	nsreg = readl(MSM_CLK_CTL_BASE + offset);
@@ -811,77 +907,53 @@ static void a11_clk_disable(unsigned id)
 	return;
 }
 
-static int a11_clk_set_rate(unsigned id, unsigned long rate)
+static int a11_clk_set_rate(unsigned id, unsigned rate)
 {
 	int retval;
 	retval = 0;
 
 	if (DEBUG_MDNS)
-		D("%s: id=%u rate=%lu\n", __func__, id, rate);
+		D("%s: id=%u rate=%u\n", __func__, id, rate);
 
 	retval = set_mdns_host_clock(id, rate);
 
 	return retval;
 }
 
-static int a11_clk_set_min_rate(unsigned id, unsigned long rate)
+static int a11_clk_set_min_rate(unsigned id, unsigned rate)
 {
 	if (id < NR_CLKS)
 		min_clk_rate[id] = rate;
 	else if (debug_mask & DEBUG_UNKNOWN_ID)
-		D(" FIXME! clk_set_min_rate not implemented; %u:%lu NR_CLKS=%d\n", id, rate, NR_CLKS);
+		D(" FIXME! clk_set_min_rate not implemented; %u:%u NR_CLKS=%d\n", id, rate, NR_CLKS);
 
 	return 0;
 }
 
-static int a11_clk_set_max_rate(unsigned id, unsigned long rate)
+static int a11_clk_set_max_rate(unsigned id, unsigned rate)
 {
 	if (id < NR_CLKS)
 		max_clk_rate[id] = rate;
 	else if (debug_mask & DEBUG_UNKNOWN_ID)
-		D(" FIXME! clk_set_min_rate not implemented; %u:%lu NR_CLKS=%d\n", id, rate, NR_CLKS);
+		D(" FIXME! clk_set_min_rate not implemented; %u:%u NR_CLKS=%d\n", id, rate, NR_CLKS);
 
 	return 0;
 }
 
-static unsigned long a11_clk_get_rate(unsigned id)
+static unsigned a11_clk_get_rate(unsigned id)
 {
-	unsigned long rate = 0;
-
 	switch (id) {
-		/* known MD/NS clocks, MSM_CLK dump and arm/mach-msm/clock-7x30.c */
-	case SDC1_CLK:
-	case SDC2_CLK:
-	case SDC3_CLK:
-	case SDC4_CLK:
-	case UART1DM_CLK:
-	case UART2DM_CLK:
-	case USB_HS_CLK:
-	case SDAC_CLK:
-	case TV_DAC_CLK:
-	case TV_ENC_CLK:
-	case USB_OTG_CLK:
-		rate = get_mdns_host_clock(id);
-		break;
-
 	case SDC1_P_CLK:
 	case SDC2_P_CLK:
 	case SDC3_P_CLK:
 	case SDC4_P_CLK:
-		rate = 64000000;	/* g1 value */
-		break;
-
-	default:
-		//TODO: support all clocks
-		if (debug_mask & DEBUG_UNKNOWN_ID)
-			D("%s: unknown clock: id=%u\n", __func__, id);
-		rate = 0;
+		return 64000000;
 	}
 
-	return rate;
+	return get_mdns_host_clock(id);;
 }
 
-static int a11_clk_set_flags(unsigned id, unsigned long flags)
+static int a11_clk_set_flags(unsigned id, unsigned flags)
 {
 	if (id == VFE_CLK) {
 		if (flags & 0x100) {
@@ -894,14 +966,14 @@ static int a11_clk_set_flags(unsigned id, unsigned long flags)
 			D("Setting internal clock for VFE_CLK\n");
 		}
 	} else if (debug_mask & DEBUG_UNKNOWN_CMD)
-		D("%s not implemented for clock: id=%u, flags=%lu\n",
+		D("%s not implemented for clock: id=%u, flags=%u\n",
 		  __func__, id, flags);
 	return 0;
 }
 
-static int a11_clk_is_enabled(unsigned id)
+static unsigned a11_clk_is_enabled(unsigned id)
 {
-	int is_enabled = 0;
+	unsigned is_enabled = 0;
 	unsigned bit;
 	bit = msm_clk_enable_bit(id);
 	if (bit > 0) {
@@ -935,7 +1007,7 @@ void __init msm_clock_a11_fixup(void)
 
 	mutex_lock(&clocks_mutex);
 
-	if (pll_get_rate(0) == 196608000) {
+	if (pll_get_rate(PLL0, true) == 196608000) {
 		// cdma pll0 = 196 MHz
 		msm_clock_freq_parameters = msm_clock_freq_parameters_pll0_196;
 	} else {
@@ -947,11 +1019,10 @@ void __init msm_clock_a11_fixup(void)
 
 static void msm_clock_a11_reset_imem(void)
 {
-	if (nand_boot)
+	if (!a11_clk_is_enabled(IMEM_CLK))
 		return;
 
 	writel(0, MSM_IMEM_BASE);
-	pr_info("reset imem_config\n");
 	pr_info("IMEM OLD: VAL = %d\n", readl(MSM_IMEM_BASE));
 	msleep(100);
 	pr_info("IMEM NEW: VAL = %d\n", readl(MSM_IMEM_BASE));
