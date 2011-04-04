@@ -150,7 +150,7 @@ static struct msm_clock_params msm_clock_parameters[NR_CLKS] = {
 	[EBI2_CLK] = {.offset = 0x28,.name = "EBI2_CLK",},
 	[EMDH_CLK] = {.offset = 0x50,.name = "EMDH_CLK",},
 	[GP_CLK] = {.offset = 0x5c,.name = "GP_CLK",},
-	[GRP_3D_CLK] = {.idx = 3, offset = 0x84, .name = "GRP_3D_CLK",},
+	[GRP_3D_CLK] = {.idx = 3, .offset = 0x84, .name = "GRP_3D_CLK",},
 	[IMEM_CLK] = {.idx = 3,.name = "IMEM_CLK",},
 	[I2C_CLK] = {.offset = 0x68,.setup_mdns = 1,.name = "I2C_CLK",},
 	[MDC_CLK] = {.offset = 0x7c,.name = "MDC_CLK",},
@@ -583,7 +583,7 @@ static int set_mdns_host_clock(unsigned id, unsigned freq)
 				__func__, id, msm_clock_freq_parameters[n].freq,
 				msm_clock_freq_parameters[n].calc_freq,
 				msm_clock_freq_parameters[n].ns & 7,
-				pll_get_rate(msm_clock_freq_parameters[n].ns & 7), false),
+				pll_get_rate(msm_clock_freq_parameters[n].ns & 7, false),
 				msm_clock_freq_parameters[n].pll_freq);
 
 		found = true;
