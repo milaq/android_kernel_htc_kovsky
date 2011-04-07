@@ -16,14 +16,15 @@
 * GNU General Public License for more details.
 *
 */
-#include <linux/kernel.h>
-#include <linux/init.h>
-#include <linux/platform_device.h>
 #include <linux/delay.h>
+#include <linux/err.h>
+#include <linux/init.h>
+#include <linux/irq.h>
+#include <linux/kernel.h>
+#include <linux/platform_device.h>
+
 #include <linux/mmc/host.h>
 #include <linux/mmc/sdio_ids.h>
-#include <linux/err.h>
-#include <linux/debugfs.h>
 #include <linux/spi/wl12xx.h>
 
 #include <asm/gpio.h>
@@ -39,12 +40,12 @@
 #define DEBUG_SDSLOT_VDD 1
 
 static struct msm_gpio sdc1_on_gpio_table[] = {
-	{.gpio_cfg = GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT3"},
-	{.gpio_cfg = GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT2"},
-	{.gpio_cfg = GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT1"},
-	{.gpio_cfg = GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_DAT0"},
-	{.gpio_cfg = GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_CMD"},
-	{.gpio_cfg = GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "MMC1_CLK"},
+	{.gpio_cfg = GPIO_CFG(51, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_DAT3"},
+	{.gpio_cfg = GPIO_CFG(52, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_DAT2"},
+	{.gpio_cfg = GPIO_CFG(53, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_DAT1"},
+	{.gpio_cfg = GPIO_CFG(54, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_4MA),.label = "MMC1_DAT0"},
+	{.gpio_cfg = GPIO_CFG(55, 1, GPIO_CFG_OUTPUT, GPIO_CFG_PULL_UP, GPIO_CFG_8MA),.label = "MMC1_CMD"},
+	{.gpio_cfg = GPIO_CFG(56, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_8MA),.label = "MMC1_CLK"},
 };
 
 static struct msm_gpio sdc1_off_gpio_table[] = {
@@ -156,19 +157,6 @@ static struct mmc_platform_data htckovsky_sdslot_data = {
  ******************************************************************************/
 static struct vreg *vreg_wifi = NULL;
 
-#include <linux/irq.h>
-static struct wl12xx_platform_data wl1251_pdata = {
-	.irq = MSM_GPIO_TO_INT(29),
-};
-
-static struct platform_device wl1251_device = {
-	.id = -1,
-	.name = "wl1251_data",
-	.dev = {
-		.platform_data = &wl1251_pdata,
-	}
-};
-
 static struct sdio_embedded_func wifi_func = {
 	.f_class = SDIO_CLASS_WLAN,
 	.f_maxblksize = 512,
@@ -179,7 +167,7 @@ static struct embedded_sdio_data ti_wifi_emb_data = {
 		.vendor = 0x104c,
 		.device = 0x9066,
 		.blksize = 512,
-		.max_dtr = 24000000,
+		.max_dtr = 19200000,
 		},
 	.cccr = {
 		 .multi_block = 0,
@@ -192,22 +180,26 @@ static struct embedded_sdio_data ti_wifi_emb_data = {
 	.num_funcs = 1,
 };
 
+static bool wifi_state = false;
+
 static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 {
 	int rc;
 	printk("%s: vdd=%d\n", __func__, vdd);
 
 	if (vdd) {
+		if (!wifi_state) {
+			rc = vreg_enable(vreg_wifi);
+			if (rc) {
+				printk(KERN_ERR "%s: failed to enable vreg %d\n",
+					   __func__, rc);
+				goto pwroff;
+			}
+			wifi_state = true;
+		}
+		mdelay(10);
 		msm_gpios_enable(sdc1_on_gpio_table,
 				 ARRAY_SIZE(sdc1_on_gpio_table));
-
-		mdelay(50);
-		rc = vreg_enable(vreg_wifi);
-		if (rc) {
-			printk(KERN_ERR "%s: failed to enable vreg %d\n",
-			       __func__, rc);
-			goto pwroff;
-		}
 
 		//We need to set power here to make the card identify
 		mdelay(100);
@@ -218,6 +210,7 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 
 pwroff:
 	//We need to disable power here to save power
+	wifi_state = false;
 	vreg_disable(vreg_wifi);
 	gpio_direction_output(KOVS100_WIFI_PWR, 0);
 	mdelay(200);
@@ -289,10 +282,8 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 		goto fail_sdcc1;
 	}
 
-	//Register the platform data, but do not care if it succeeds
-	//if not, we can just shut all the power off via rfkill
+	//set irq flags here because wl1251_sdio won't be able to use set_irq_flags
 	set_irq_flags(MSM_GPIO_TO_INT(KOVS100_WIFI_IRQ), IRQF_VALID | IRQF_NOAUTOEN);
-	platform_device_register(&wl1251_device);
 	return 0;
 
  fail_sdcc1:
