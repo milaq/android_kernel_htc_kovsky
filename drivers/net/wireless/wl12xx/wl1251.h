@@ -52,7 +52,7 @@ enum {
 	DEBUG_ALL	= ~0,
 };
 
-#define DEBUG_LEVEL (DEBUG_ALL)
+#define DEBUG_LEVEL (DEBUG_NONE)
 
 #define DEBUG_DUMP_LIMIT 1024
 
