@@ -27,12 +27,19 @@
 #include <linux/io.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 
 #include <mach/htc_acoustic_wince.h>
 #include <mach/msm_iomap.h>
 #include "dex_comm.h"
 
 /* structs */
+struct msm_acoustic_capabilities {
+    char voc_cal_field_size;
+    bool dual_mic_supported;
+    bool use_tpa_2016;
+};
+
 struct msm_audio_path {
 	bool enable_mic;
 	bool enable_dual_mic;
@@ -50,6 +57,20 @@ struct htc_voc_cal_table {
 	int size;
 };
 
+enum audio_update_req_type {
+    PCOM_UPDATE_REQ = 0,
+    ADIE_FORCE8K_REQ,
+    ADIE_FORCE_ADIE_AWAKE_REQ,
+    ADIE_FORCE_ADIE_UPDATE_REQ,
+    ADIE_UPDATE_AUDIO_METHOD,
+
+};
+
+struct audio_update_req {
+    enum audio_update_req_type type;
+    int value;
+};
+
 enum dex_audio_cmd {
 	DEX_UPDATE_VOC = 0x2,
 	DEX_AUDIO_DONE = 0x10,
@@ -57,7 +78,7 @@ enum dex_audio_cmd {
 
 #define E(fmt, args...) printk(KERN_ERR "htc-acoustic_wince: "fmt, ##args)
 
-#if 0
+#if 1
 	#define D(fmt, args...) printk(KERN_INFO "htc-acoustic_wince: "fmt, ##args)
 #else
 	#define D(fmt, args...) do {} while (0)
@@ -87,6 +108,33 @@ static void speaker_amp_power(bool status)
 		htc_acoustic_wce_board_data->set_speaker_amp(status);
 }
 
+static int acoustic_get_capabilities(void __user *arg)
+{
+	int rc = 0;
+	struct msm_acoustic_capabilities capabilities = {};
+
+	capabilities.voc_cal_field_size = amss_data->voc_cal_field_size;
+
+	if (htc_acoustic_wce_board_data) {
+		capabilities.dual_mic_supported =
+			htc_acoustic_wce_board_data->dual_mic_supported;
+		//todo: do detection in userland.
+		capabilities.use_tpa_2016 =
+			htc_acoustic_wce_board_data->use_tpa_2016;
+	}
+
+
+	if (copy_to_user((void __user *)arg,
+					&capabilities,
+					sizeof(struct msm_acoustic_capabilities))
+	) {
+		ERR_COPY_TO_USER();
+		rc = -EFAULT;
+	}
+
+	return rc;
+}
+
 /* Table update routines */
 static int update_volume_table(void __user * arg)
 {
@@ -96,7 +144,7 @@ static int update_volume_table(void __user * arg)
 		ERR_COPY_FROM_USER();
 		return -EFAULT;
 	} else {
-		memcpy((void *)amss_data->volume_table, table, sizeof(table));
+		memcpy(amss_data->volume_table, table, sizeof(table));
 	}
 
 	return 0;
@@ -110,7 +158,7 @@ static int update_ce_table(void __user * arg)
 		ERR_COPY_FROM_USER();
 		return -EFAULT;
 	} else {
-		memcpy((void *)amss_data->ce_table, table, sizeof(table));
+		memcpy(amss_data->ce_table, table, sizeof(table));
 	}
 
 	return 0;
@@ -130,7 +178,7 @@ static int update_audio_adie_table(void __user * arg)
 			ERR_COPY_FROM_USER();
 			return -EFAULT;
 		}
-		memcpy((void *)(amss_data->adie_table +
+		memcpy((amss_data->adie_table +
 				(table.table_num * 0x80)), pcArray, 0x80);
 		rc = 0;
 	}
@@ -174,17 +222,54 @@ static int update_codec_table(void __user * arg)
 	return rc;
 }
 
-static int dex_update_audio(void __user * arg)
+/* Adie updates */
+static void ADIE_Force8k(bool bOn) {
+    int adie = readl(MSM_SHARED_RAM_BASE + 0xfc0d0);
+    if (bOn) {
+        adie |= 0x1;
+    } else {
+        adie &= ~0x1;
+    }
+    writel(adie, MSM_SHARED_RAM_BASE + 0xfc0d0);
+}
+
+static void ADIE_ForceADIEAwake(bool bForce) {
+    int adie = readl(MSM_SHARED_RAM_BASE + 0xfc0d0);
+    if (bForce) {
+        adie |= 0x8;
+    } else {
+        adie &= ~0x8;
+    }
+    writel(adie, MSM_SHARED_RAM_BASE + 0xfc0d0);
+}
+
+static void ADIE_ForceADIEUpdate(bool bForce) {
+    int adie = readl(MSM_SHARED_RAM_BASE + 0xfc0d0);
+    if (bForce) {
+        adie |= 0x2;
+    } else {
+        adie &= ~0x2;
+    }
+    writel(adie, MSM_SHARED_RAM_BASE + 0xfc0d0);
+}
+
+static void ADIE_UpdateAudioMethod(bool bUpdate) {
+    int adie = readl(MSM_SHARED_RAM_BASE + 0xfc0d0);
+    if (bUpdate) {
+        adie |= 0x4;
+    } else {
+        adie &= ~0x4;
+    }
+    writel(adie, MSM_SHARED_RAM_BASE + 0xfc0d0);
+}
+
+static int dex_update_audio(int data)
 {
 	struct msm_dex_command dex = {
 		.cmd = DEX_UPDATE_AUDIO,
-		.has_data = 1
+		.has_data = 1,
+		.data = data,
 	};
-
-	if (copy_from_user(&dex.data, arg, sizeof(uint16_t))) {
-		ERR_COPY_FROM_USER();
-		return -EFAULT;
-	}
 	msm_dex_comm(&dex, 0);
 
 	return 0;
@@ -200,13 +285,54 @@ static int dex_update_audio_done(void) {
 	return msm_dex_comm(&dex, 0);
 }
 
+static int update_audio_setting(void __user *arg)
+{
+    int ret = -EFAULT;
+    struct audio_update_req req;
+
+	if (copy_from_user(&req, arg, sizeof(struct audio_update_req))) {
+		ERR_COPY_FROM_USER();
+		return -EFAULT;
+	} else {
+        switch (req.type) {
+            case PCOM_UPDATE_REQ:
+                ret = dex_update_audio(req.value);
+            break;
+
+            case ADIE_FORCE8K_REQ:
+                ADIE_Force8k( (req.value)?true:false );
+                ret = 0;
+            break;
+
+            case ADIE_FORCE_ADIE_AWAKE_REQ:
+                ADIE_ForceADIEAwake( (req.value)?true:false );
+                ret = 0;
+            break;
+
+            case ADIE_FORCE_ADIE_UPDATE_REQ:
+                ADIE_ForceADIEUpdate( (req.value)?true:false );
+                ret = 0;
+            break;
+
+            case ADIE_UPDATE_AUDIO_METHOD:
+                ADIE_UpdateAudioMethod( (req.value)?true:false );
+                ret = 0;
+            break;
+
+            default:
+            break;
+        }
+    }
+    return ret;
+}
+
 static int turn_mic_bias_on(bool on)
 {
 
 	D("%s(%d)\n", __func__, on);
 
 	/* enable handset mic */
-	writel(0xffff0080|(on?0x100:0), amss_data->mic_offset);
+	writel(0xffff0080 | (on ? 0x100 : 0), amss_data->mic_offset);
 	dex_update_audio_done();
 
 	if (amss_data->mic_bias_callback)
@@ -236,7 +362,6 @@ static int update_hw_audio_path(void __user * arg)
 	headphone_amp_power(audio_path.enable_headset);
 
 	/* Switch Speaker HW on/off */
-	// TODO : Should depop be done here ??
 	speaker_amp_power(audio_path.enable_speaker);
 
 	return 0;
@@ -262,50 +387,56 @@ static long acoustic_ioctl(struct file *file, unsigned int cmd,
 	mutex_lock(&api_lock);
 
 	switch (cmd) {
+	case ACOUSTIC_GET_CAPABILITIES:
+		D("ioctl: ACOUSTIC_GET_CAPABILITIES called %d.\n",
+			task_pid_nr(current));
+		rc = acoustic_get_capabilities((void __user *)arg);
+	break;
+
 	case ACOUSTIC_ARM11_DONE:
 		rc = dex_update_audio_done();
-		D("ioctl: ACOUSTIC_ARM11_DONE %d\n", rc);
+		D("ioctl: ACOUSTIC_ARM11_DONE pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
 	case ACOUSTIC_UPDATE_ADIE_TABLE:
 		rc = update_audio_adie_table((void __user *)arg);
-		D("ioctl: ACOUSTIC_UPDATE_ADIE_TABLE rc %d\n", rc);
+		D("ioctl: ACOUSTIC_UPDATE_ADIE_TABLE pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
 	case ACOUSTIC_UPDATE_VOLUME_TABLE:
 		rc = update_volume_table((void __user *)arg);
-		D("ioctl: ACOUSTIC_UPDATE_VOLUME_TABLE rc %d.\n", rc);
+		D("ioctl: ACOUSTIC_UPDATE_VOLUME_TABLE pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
 	case ACOUSTIC_UPDATE_CE_TABLE:
 		rc = update_ce_table((void __user *)arg);
-		D("ioctl: ACOUSTIC_UPDATE_CE_TABLE rc %d.\n", rc);
-		break;
-
-	case ACOUSTIC_GET_HTC_VOC_CAL_FIELD_SIZE:
-		rc = amss_data->voc_cal_field_size;
-		rc = copy_to_user((void __user *)arg, &rc, sizeof(uint16_t));
-		D("ioctl: ACOUSTIC_GET_HTC_VOC_CAL_FIELD_SIZE rc %d.\n", rc);
+		D("ioctl: ACOUSTIC_UPDATE_CE_TABLE pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
 	case ACOUSTIC_UPDATE_HTC_VOC_CAL_CODEC_TABLE:
 		rc = update_codec_table((void __user *)arg);
-		D("ioctl: ACOUSTIC_UPDATE_HTC_VOC_CAL_CODEC_TABLE rc %d.\n",
-		  rc);
+		D("ioctl: ACOUSTIC_UPDATE_HTC_VOC_CAL_CODEC_TABLE pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
-	case ACOUSTIC_DEX_UPDATE_AUDIO:
-		rc = dex_update_audio((void __user *)arg);
-		D("ioctl: ACOUSTIC_DEX_UPDATE_AUDIO called rc %d.\n", rc);
+	case ACOUSTIC_UPDATE_AUDIO_SETTINGS:
+		rc = update_audio_setting((void __user *)arg);
+		D("ioctl: ACOUSTIC_UPDATE_AUDIO_SETTINGS called pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
 	case ACOUSTIC_SET_HW_AUDIO_PATH:
 		rc = update_hw_audio_path((void __user *)arg);
-		D("ioctl: ACOUSTIC_SET_HW_AUDIO_PATH rc %d.\n", rc);
+		D("ioctl: ACOUSTIC_SET_HW_AUDIO_PATH pid=%d result=%d\n",
+			task_pid_nr(current), rc);
 		break;
 
 	default:
-		E("ioctl: invalid command %d\n", cmd);
+		E("ioctl: invalid command %d pid=%d\n", cmd, task_pid_nr(current));
 		rc = -EINVAL;
 	}
 
@@ -376,7 +507,7 @@ static struct platform_driver htc_acoustic_wince_driver = {
 	.probe		= htc_acoustic_wince_probe,
 	.remove		= htc_acoustic_wince_remove,
 	.driver		= {
-		.name		= "htc_acoustic_wince",
+		.name		= "htc_acoustic",
 		.owner		= THIS_MODULE,
 	},
 };
