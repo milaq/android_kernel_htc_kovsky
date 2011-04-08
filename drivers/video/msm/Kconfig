@@ -6,6 +6,26 @@ config FB_MSM
 	select FB_CFB_IMAGEBLIT
 	default y
 
+config FB_MSM_REFRESH
+	bool "Enable MSM Framebuffer Refresh Thread"
+	depends on FB_MSM
+	default n
+	---help---
+	  The refresh thread will constantly perform a full screen
+	  update. This is neccesary when using X with the default
+	  fbdev driver.
+
+config MSMFB_FBIOBLANK
+        bool "Enable FBIOBLANK ioctl for MSM Framebuffer"
+	depends on FB_MSM
+        default n
+	---help---
+	  Enabling this experimental option enables the FBIOBLANK ioctl
+          for the MSM Framebuffer driver.
+	  FBIOBLANK is an ioctl that permit the userspace to
+          power on or off the display without the need of suspend/resume
+	  If unsure, say N.
+
 config FB_MSM_LEGACY_MDP
 	bool
 	depends on FB_MSM && (MSM_MDP31 || MSM_MDP22)

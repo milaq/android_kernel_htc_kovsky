@@ -34,6 +34,12 @@
 #include <linux/debugfs.h>
 #include <linux/dma-mapping.h>
 
+#ifdef CONFIG_FB_MSM_REFRESH
+#include <linux/sched.h>
+#include <linux/kthread.h>
+#endif 
+
+#define MSM_FB_REFRESH_RATE 25
 #define MSMFB_DEBUG 1
 #ifdef CONFIG_FB_MSM_LOGO
 #define INIT_IMAGE_FILE "/logo.rle"
@@ -112,6 +118,61 @@ static int msmfb_release(struct fb_info *info, int user)
 {
 	return 0;
 }
+
+#ifdef CONFIG_FB_MSM_REFRESH
+static void msmfb_update(struct fb_info *info, uint32_t left, uint32_t top,
+			 uint32_t eright, uint32_t ebottom);
+
+struct task_struct *msmfb_thread_task = NULL;
+static struct task_struct *start_msmfb_refresh_thread(void);
+static int stop_msmfb_refresh_thread(struct task_struct *thread_task);
+
+static int msmfb_refresh_thread(void *v)
+{
+	struct fb_info *fb;
+	struct completion exit;
+	siginfo_t info;
+
+	printk("+%s\n", __func__);
+	daemonize("msmfb_refreshd");
+	allow_signal(SIGKILL);
+
+	init_completion(&exit);
+	
+	while ( true ){
+		if (signal_pending(current)){
+			if (dequeue_signal_lock(current,
+					&current->blocked, 
+					&info) == SIGKILL)
+				goto die;
+		       
+		}else{
+			msleep(MSM_FB_REFRESH_RATE);
+			
+			if (num_registered_fb > 0) {
+				fb = registered_fb[0];
+				msmfb_update(fb, 0, 0, 
+					     fb->var.xres, fb->var.yres);
+			}
+		}	
+	}
+die:
+	complete_and_exit(&exit,0);
+}
+
+static struct task_struct *start_msmfb_refresh_thread(){
+	void *v = NULL;
+	struct task_struct *thread_task;
+	thread_task = kthread_create(msmfb_refresh_thread, v,"msmfb_refreshd");	
+	wake_up_process(thread_task);
+	return thread_task;
+}
+
+static int stop_msmfb_refresh_thread(struct task_struct *thread_task){
+	send_sig(SIGKILL,thread_task,0);
+ 	return 0;
+}
+#endif
 
 /* Called from dma interrupt handler, must not sleep */
 static void msmfb_handle_dma_interrupt(struct msmfb_callback *callback)
@@ -437,6 +498,37 @@ static void msmfb_resume(struct early_suspend *h)
 }
 #endif
 
+
+#ifdef CONFIG_MSMFB_FBIOBLANK
+static int msmfb_blank(int blank_mode,struct fb_info *info){
+	struct msmfb_info *msmfb = info->par;
+	struct msm_panel_data *panel = msmfb->panel;
+	unsigned long irq_flags;
+
+	printk("%s(%d)\n", __func__, blank_mode != FB_BLANK_UNBLANK);
+	mutex_lock(&msmfb->panel_init_lock);
+
+	if (blank_mode == FB_BLANK_UNBLANK){
+
+#ifdef CONFIG_FB_MSM_REFRESH
+		if (msmfb_thread_task == NULL)
+			msmfb_thread_task = start_msmfb_refresh_thread();
+#endif
+
+	}
+	else if(blank_mode == FB_BLANK_POWERDOWN){
+
+#ifdef CONFIG_FB_MSM_REFRESH
+		stop_msmfb_refresh_thread(msmfb_thread_task);
+		msmfb_thread_task = NULL;
+#endif
+	}
+
+	mutex_unlock(&msmfb->panel_init_lock);
+	return 0;
+}
+#endif
+
 static int msmfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	u32 size;
@@ -582,6 +674,7 @@ static int msmfb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 		if (ret)
 			return ret;
 		break;
+
 	default:
 			printk(KERN_INFO "msmfb unknown ioctl: %d\n", cmd);
 			return -EINVAL;
@@ -600,6 +693,9 @@ static struct fb_ops msmfb_ops = {
 	.fb_copyarea = msmfb_copyarea,
 	.fb_imageblit = msmfb_imageblit,
 	.fb_ioctl = msmfb_ioctl,
+#ifdef CONFIG_MSMFB_FBIOBLANK
+	.fb_blank = msmfb_blank,
+#endif
 };
 
 static unsigned PP[16];
@@ -818,14 +914,17 @@ static int msmfb_probe(struct platform_device *pdev)
 	msmfb->sleeping = WAKING;
 
 #ifdef CONFIG_FB_MSM_LOGO
-	if (!load_565rle_image(INIT_IMAGE_FILE)) {
+	printk(KERN_INFO "msmfb logo requested... attemping to download '" CONFIG_FB_MSM_LOGO_SOURCE "' \n");
+
+	if (!load_565rle_image(CONFIG_FB_MSM_LOGO_SOURCE)) {
+		printk(KERN_INFO "msmfb logo download ok, blitting now\n");
 		/* Flip buffer */
 		msmfb->update_info.left = 0;
 		msmfb->update_info.top = 0;
-		msmfb->update_info.eright = info->var.xres;
-		msmfb->update_info.ebottom = info->var.yres;
-		msmfb_pan_update(info, 0, 0, fb->var.xres,
-				 fb->var.yres, 0, 1);
+		msmfb_pan_update(fb, 0, 0, fb->var.xres, fb->var.yres, 0, 1);
+	}
+	else {
+		printk(KERN_INFO "msmfb logo download failed :/\n");
 	}
 #endif
 	return 0;
