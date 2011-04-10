@@ -543,6 +543,27 @@ static struct msm_mddi_platform_data mddi_pdata = {
 	},
 };
 
+static void patch_for_halfres(void) {
+	int i;
+	epson_client_data.fb_data.xres = 240;
+	epson_client_data.fb_data.yres = 400;
+	for (i = 0; i < ARRAY_SIZE(mddi_epson_init_table_1); i++) {
+		switch(mddi_epson_init_table_1[i].reg) {
+			case 0x680:
+				mddi_epson_init_table_1[i].value |= 3; //enable pixel doubling
+				break;
+			case 0x690:
+				mddi_epson_init_table_1[i].value = 239; //horizontal size - 1
+				break;
+			case 0x694:
+				mddi_epson_init_table_1[i].value = 399; //vertical size - 1
+				break;
+		}
+	}
+}
+
+static int halfres = 0;
+module_param_named(halfres, halfres, int, 0);
 
 int __init htckovsky_init_panel(void)
 {
@@ -553,6 +574,10 @@ int __init htckovsky_init_panel(void)
 	if (!machine_is_htckovsky()) {
 		printk(KERN_INFO "%s: disabling kovsky panel\n", __func__);
 		return 0;
+	}
+
+	if (halfres) {
+		patch_for_halfres();
 	}
 
 	vreg_18v = vreg_get_by_id(0, 7);
@@ -587,7 +612,7 @@ int __init htckovsky_init_panel(void)
 	if (ret)
 		goto fail_mdp;
 
-	writel(0x19, MSM_CLK_CTL_BASE + 0x8c);
+	//writel(0x19, MSM_CLK_CTL_BASE + 0x8c);
 	msm_device_mddi0.dev.platform_data = &mddi_pdata;
 	ret = platform_device_register(&msm_device_mddi0);
 	if (ret)
