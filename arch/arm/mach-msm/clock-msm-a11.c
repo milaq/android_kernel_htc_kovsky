@@ -146,8 +146,6 @@ unsigned int pll_get_rate(enum pll pll, bool dump)
  */
 static struct msm_clock_params msm_clock_parameters[NR_CLKS] = {
 	[ADSP_CLK] = {.offset = 0x34,.name = "ADSP_CLK",},
-	[EBI1_CLK] = {.offset = 0x2c,.name = "EBI1_CLK",},
-	[EBI2_CLK] = {.offset = 0x28,.name = "EBI2_CLK",},
 	[EMDH_CLK] = {.offset = 0x50,.name = "EMDH_CLK",},
 	[GP_CLK] = {.offset = 0x5c,.name = "GP_CLK",},
 	[GRP_3D_CLK] = {.idx = 3, .offset = 0x84, .name = "GRP_3D_CLK",},
@@ -174,6 +172,7 @@ static struct msm_clock_params msm_clock_parameters[NR_CLKS] = {
 			 "UART2DM_CLK",},
 	[USB_HS_CLK] = {.offset = 0x2c0,.name = "USB_HS_CLK",},
 	[USB_HS_P_CLK] = {.idx = 25,.name = "USB_HS_P_CLK",},
+	[USB_OTG_CLK] = {.offset = 0xe8, .name = "USB_OTG_CLK"},
 	[VFE_CLK] = {.offset = 0x44,.setup_mdns = 1,.name = "VFE_CLK",},
 	[VFE_MDC_CLK] = {.offset = 0x44,.name = "VFE_MDC_CLK",},
 	[VDC_CLK] = {.offset = 0xf0,.name = "VDC_CLK",},
@@ -282,6 +281,7 @@ set_ns:
 		default:
 		break;
 	}
+	printk("%s: rate=%d, ns_val=%08x\n", __func__, freq, ns_val);
 	return ns_val;
 }
 
@@ -536,8 +536,6 @@ static int set_mdns_host_clock(unsigned id, unsigned freq)
 	switch (id) {
 		case MDP_CLK:
 		case PMDH_CLK:
-		case EBI1_CLK:
-		case EBI2_CLK:
 		case ADSP_CLK:
 		case EMDH_CLK:
 		case GP_CLK:
@@ -716,6 +714,7 @@ static int a11_clk_enable(unsigned id)
 	case SDC3_CLK:
 	case SDC4_CLK:
 	case USB_HS_CLK:
+	case USB_OTG_CLK:
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x800,
 		       MSM_CLK_CTL_BASE + params.offset);
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x100,
@@ -825,6 +824,7 @@ static void a11_clk_disable(unsigned id)
 	case SDC3_CLK:
 	case SDC4_CLK:
 	case USB_HS_CLK:
+	case USB_OTG_CLK:
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x200,
 		       MSM_CLK_CTL_BASE + params.offset);
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x800,
