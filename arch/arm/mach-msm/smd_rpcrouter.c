@@ -44,15 +44,15 @@
 #include "smd_rpcrouter.h"
 #include "smd_private.h"
 
-#define TRACE_R2R_MSG 1
-#define TRACE_R2R_RAW 1
-#define TRACE_RPC_MSG 1
-#define TRACE_NOTIFY_MSG 1
+#define TRACE_R2R_MSG 0
+#define TRACE_R2R_RAW 0
+#define TRACE_RPC_MSG 0
+#define TRACE_NOTIFY_MSG 0
 
-#define MSM_RPCROUTER_DEBUG 1
-#define MSM_RPCROUTER_DEBUG_PKT 1
-#define MSM_RPCROUTER_R2R_DEBUG 1
-#define DUMP_ALL_RECEIVED_HEADERS 1
+#define MSM_RPCROUTER_DEBUG 0
+#define MSM_RPCROUTER_DEBUG_PKT 0
+#define MSM_RPCROUTER_R2R_DEBUG 0
+#define DUMP_ALL_RECEIVED_HEADERS 0
 
 #define DIAG(x...) printk("[RR] ERROR " x)
 
@@ -145,22 +145,20 @@ static int rpcrouter_send_control_msg(union rr_control_msg *msg)
 	RR("send control message cmd=%d srv.cmd=%d prog=%08x:%x id=%d:%08x\n",
 	   msg->cmd, msg->srv.cmd, msg->srv.prog, msg->srv.vers, msg->srv.pid,
 	   msg->srv.cid);
-
 	if (!
-	    (msg->cmd == RPCROUTER_CTRL_CMD_HELLO
-	     || msg->cmd == RPCROUTER_CTRL_CMD_BYE) && !initialized) {
+		(msg->cmd == RPCROUTER_CTRL_CMD_HELLO ||
+		msg->cmd == RPCROUTER_CTRL_CMD_BYE) && !initialized) {
 		printk(KERN_ERR "rpcrouter_send_control_msg(): Warning, "
 		       "router not initialized\n");
 		return -EINVAL;
 	}
-
 	hdr.version = RPCROUTER_VERSION;
 	hdr.type = msg->cmd;
 	hdr.src_pid = RPCROUTER_PID_LOCAL;
 	hdr.src_cid = RPCROUTER_ROUTER_ADDRESS;
 	hdr.confirm_rx = 0;
 	hdr.size = sizeof(*msg);
-	hdr.dst_pid = 0;
+	hdr.dst_pid = RPCROUTER_PID_REMOTE;
 	hdr.dst_cid = RPCROUTER_ROUTER_ADDRESS;
 
 	/* TODO: what if channel is full? */
@@ -424,16 +422,17 @@ static int process_control_msg(union rr_control_msg *msg, int len)
 		RR("x HELLO\n");
 		memset(&ctl, 0, sizeof(ctl));
 
-		if (hot_boot)
-		ctl.cmd = RPCROUTER_CTRL_CMD_BYE;
-		rpcrouter_send_control_msg(&ctl);
-		msleep(50);
+		if (hot_boot) {
+			ctl.cmd = RPCROUTER_CTRL_CMD_BYE;
+			rpcrouter_send_control_msg(&ctl);
+			msleep(50);
+		}
 
 		ctl.cmd = RPCROUTER_CTRL_CMD_HELLO;
 		rpcrouter_send_control_msg(&ctl);
 
 		if (hot_boot)
-		msleep(50);
+			msleep(50);
 
 		initialized = 1;
 
