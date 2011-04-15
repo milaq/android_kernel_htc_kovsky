@@ -719,6 +719,64 @@ static int __init htckovsky_init_acoustic(void) {
 	return 0;
 }
 
+/******************************************************************************
+ * GPIOs
+ * Only input gpios and those not handled by other drivers are listed here
+ ******************************************************************************/
+static struct msm_gpio kovsky_gpios_init_off[] = {
+	{.gpio_cfg = GPIO_CFG(KOVS100_EXT_MIC, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Ext Mic"},
+	{.gpio_cfg = GPIO_CFG(0x1b, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x1c, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_HEADSET_IN, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Headset Jack"},
+	{.gpio_cfg = GPIO_CFG(0x1f, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x21, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x22, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x23, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_SLIDER_IRQ_GPIO, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),.label = "Slider"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_CAM_FULL_KEY, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),.label = "Camera Key2"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_CAM_HALF_KEY, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),.label = "Camera Key1"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_JOYSTICK_IRQ, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_UP, GPIO_CFG_2MA),.label = "MicroP2"},
+	{.gpio_cfg = GPIO_CFG(0x3e, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x44, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x45, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x46, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x47, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x55, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x56, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x57, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x65, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x67, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+	{.gpio_cfg = GPIO_CFG(0x6d, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+};
+
+static struct msm_gpio kovsky_gpios_init_on[] = {
+	{.gpio_cfg = GPIO_CFG(KOVS100_N_CHG_ENABLE, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Charger"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_0, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Speaker"},
+	{.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_1, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Speaker"},
+	{.gpio_cfg = GPIO_CFG(0x54, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
+};
+
+static void htckovsky_gpios_init(void) {
+	int rc;
+	rc = msm_gpios_request(kovsky_gpios_init_off, ARRAY_SIZE(kovsky_gpios_init_off));
+	if (rc) {
+		printk(KERN_ERR "%s: unable to request off gpios\n", __func__);
+		return;
+	}
+	rc = msm_gpios_request(kovsky_gpios_init_on, ARRAY_SIZE(kovsky_gpios_init_on));
+	if (rc) {
+		printk(KERN_ERR "%s: unable to request on gpios\n", __func__);
+		goto free_off;
+	}
+
+	msm_gpios_disable(kovsky_gpios_init_off, ARRAY_SIZE(kovsky_gpios_init_off));
+	msm_gpios_enable(kovsky_gpios_init_on, ARRAY_SIZE(kovsky_gpios_init_on));
+	msm_gpios_free(kovsky_gpios_init_on, ARRAY_SIZE(kovsky_gpios_init_on));
+
+free_off:
+	msm_gpios_free(kovsky_gpios_init_off, ARRAY_SIZE(kovsky_gpios_init_off));
+}
+
 static struct platform_device *devices[] __initdata = {
 	&amss_device,
 	&msm_device_i2c,
@@ -756,6 +814,7 @@ static void __init htckovsky_init(void)
 	msm_acpu_clock_init(&htckovsky_clock_data);
 	msm_dex_comm_init();
 	msm_add_mem_devices(&htckovsky_pmem_settings);
+	htckovsky_gpios_init();
 
 	htckovsky_request_ulpi_gpios();
 	msm_hsusb_board_pdata = &htckovsky_hsusb_pdata;
