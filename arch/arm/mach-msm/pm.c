@@ -245,16 +245,16 @@ msm_pm_enter_prep_hw(void)
 static void
 msm_pm_exit_restore_hw(void)
 {
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
+	writel(0,MSM_SHARED_RAM_BASE+0xfc100);
+	writel(0,MSM_SHARED_RAM_BASE+0xfc128);
+#endif
 #if defined(CONFIG_ARCH_MSM7X30)
 	writel(0, A11S_SECOP);
 	writel(0, A11S_PWRDOWN);
 #else
 	writel(0x00, A11S_CLK_SLEEP_EN);
 	writel(0, A11S_PWRDOWN);
-#endif
-#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
-	writel(0,MSM_SHARED_RAM_BASE+0xfc100);
-	writel(0,MSM_SHARED_RAM_BASE+0xfc128);
 #endif
 }
 
