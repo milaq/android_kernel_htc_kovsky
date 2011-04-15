@@ -421,17 +421,36 @@ static const struct i2c_algorithm msm_i2c_algo = {
 	.functionality	= msm_i2c_func,
 };
 
+static void msm_i2c_set_clk_rate(struct msm_i2c_dev *dev) {
+	int fs_div;
+	int hs_div;
+	int i2c_clk;
+	int clk_ctl;
+	int target_clk;
+
+	clk_enable(dev->clk);
+
+	/* I2C_HS_CLK = I2C_CLK/(3*(HS_DIVIDER_VALUE+1) */
+	/* I2C_FS_CLK = I2C_CLK/(2*(FS_DIVIDER_VALUE+3) */
+	/* FS_DIVIDER_VALUE = ((I2C_CLK / I2C_FS_CLK) / 2) - 3 */
+	i2c_clk = 19200000; /* input clock */
+	target_clk = 100000;
+	/* target_clk = 200000; */
+	fs_div = ((i2c_clk / target_clk) / 2) - 3;
+	hs_div = 3;
+	clk_ctl = ((hs_div & 0x7) << 8) | (fs_div & 0xff);
+	writel(clk_ctl, dev->base + I2C_CLK_CTL);
+	printk(KERN_INFO "%s: clk_ctl %x, %d Hz\n",
+	       __func__, clk_ctl, i2c_clk / (2 * ((clk_ctl & 0xff) + 3)));
+	clk_disable(dev->clk);
+}
+
 static int
 msm_i2c_probe(struct platform_device *pdev)
 {
 	struct msm_i2c_dev	*dev;
 	struct resource		*mem, *irq, *ioarea;
 	int ret;
-	int fs_div;
-	int hs_div;
-	int i2c_clk;
-	int clk_ctl;
-	int target_clk;
 	struct clk *clk;
 
 	printk(KERN_INFO "msm_i2c_probe\n");
@@ -481,25 +500,11 @@ msm_i2c_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, dev);
 
 	//Claim gpios
-	msm_set_i2c_mux(true, &i2c_clk, &i2c_clk);
+	msm_set_i2c_mux(true, &ret, &ret);
 	//Disable until actually used
 	msm_set_i2c_mux(false, NULL, NULL);
 
-	clk_enable(clk);
-
-	/* I2C_HS_CLK = I2C_CLK/(3*(HS_DIVIDER_VALUE+1) */
-	/* I2C_FS_CLK = I2C_CLK/(2*(FS_DIVIDER_VALUE+3) */
-	/* FS_DIVIDER_VALUE = ((I2C_CLK / I2C_FS_CLK) / 2) - 3 */
-	i2c_clk = 19200000; /* input clock */
-	target_clk = 100000;
-	/* target_clk = 200000; */
-	fs_div = ((i2c_clk / target_clk) / 2) - 3;
-	hs_div = 3;
-	clk_ctl = ((hs_div & 0x7) << 8) | (fs_div & 0xff);
-	writel(clk_ctl, dev->base + I2C_CLK_CTL);
-	printk(KERN_INFO "msm_i2c_probe: clk_ctl %x, %d Hz\n",
-	       clk_ctl, i2c_clk / (2 * ((clk_ctl & 0xff) + 3)));
-	clk_disable(clk);
+	msm_i2c_set_clk_rate(dev);
 
 	i2c_set_adapdata(&dev->adapter, dev);
 	dev->adapter.algo = &msm_i2c_algo;
@@ -571,9 +576,10 @@ static int msm_i2c_suspend_noirq(struct device *device)
 static int msm_i2c_resume_noirq(struct device *device) {
 	struct platform_device *pdev = to_platform_device(device);
 	struct msm_i2c_dev *dev = platform_get_drvdata(pdev);
-
 	/* Block to allow any i2c_xfers to finish */
 	i2c_lock_adapter(&dev->adapter);
+	msm_i2c_set_clk_rate(dev);
+	msm_i2c_recover_bus_busy(dev);
 	dev->is_suspended = false;
 	i2c_unlock_adapter(&dev->adapter);
 	return 0;
