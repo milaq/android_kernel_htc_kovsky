@@ -109,11 +109,12 @@ static int htckovsky_rfkill_probe(struct platform_device *pdev)
 		goto fail_rfk_alloc;
 	}
 
+	rfkill_set_states(bt_rfk, true, false);
+	
 	rc = rfkill_register(bt_rfk);
 	if (rc)
 		goto fail_rfk_reg;
 
-	rfkill_set_states(bt_rfk, true, false);
 
 	return 0;
 
