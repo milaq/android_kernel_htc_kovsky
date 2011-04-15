@@ -90,11 +90,11 @@ static int htckovsky_rfkill_probe(struct platform_device *pdev)
 		rc = PTR_ERR(vreg_bt);
 		goto fail_vreg_bt;
 	}
-	rc = gpio_request(KOVS100_BT_POWER, "HTC Kovsky BT Power");
+	rc = gpio_request(KOVS100_BT_POWER, "BT Power");
 	if (rc)
 		goto fail_power_gpio;
 
-	rc = gpio_request(KOVS100_BT_ROUTER, "HTC Kovsky BT Router");
+	rc = gpio_request(KOVS100_BT_ROUTER, "BT Router");
 	if (rc)
 		goto fail_router_gpio;
 
@@ -112,6 +112,8 @@ static int htckovsky_rfkill_probe(struct platform_device *pdev)
 	rc = rfkill_register(bt_rfk);
 	if (rc)
 		goto fail_rfk_reg;
+
+	rfkill_set_states(bt_rfk, true, false);
 
 	return 0;
 
