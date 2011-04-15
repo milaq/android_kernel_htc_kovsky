@@ -27,6 +27,7 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 #include <linux/i2c.h>
+#include <linux/input/msm_ts.h>
 #include <linux/pda_power.h>
 #include <linux/gpio_keys.h>
 #include <linux/microp-keypad.h>
@@ -54,7 +55,6 @@
 #include <mach/msm_fb.h>
 #include <mach/msm_hsusb.h>
 #include <mach/msm_serial_hs.h>
-#include <mach/msm_ts.h>
 #include <mach/vreg.h>
 
 #include "dex_comm.h"
