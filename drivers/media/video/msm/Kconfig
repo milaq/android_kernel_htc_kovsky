@@ -23,6 +23,12 @@ config MSM_CAMERA_DEBUG
 	  Enable printk() debug for msm camera
 
 comment "Camera Sensor Selection"
+config MT9T012VC
+	bool "Sensor mt9t012vc (BAYER 3M)"
+	depends on MSM_CAMERA
+	---help---
+	  SAMSUNG 3.2M Bayer Sensor with AutoFocus
+
 config MT9T013
 	bool "Sensor mt9t013 (BAYER 3M)"
 	depends on MSM_CAMERA
