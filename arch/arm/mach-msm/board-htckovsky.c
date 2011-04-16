@@ -149,7 +149,7 @@ static int htckovsky_microp_keymap[] = {
 
 static int htckovsky_init_microp_keypad(struct device *dev) {
 	int ret;
-	ret = gpio_request(KOVS100_SLIDER_IRQ_GPIO, "HTC Kovsky Keyboard slider");
+	ret = gpio_request(KOVS100_SLIDER_IRQ_GPIO, "Keyboard slider");
 	if (ret)
 		return ret;
 	ret = gpio_direction_input(KOVS100_SLIDER_IRQ_GPIO);
@@ -182,7 +182,7 @@ static struct platform_device htckovsky_keypad = {
 };
 
 static struct platform_device* htckovsky_microp_keypad_clients[] = {
-    &htckovsky_keypad,
+	&htckovsky_keypad,
 };
 
 static uint16_t micropksc_compatible_versions[] = {
@@ -196,6 +196,7 @@ static struct microp_platform_data htckovsky_microp_keypad_pdata = {
 	.comp_versions = micropksc_compatible_versions,
 	.n_comp_versions = ARRAY_SIZE(micropksc_compatible_versions),
 };
+
 
 /******************************************************************************
  * Power Supply
@@ -241,21 +242,21 @@ static void htckovsky_set_charge(int flags)
 		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
 		break;
 	default:
-		gpio_set_value(KOVS100_N_CHG_ENABLE, 1);
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
 		return;
 	}
-	gpio_set_value(KOVS100_N_CHG_ENABLE, 0);
+	gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
 }
 
 static int htckovsky_power_init(struct device *dev)
 {
 	int rc = 0;
 
-	rc = gpio_request(KOVS100_N_CHG_ENABLE, "HTC Kovsky charger disable");
+	rc = gpio_request(KOVS100_N_CHG_ENABLE, "Charger Disable");
 	if (rc)
 		goto err;
 
-	rc = gpio_request(KOVS100_AC_DETECT, "HTC Kovsky charger detection");
+	rc = gpio_request(KOVS100_AC_DETECT, "Charger Detection");
 	if (rc)
 		goto err;
 
@@ -308,8 +309,14 @@ static struct platform_device htckovsky_microp_leds = {
   .name = "htckovsky-microp-leds",
 };
 
+static struct platform_device htckovsky_optical_joystick = {
+  .id = -1,
+  .name = "htckovsky-oj",
+};
+
 static struct platform_device* htckovsky_microp_clients[] = {
-    &htckovsky_microp_leds,
+	&htckovsky_microp_leds,
+//	&htckovsky_optical_joystick,
 };
 
 static uint16_t micropklt_compatible_versions[] = {
@@ -329,9 +336,6 @@ static struct microp_platform_data htckovsky_microp_pdata = {
  ******************************************************************************/
 static struct i2c_board_info i2c_devices[] = {
 	{
-	I2C_BOARD_INFO("mt9t012vc", 0x20),
-	},
-	{
 	// Battery driver
 	.type = DS2746_NAME,
 	.addr = 0x36,
@@ -349,6 +353,9 @@ static struct i2c_board_info i2c_devices[] = {
 	 .addr = 0x67,
 	 .platform_data = &htckovsky_microp_keypad_pdata,
 	 },
+	{
+	I2C_BOARD_INFO("mt9t012vc", 0x20),
+	},
 };
 
 /******************************************************************************
@@ -362,13 +369,13 @@ static int htckovsky_request_ulpi_gpios(void)
 	if (done)
 		return 0;
 
-	ret = gpio_request(0x54, "MSM USB");
+	ret = gpio_request(0x54, "Kovsky USB Unknown");
 	if (ret)
 		goto free_x54;
-	ret = gpio_request(KOVS100_USB_1, "MSM USB");
+	ret = gpio_request(KOVS100_USB_RESET_PHY, "USB PHY Reset");
 	if (ret)
 		goto free_x64;
-	ret = gpio_request(KOVS100_USB_2, "MSM USB");
+	ret = gpio_request(KOVS100_USB_POWER_PHY, "USB PHY Power");
 	if (ret)
 		goto free_x69;
 
@@ -376,9 +383,9 @@ static int htckovsky_request_ulpi_gpios(void)
 	return 0;
 
 free_x69:
-	gpio_free(KOVS100_USB_2);
+	gpio_free(KOVS100_USB_POWER_PHY);
 free_x64:
-	gpio_free(KOVS100_USB_1);
+	gpio_free(KOVS100_USB_RESET_PHY);
 free_x54:
 	gpio_free(0x54);
 
@@ -388,21 +395,21 @@ free_x54:
 static inline void htckovsky_usb_disable(void)
 {
 	printk(KERN_DEBUG "[KOVSKY]: Disable USB\n");
-	gpio_set_value(KOVS100_USB_1, 0);
-	gpio_set_value(KOVS100_USB_2, 0);
+	gpio_direction_output(KOVS100_USB_RESET_PHY, 0);
+	gpio_direction_output(KOVS100_USB_POWER_PHY, 0);
 }
 
 static void htckovsky_usb_enable(void)
 {
 	printk(KERN_DEBUG "[KOVSKY]: Enable USB\n");
-	gpio_set_value(0x54, 1);
+	gpio_direction_output(0x54, 1);
 
 	gpio_set_value(KOVS100_BT_ROUTER, 0);
 
-	gpio_set_value(KOVS100_USB_2, 1);
-	gpio_set_value(KOVS100_USB_1, 0);
+	gpio_direction_output(KOVS100_USB_POWER_PHY, 1);
+	gpio_direction_output(KOVS100_USB_RESET_PHY, 0);
 	mdelay(3);
-	gpio_set_value(KOVS100_USB_1, 1);
+	gpio_direction_output(KOVS100_USB_RESET_PHY, 1);
 	mdelay(3);
 }
 
@@ -437,65 +444,56 @@ static struct platform_device android_usb = {
  * Camera
  ******************************************************************************/
 #ifdef CONFIG_MSM_CAMERA
-static unsigned camera_off_gpio_table[] = {
-	/* CAMERA */
-	GPIO_CFG(2, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT2 */
-	GPIO_CFG(3, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT3 */
-	GPIO_CFG(4, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT4 */
-	GPIO_CFG(5, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT5 */
-	GPIO_CFG(6, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT6 */
-	GPIO_CFG(7, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT7 */
-	GPIO_CFG(8, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT8 */
-	GPIO_CFG(9, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT9 */
-	GPIO_CFG(10, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT10 */
-	GPIO_CFG(11, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* DAT11 */
-	GPIO_CFG(12, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* PCLK */
-	GPIO_CFG(13, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* HSYNC_IN */
-	GPIO_CFG(14, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* VSYNC_IN */
-	GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),	/* MCLK */
+
+static struct msm_gpio htckovsky_camera_gpios_on[] = {
+	{.gpio_cfg = GPIO_CFG(2, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT2 "},
+	{.gpio_cfg = GPIO_CFG(3, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT3 "},
+	{.gpio_cfg = GPIO_CFG(4, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT4 "},
+	{.gpio_cfg = GPIO_CFG(5, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT5 "},
+	{.gpio_cfg = GPIO_CFG(6, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT6 "},
+	{.gpio_cfg = GPIO_CFG(7, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT7 "},
+	{.gpio_cfg = GPIO_CFG(8, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT8 "},
+	{.gpio_cfg = GPIO_CFG(9, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT9 "},
+	{.gpio_cfg = GPIO_CFG(10, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT10 "},
+	{.gpio_cfg = GPIO_CFG(11, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT11 "},
+	{.gpio_cfg = GPIO_CFG(12, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "PCLK "},
+	{.gpio_cfg = GPIO_CFG(13, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "HSYNC_IN "},
+	{.gpio_cfg = GPIO_CFG(14, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "VSYNC_IN "},
+	{.gpio_cfg = GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA),.label = "MCLK "},
 };
 
-static unsigned camera_on_gpio_table[] = {
-	/* CAMERA */
-	GPIO_CFG(2, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT2 */
-	GPIO_CFG(3, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT3 */
-	GPIO_CFG(4, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT4 */
-	GPIO_CFG(5, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT5 */
-	GPIO_CFG(6, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT6 */
-	GPIO_CFG(7, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT7 */
-	GPIO_CFG(8, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT8 */
-	GPIO_CFG(9, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT9 */
-	GPIO_CFG(10, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT10 */
-	GPIO_CFG(11, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* DAT11 */
-	GPIO_CFG(12, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* PCLK */
-	GPIO_CFG(13, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* HSYNC_IN */
-	GPIO_CFG(14, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),	/* VSYNC_IN */
-	GPIO_CFG(15, 1, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_16MA),	/* MCLK */
+static struct msm_gpio htckovsky_camera_gpios_off[] = {
+	{.gpio_cfg = GPIO_CFG(2, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT2 "},
+	{.gpio_cfg = GPIO_CFG(3, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT3 "},
+	{.gpio_cfg = GPIO_CFG(4, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT4 "},
+	{.gpio_cfg = GPIO_CFG(5, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT5 "},
+	{.gpio_cfg = GPIO_CFG(6, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT6 "},
+	{.gpio_cfg = GPIO_CFG(7, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT7 "},
+	{.gpio_cfg = GPIO_CFG(8, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT8 "},
+	{.gpio_cfg = GPIO_CFG(9, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT9 "},
+	{.gpio_cfg = GPIO_CFG(10, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT10 "},
+	{.gpio_cfg = GPIO_CFG(11, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "DAT11 "},
+	{.gpio_cfg = GPIO_CFG(12, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "PCLK "},
+	{.gpio_cfg = GPIO_CFG(13, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "HSYNC_IN "},
+	{.gpio_cfg = GPIO_CFG(14, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "VSYNC_IN "},
+	{.gpio_cfg = GPIO_CFG(15, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_4MA),.label = "MCLK "},
 };
-
-static void config_gpio_table(unsigned *table, int len)
-{
-	int n;
-	unsigned id;
-	for (n = 0; n < len; n++) {
-		id = table[n];
-		gpio_tlmm_config(id, 0);
-	}
-}
 
 static void config_camera_on_gpios(void)
 {
 	printk(KERN_DEBUG "+%s\n", __func__);
-	config_gpio_table(camera_on_gpio_table,
-			ARRAY_SIZE(camera_on_gpio_table));
+	msm_gpios_request(htckovsky_camera_gpios_on,
+							ARRAY_SIZE(htckovsky_camera_gpios_on));
+	msm_gpios_disable(htckovsky_camera_gpios_on,
+							ARRAY_SIZE(htckovsky_camera_gpios_on));
 	printk(KERN_DEBUG "-%s\n", __func__);
 }
 
 static void config_camera_off_gpios(void)
 {
 	printk(KERN_DEBUG "-%s\n", __func__);
-	config_gpio_table(camera_off_gpio_table,
-			ARRAY_SIZE(camera_off_gpio_table));
+	msm_gpios_disable_free(htckovsky_camera_gpios_off,
+							ARRAY_SIZE(htckovsky_camera_gpios_off));
 	printk(KERN_DEBUG "-%s\n", __func__);
 }
 
@@ -509,39 +507,96 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 };
 
 #ifdef CONFIG_MT9T012VC
-static void kovsky_af_vdd(int on)
+int kovsky_af_vdd(int on)
 {
+	printk("%s(%d)\n", __func__, on);
 	struct msm_dex_command dex = {
 		.cmd = on ? DEX_PMIC_REG_ON : DEX_PMIC_REG_OFF,
 		.has_data = 1,
 		.data = 0x100,
 	};
 
-	msm_dex_comm(&dex, 0);
+	return msm_dex_comm(&dex, 0);
 }
 
-/* This is needed to control the lens position*/
-static void kovsky_pull_vcm_d(int on)
+int kovsky_pull_vcm_d(int on)
 {
+	printk("%s(%d)\n", __func__, on);
 	kovsky_af_vdd(on);
-	gpio_direction_output(0x6b, on);
-	gpio_direction_output(0x1c, on);
-}
-
-static int camera_set_state(int on)
-{
-	gpio_direction_output(1, on);
-	gpio_direction_output(0x17, on);
-	gpio_direction_output(0x1f, on);
-	gpio_direction_output(0, on);
-	gpio_direction_output(0x63, !on);
+	volatile char* focus;
+	focus = ioremap(0xa9d00000, 0x1000);
 
 	if (on) {
+		writel(2, focus + 0x4c);
+		writel(0x1e21, focus + 0x50);
+		writel(0x1de, focus + 0x54);
+		gpio_direction_output(0x6c, 1);
+		gpio_direction_output(0x1c, 0);
+	}
+	else {
+		gpio_direction_output(0x6c, 0);
+		gpio_direction_output(0x1c, 0);
+		writel(0, focus + 0x4c);
+		writel(0, focus + 0x50);
+		writel(0, focus + 0x54);
+	}
+	iounmap(focus);
+	return 0;
+}
+
+#if 0
+torch 0x57 - bright
+0x55 - power
+
+static void ov6680_power(int on) {
+	0x17, 1
+	0x1f, 1
+	0x63, 1
+
+	0x1, 0
+	0x0, 1
+}
+
+static void set_sensor_vdd(void) {
+	0, 0
+	0x17, 1
+	0x1f, 1
+	pull vcm
+}
+
+#endif
+
+int kovsky_camera_set_state(int on)
+{
+	static bool requested = false;
+
+	if (!requested) {
+		gpio_request(0, "Camera Reset");
+		gpio_request(1, "Camera Power");
+		gpio_request(0x17 /* 23 */, "Camera");
+		gpio_request(0x1f /* 31 */, "Camera");
+		gpio_request(0x63 /* 99 */, "VFE Mux");
+		gpio_request(0x6c /* 107 */, "Camera VCM PWD");
+		gpio_request(0x1c, "Camera VCM 2");
+
+		requested = true;
+	}
+
+	printk("%s(%d)\n", __func__, on);
+	gpio_direction_output(1, on); //sensor pwd
+	//gpio_direction_output(0, 0); //sensor reset
+	gpio_direction_output(0x17 /*23*/, on);
+	gpio_direction_output(0x1f /*31*/, on);
+	gpio_direction_output(0x63 /*99*/, !on); //MUX: 0 -> rear, 1 -> front
+
+	if (on) {
+		mdelay(2);
 		gpio_direction_output(0, 1);
 		mdelay(10);
 		gpio_direction_output(0, 0);
 		mdelay(10);
 		gpio_direction_output(0, 1);
+		mdelay(2);
 	}
 	return 0;
 }
@@ -549,9 +604,10 @@ static int camera_set_state(int on)
 static struct msm_camera_sensor_info msm_camera_sensor_mt9t012vc_data = {
 	//fake sensor name for the stupid proprietary driver
 	.sensor_name = "mt9t013",
+	.sensor_reset   = -1,
+	.sensor_pwd     = -1,
+	.vcm_pwd        = -1,
 	.pdata = &msm_camera_device_data,
-	.set_actuator = kovsky_pull_vcm_d,
-	.set_state = camera_set_state,
 };
 
 static struct platform_device msm_camera_sensor_mt9t012vc = {
@@ -560,8 +616,8 @@ static struct platform_device msm_camera_sensor_mt9t012vc = {
 		.platform_data = &msm_camera_sensor_mt9t012vc_data,
 	},
 };
-#endif				//CONFIG_MT9T012VC
-#endif				//CONFIG_MSM_CAMERA
+#endif	//CONFIG_MT9T012VC
+#endif	//CONFIG_MSM_CAMERA
 
 
 /******************************************************************************
@@ -570,8 +626,8 @@ static struct platform_device msm_camera_sensor_mt9t012vc = {
 static struct gpio_keys_button htckovsky_button_table[] = {
 	/*KEY   GPIO    ACTIVE_LOW      DESCRIPTION     type    wakeup  debounce */
 	{KEY_POWER, 83, 1, "Power button", EV_KEY, 1, 0},
-	{KEY_MENU, 42, 1, "Camera half press", EV_KEY, 0, 10},
-	{KEY_HOME, 41, 1, "Camera full press", EV_KEY, 0, 0},
+	{KEY_CAMERA - 1, 42, 1, "Camera half press", EV_KEY, 0, 10},
+	{KEY_CAMERA, 41, 1, "Camera full press", EV_KEY, 0, 0},
 };
 
 static struct gpio_keys_platform_data htckovsky_gpio_keys_data = {
@@ -671,7 +727,6 @@ static void __init htckovsky_patch_uart_dma(void) {
 	}
 
 }
-
 /******************************************************************************
  * Headset
  ******************************************************************************/
@@ -786,15 +841,12 @@ static struct platform_device *devices[] __initdata = {
 	&htckovsky_rfkill,
 	&msm_device_uart_dm2,
 	&msm_device_hsusb,
-#ifdef CONFIG_USB_ANDROID
 	&android_usb,
-#endif
 	&htckovsky_powerdev,
-#ifdef CONFIG_MT9T012VC
-//      &msm_camera_sensor_mt9t012vc,
-#endif
+	&msm_camera_sensor_mt9t012vc,
 	&msm_device_touchscreen,
 	&htckovsky_headset,
+	&msm_device_nand,
 };
 
 extern struct sys_timer msm_timer;
@@ -825,13 +877,16 @@ static void __init htckovsky_init(void)
 	msm_device_touchscreen.dev.platform_data = &htckovsky_ts_pdata;
 
 	if (!htckovsky_init_acoustic())
-	htc_acoustic_wce_board_data = &htckovsky_acoustic_data;
+		htc_acoustic_wce_board_data = &htckovsky_acoustic_data;
 
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 
 	// Register I2C devices
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
+
+	//trigger usb detection
+	htckovsky_is_usb_online();
 
 	/* A little vibrating welcome */
 	for (i = 0; i < 2; i++) {
@@ -878,7 +933,7 @@ static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
 	}
 }
 
-MACHINE_START(HTCKOVSKY, "HTC Kovsky GSM phone (aka Xperia X1)")
+MACHINE_START(HTCKOVSKY, "kovsky")
 	.fixup = htckovsky_fixup,
 	.boot_params = 0x10000100,
 	.map_io = htckovsky_map_io,
