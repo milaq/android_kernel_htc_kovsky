@@ -63,6 +63,8 @@
 #include "clock-msm-a11.h"
 #include "gpio_chip.h"
 
+static bool htckovsky_charger_is_ac = false;
+
 /******************************************************************************
  * MicroP Keypad
  ******************************************************************************/
@@ -197,8 +199,7 @@ static struct microp_platform_data htckovsky_microp_keypad_pdata = {
 	.n_comp_versions = ARRAY_SIZE(micropksc_compatible_versions),
 };
 
-
-/******************************************************************************
+/*****************************************************************************
  * Power Supply
  ******************************************************************************/
 static char *supplicants[] = {
@@ -227,18 +228,18 @@ static int htckovsky_is_usb_online(void)
 
 static int htckovsky_is_ac_online(void)
 {
-	int vbus_state = readl(MSM_SHARED_RAM_BASE + 0xfc00c);
-	int cable_in = !gpio_get_value(KOVS100_AC_DETECT);
-	return cable_in & !vbus_state;
+	return htckovsky_charger_is_ac && htckovsky_is_usb_online();
 }
 
 static void htckovsky_set_charge(int flags)
 {
 	switch (flags) {
 	case PDA_POWER_CHARGE_USB:
+		gpio_direction_output(KOVS100_CHARGER_FULL, 0);
 		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
 		break;
 	case PDA_POWER_CHARGE_AC:
+  		gpio_direction_output(KOVS100_CHARGER_FULL, 1);
 		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
 		break;
 	default:
@@ -258,12 +259,21 @@ static int htckovsky_power_init(struct device *dev)
 
 	rc = gpio_request(KOVS100_AC_DETECT, "Charger Detection");
 	if (rc)
-		goto err;
+		goto err_ac;
+	
+	rc = gpio_request(KOVS100_CHARGER_FULL, "Charge 500mA");
+	if (rc)
+	      goto err_chg_full;
 
 	htckovsky_power_resources[0].start = gpio_to_irq(KOVS100_AC_DETECT);
 	htckovsky_power_resources[0].end = htckovsky_power_resources[0].start;
 	htckovsky_power_resources[1].start = gpio_to_irq(KOVS100_AC_DETECT);
 	htckovsky_power_resources[1].end = htckovsky_power_resources[1].start;
+
+err_chg_full:
+	gpio_free(KOVS100_AC_DETECT);
+err_ac:	
+	gpio_free(KOVS100_N_CHG_ENABLE);
 err:
 	return rc;
 }
@@ -430,9 +440,14 @@ static void htckovsky_usb_hw_reset(bool state)
 	}
 }
 
+static void htckovsky_usb_connected(int state) {
+	htckovsky_charger_is_ac = state == 2;
+}
+
 static struct msm_hsusb_platform_data htckovsky_hsusb_pdata = {
 	.hw_reset = htckovsky_usb_hw_reset,
 	.phy_reset = htckovsky_phy_reset,
+	.usb_connected = htckovsky_usb_connected,
 };
 
 static struct platform_device android_usb = {
