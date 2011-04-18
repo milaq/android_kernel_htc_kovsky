@@ -42,9 +42,6 @@ enum {
 static int debug_mask = 0;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
-int nand_boot = 0;
-module_param_named(nand_boot, nand_boot, int, 0);
-
 static unsigned a11_clk_is_enabled(unsigned id);
 static int a11_clk_enable(unsigned id);
 static void a11_clk_disable(unsigned id);
@@ -1002,9 +999,6 @@ int a11_clk_reset(unsigned id, enum clk_reset_action action)
 
 void __init msm_clock_a11_fixup(void)
 {
-	if (nand_boot)
-		mdelay(6000);
-
 	mutex_lock(&clocks_mutex);
 
 	if (pll_get_rate(PLL0, true) == 196608000) {
