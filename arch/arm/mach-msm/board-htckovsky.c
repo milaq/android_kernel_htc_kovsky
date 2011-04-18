@@ -260,7 +260,7 @@ static int htckovsky_power_init(struct device *dev)
 	rc = gpio_request(KOVS100_AC_DETECT, "Charger Detection");
 	if (rc)
 		goto err_ac;
-	
+
 	rc = gpio_request(KOVS100_CHARGER_FULL, "Charge 500mA");
 	if (rc)
 	      goto err_chg_full;
@@ -270,9 +270,11 @@ static int htckovsky_power_init(struct device *dev)
 	htckovsky_power_resources[1].start = gpio_to_irq(KOVS100_AC_DETECT);
 	htckovsky_power_resources[1].end = htckovsky_power_resources[1].start;
 
+	return 0;
+
 err_chg_full:
 	gpio_free(KOVS100_AC_DETECT);
-err_ac:	
+err_ac:
 	gpio_free(KOVS100_N_CHG_ENABLE);
 err:
 	return rc;
