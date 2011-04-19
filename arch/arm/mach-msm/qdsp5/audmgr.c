@@ -276,11 +276,13 @@ int audmgr_enable(struct audmgr *am, struct audmgr_config *cfg)
 	msg.args.def_method = cpu_to_be32(cfg->def_method);
 	msg.args.codec_type = cpu_to_be32(cfg->codec);
 	msg.args.snd_method = cpu_to_be32(cfg->snd_method);
-//	msg.args.cb_func = cpu_to_be32(0x11111111);
-//	msg.args.client_data = cpu_to_be32(0x11223344);
-
+#ifdef CONFIG_MSM_AMSS_VERSION_WINCE
 	msg.args.cb_func = cpu_to_be32(9);//AUDMGR_CB_FUNC_PTR ?
 	msg.args.client_data = cpu_to_be32(0x017ad580);
+#else
+	msg.args.cb_func = cpu_to_be32(0x11111111);
+	msg.args.client_data = cpu_to_be32(0x11223344);
+#endif
 
 	msm_rpc_setup_req(&msg.hdr, audmgr_prog, msm_rpc_get_vers(am->ept),
 			  AUDMGR_ENABLE_CLIENT);
@@ -292,7 +294,7 @@ int audmgr_enable(struct audmgr *am, struct audmgr_config *cfg)
 	rc = wait_event_timeout(am->wait, am->state != STATE_ENABLING, 15 * HZ);
 	if (rc == 0) {
 		pr_err("audmgr_enable: ARM9 did not reply to RPC am->state = %d\n", am->state);
-		//BUG();
+		BUG();
 	}
 	if (am->state == STATE_ENABLED)
 		return 0;
@@ -330,7 +332,7 @@ int audmgr_disable(struct audmgr *am)
 	rc = wait_event_timeout(am->wait, am->state != STATE_DISABLING, 15 * HZ);
 	if (rc == 0) {
 		pr_err("audmgr_disable: ARM9 did not reply to RPC am->state = %d\n", am->state);
-		//BUG();
+		BUG();
 	}
 
 	if (am->state == STATE_DISABLED)
