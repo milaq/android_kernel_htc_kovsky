@@ -89,12 +89,12 @@ static smd_channel_t *smd_channel;
 static int initialized;
 static wait_queue_head_t newserver_wait;
 static wait_queue_head_t smd_wait;
+static wait_queue_head_t init_wait;
 static int smd_wait_count;	/* odd while waiting */
 
 static DEFINE_SPINLOCK(local_endpoints_lock);
 static DEFINE_SPINLOCK(remote_endpoints_lock);
 static DEFINE_SPINLOCK(server_list_lock);
-//static DEFINE_SPINLOCK(smd_lock);
 
 static struct workqueue_struct *rpcrouter_workqueue;
 static struct wake_lock rpcrouter_wake_lock;
@@ -559,6 +559,7 @@ static void do_create_rpcrouter_pdev(struct work_struct *work)
 {
 	if (atomic_cmpxchg(&rpcrouter_pdev_created, 0, 1) == 0)
 	platform_device_register(&rpcrouter_pdev);
+	wake_up(&init_wait);
 }
 
 static void do_create_pdevs(struct work_struct *work)
@@ -1294,6 +1295,8 @@ int msm_rpc_register_server(struct msm_rpc_endpoint *ept,
 	RR("x REG_NEW_SERVER id=%d:%08x prog=%08x:%x\n",
 	   ept->pid, ept->cid, prog, vers);
 
+	wait_event_interruptible(init_wait, initialized != 0);
+
 	rc = rpcrouter_send_control_msg(&msg);
 	if (rc < 0)
 		return rc;
@@ -1331,6 +1334,8 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 
 	init_waitqueue_head(&newserver_wait);
 	init_waitqueue_head(&smd_wait);
+	init_waitqueue_head(&init_wait);
+
 	wake_lock_init(&rpcrouter_wake_lock, WAKE_LOCK_SUSPEND, "SMD_RPCCALL");
 
 	rpcrouter_workqueue = create_singlethread_workqueue("rpcrouter");
