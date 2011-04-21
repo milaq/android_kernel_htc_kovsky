@@ -237,7 +237,7 @@ static void htckovsky_set_charge(int flags)
 	if (flags) {
 		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
 		gpio_direction_output(KOVS100_N_CHG_INHIBIT, 1);
-		gpio_direction_output(KOVS100_CHG_HIGH, 0);
+		gpio_direction_output(KOVS100_CHG_HIGH, 1);
 	}
 	else {
 		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
