@@ -233,20 +233,13 @@ static int htckovsky_is_ac_online(void)
 
 static void htckovsky_set_charge(int flags)
 {
-	switch (flags) {
-	case PDA_POWER_CHARGE_USB:
-		gpio_direction_output(KOVS100_CHARGER_FULL, 0);
-		printk(KERN_DEBUG "[KOVSKY]: set USB charging\n");
-		break;
-	case PDA_POWER_CHARGE_AC:
-  		gpio_direction_output(KOVS100_CHARGER_FULL, 1);
-		printk(KERN_DEBUG "[KOVSKY]: set AC charging\n");
-		break;
-	default:
+	if (flags) {
+		gpio_direction_output(KOVS100_CHARGER_FULL, htckovsky_charger_is_ac);
 		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
-		return;
 	}
-	gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
+	else {
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
+	}
 }
 
 static int htckovsky_power_init(struct device *dev)
@@ -403,16 +396,13 @@ free_x54:
 
 static inline void htckovsky_usb_disable(void)
 {
-	printk(KERN_DEBUG "[KOVSKY]: Disable USB\n");
 	gpio_direction_output(KOVS100_USB_RESET_PHY, 0);
 	gpio_direction_output(KOVS100_USB_POWER_PHY, 0);
 }
 
 static void htckovsky_usb_enable(void)
 {
-	printk(KERN_DEBUG "[KOVSKY]: Enable USB\n");
 	gpio_direction_output(0x54, 1);
-
 	gpio_set_value(KOVS100_BT_ROUTER, 0);
 
 	gpio_direction_output(KOVS100_USB_POWER_PHY, 1);
@@ -423,14 +413,12 @@ static void htckovsky_usb_enable(void)
 }
 
 static void htckovsky_phy_reset(void) {
-	printk(KERN_DEBUG "[KOVSKY]: %s\n", __func__);
 	htckovsky_usb_disable();
 	htckovsky_usb_enable();
 }
 
 static void htckovsky_usb_hw_reset(bool state)
 {
-	printk(KERN_DEBUG "[KOVSKY]: %s(%d)\n", __func__, state);
 	if (state) {
 		htckovsky_usb_disable();
 	}
