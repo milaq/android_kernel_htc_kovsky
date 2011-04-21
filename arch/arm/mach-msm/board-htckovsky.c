@@ -233,12 +233,16 @@ static int htckovsky_is_ac_online(void)
 
 static void htckovsky_set_charge(int flags)
 {
+	//TODO: detect battery overtemperature and low-power usb ports
 	if (flags) {
-		gpio_direction_output(KOVS100_CHARGER_FULL, htckovsky_charger_is_ac);
 		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
+		gpio_direction_output(KOVS100_N_CHG_INHIBIT, 1);
+		gpio_direction_output(KOVS100_CHG_HIGH, 0);
 	}
 	else {
 		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
+		gpio_direction_output(KOVS100_N_CHG_INHIBIT, 0);
+		gpio_direction_output(KOVS100_CHG_HIGH, 0);
 	}
 }
 
@@ -254,9 +258,13 @@ static int htckovsky_power_init(struct device *dev)
 	if (rc)
 		goto err_ac;
 
-	rc = gpio_request(KOVS100_CHARGER_FULL, "Charge 500mA");
+	rc = gpio_request(KOVS100_N_CHG_INHIBIT, "Charger Block");
 	if (rc)
-	      goto err_chg_full;
+	      goto err_chg_block;
+
+	rc = gpio_request(KOVS100_CHG_HIGH, "Charger High");
+	if (rc)
+		goto err_chg_high;
 
 	htckovsky_power_resources[0].start = gpio_to_irq(KOVS100_AC_DETECT);
 	htckovsky_power_resources[0].end = htckovsky_power_resources[0].start;
@@ -265,7 +273,9 @@ static int htckovsky_power_init(struct device *dev)
 
 	return 0;
 
-err_chg_full:
+err_chg_high:
+	gpio_free(KOVS100_N_CHG_INHIBIT);
+err_chg_block:
 	gpio_free(KOVS100_AC_DETECT);
 err_ac:
 	gpio_free(KOVS100_N_CHG_ENABLE);
@@ -403,6 +413,7 @@ static inline void htckovsky_usb_disable(void)
 static void htckovsky_usb_enable(void)
 {
 	gpio_direction_output(0x54, 1);
+
 	gpio_set_value(KOVS100_BT_ROUTER, 0);
 
 	gpio_direction_output(KOVS100_USB_POWER_PHY, 1);
@@ -590,7 +601,6 @@ static struct platform_device msm_camera_sensor_mt9t012vc = {
 		.platform_data = &msm_camera_sensor_mt9t012vc_data,
 	},
 };
-
 /******************************************************************************
  * GPIO Keys
  ******************************************************************************/
