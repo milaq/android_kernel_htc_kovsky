@@ -235,10 +235,10 @@ static void htckovsky_set_charge(int flags)
 {
 	if (flags) {
 		gpio_direction_output(KOVS100_CHARGER_FULL, htckovsky_charger_is_ac);
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
 	}
 	else {
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
 	}
 }
 
