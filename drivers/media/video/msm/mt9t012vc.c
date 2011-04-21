@@ -715,9 +715,7 @@ static int32_t mt9t012vc_power_down(void)
 static int mt9t012vc_sensor_init_done(const struct msm_camera_sensor_info
 				*data)
 {
-
-//	gpio_direction_output(data->sensor_reset, 0);
-//	gpio_free(data->sensor_reset);
+	kovsky_camera_set_state(0);
 	return 0;
 }
 
@@ -1067,7 +1065,7 @@ int mt9t012vc_sensor_config(void __user * argp)
 	return rc;
 }
 
-int mt9t012vc_sensor_release(void)
+static int mt9t012vc_sensor_release(void)
 {
 	int rc = -EBADF;
 
