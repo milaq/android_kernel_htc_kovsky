@@ -445,8 +445,6 @@ static struct platform_device android_usb = {
 /******************************************************************************
  * Camera
  ******************************************************************************/
-#ifdef CONFIG_MSM_CAMERA
-
 static struct msm_gpio htckovsky_camera_gpios_on[] = {
 	{.gpio_cfg = GPIO_CFG(2, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT2 "},
 	{.gpio_cfg = GPIO_CFG(3, 1, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA),.label = "DAT3 "},
@@ -508,10 +506,8 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 	.ioext.appsz = MSM_CLK_CTL_SIZE,
 };
 
-#ifdef CONFIG_MT9T012VC
 int kovsky_af_vdd(int on)
 {
-	printk("%s(%d)\n", __func__, on);
 	struct msm_dex_command dex = {
 		.cmd = on ? DEX_PMIC_REG_ON : DEX_PMIC_REG_OFF,
 		.has_data = 1,
@@ -523,9 +519,8 @@ int kovsky_af_vdd(int on)
 
 int kovsky_pull_vcm_d(int on)
 {
-	printk("%s(%d)\n", __func__, on);
-	kovsky_af_vdd(on);
 	volatile char* focus;
+	kovsky_af_vdd(on);
 	focus = ioremap(0xa9d00000, 0x1000);
 
 	if (on) {
@@ -546,28 +541,6 @@ int kovsky_pull_vcm_d(int on)
 	return 0;
 }
 
-#if 0
-torch 0x57 - bright
-0x55 - power
-
-static void ov6680_power(int on) {
-	0x17, 1
-	0x1f, 1
-	0x63, 1
-
-	0x1, 0
-	0x0, 1
-}
-
-static void set_sensor_vdd(void) {
-	0, 0
-	0x17, 1
-	0x1f, 1
-	pull vcm
-}
-
-#endif
-
 int kovsky_camera_set_state(int on)
 {
 	static bool requested = false;
@@ -584,12 +557,11 @@ int kovsky_camera_set_state(int on)
 		requested = true;
 	}
 
-	printk("%s(%d)\n", __func__, on);
 	gpio_direction_output(1, on); //sensor pwd
-	//gpio_direction_output(0, 0); //sensor reset
-	gpio_direction_output(0x17 /*23*/, on);
-	gpio_direction_output(0x1f /*31*/, on);
-	gpio_direction_output(0x63 /*99*/, !on); //MUX: 0 -> rear, 1 -> front
+	gpio_direction_output(0, 0); //sensor reset
+	gpio_direction_output(0x17, on);
+	gpio_direction_output(0x1f, on);
+	gpio_direction_output(0x63, 0); //MUX: 0 -> rear, 1 -> front
 
 	if (on) {
 		mdelay(2);
@@ -618,9 +590,6 @@ static struct platform_device msm_camera_sensor_mt9t012vc = {
 		.platform_data = &msm_camera_sensor_mt9t012vc_data,
 	},
 };
-#endif	//CONFIG_MT9T012VC
-#endif	//CONFIG_MSM_CAMERA
-
 
 /******************************************************************************
  * GPIO Keys
