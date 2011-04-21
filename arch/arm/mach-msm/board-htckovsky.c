@@ -321,14 +321,11 @@ static struct platform_device htckovsky_microp_leds = {
   .name = "htckovsky-microp-leds",
 };
 
-static struct platform_device htckovsky_optical_joystick = {
-  .id = -1,
-  .name = "htckovsky-oj",
-};
+static struct platform_device htckovsky_microp_acoustic;
 
 static struct platform_device* htckovsky_microp_clients[] = {
 	&htckovsky_microp_leds,
-//	&htckovsky_optical_joystick,
+	&htckovsky_microp_acoustic,
 };
 
 static uint16_t micropklt_compatible_versions[] = {
