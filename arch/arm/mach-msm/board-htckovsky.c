@@ -764,11 +764,47 @@ static struct platform_device htckovsky_headset = {
 /******************************************************************************
  * Acoustic
  ******************************************************************************/
+static struct i2c_client *mp_client = NULL;
+
+static struct platform_device htckovsky_microp_acoustic = {
+	.name = "htckovsky-microp-acoustic",
+	.id = -1,
+};
+
+static int htckovsky_acoustic_probe(struct platform_device *pdev)
+{
+	mp_client = dev_get_drvdata(&pdev->dev);
+	return 0;
+}
+
+static int htckovsky_acoustic_remove(struct platform_device *pdev)
+{
+	mp_client = NULL;
+	return 0;
+}
+
+
+static struct platform_driver htckovsky_acoustic_driver = {
+	.probe		= htckovsky_acoustic_probe,
+	.remove		= htckovsky_acoustic_remove,
+	.driver		= {
+		.name		= "htckovsky-microp-acoustic",
+		.owner		= THIS_MODULE,
+	},
+};
+
 static void htckovsky_set_speaker_amp(bool enable) {
+	gpio_direction_output(KOVS100_SPK_UNK_0, enable);
+	gpio_direction_output(KOVS100_SPK_UNK_1, enable);
+	gpio_direction_output(KOVS100_SPK_UNK_2, enable);
+
 	gpio_direction_output(KOVS100_SPK_AMP, enable);
 }
 
 static void htckovsky_set_headset_amp(bool enable) {
+	char buffer[] = {MICROP_HEADSET_AMP_KOVS, enable};
+	if (mp_client)
+		microp_ng_write(mp_client, buffer, ARRAY_SIZE(buffer));
 	gpio_direction_output(KOVS100_HP_AMP, enable);
 }
 
@@ -778,15 +814,44 @@ static struct htc_acoustic_wce_board_data htckovsky_acoustic_data = {
 };
 
 static int __init htckovsky_init_acoustic(void) {
-	int ret = gpio_request(KOVS100_SPK_AMP, "Speaker Amplifier");
+	struct msm_gpio acoustic_gpios[] = {
+		{
+			.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_0, 0, GPIO_CFG_OUTPUT,
+									GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+			.label = "Speaker",
+		},
+		{
+			.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_1, 0, GPIO_CFG_OUTPUT,
+									GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+			.label = "Speaker",
+		},
+		{
+			.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_2, 0, GPIO_CFG_OUTPUT,
+									GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+			.label = "Speaker",
+		},
+		{
+			.gpio_cfg = GPIO_CFG(KOVS100_SPK_AMP, 0, GPIO_CFG_OUTPUT,
+									GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+			.label = "Speaker Amp",
+		},
+		{
+			.gpio_cfg = GPIO_CFG(KOVS100_HP_AMP, 0, GPIO_CFG_OUTPUT,
+									GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+			.label = "Headphone Amp",
+		},
+	};
+
+
+	int ret = msm_gpios_request(acoustic_gpios, ARRAY_SIZE(acoustic_gpios));
 	if (ret)
 		return ret;
 
-	ret = gpio_request(KOVS100_HP_AMP, "Headset amplifier");
-	if (ret) {
-		gpio_free(KOVS100_SPK_AMP);
-		return ret;
-	}
+	//Amplifier seems to work fine even without i2c calls,
+	//so we do not care if microp client is installed or not
+	platform_driver_register(&htckovsky_acoustic_driver);
+	htckovsky_set_headset_amp(false);
+	htckovsky_set_speaker_amp(false);
 
 	return 0;
 }
@@ -823,8 +888,6 @@ static struct msm_gpio kovsky_gpios_init_off[] = {
 
 static struct msm_gpio kovsky_gpios_init_on[] = {
 	{.gpio_cfg = GPIO_CFG(KOVS100_N_CHG_ENABLE, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Charger"},
-	{.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_0, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Speaker"},
-	{.gpio_cfg = GPIO_CFG(KOVS100_SPK_UNK_1, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Speaker"},
 	{.gpio_cfg = GPIO_CFG(0x54, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "Unknown"},
 };
 
