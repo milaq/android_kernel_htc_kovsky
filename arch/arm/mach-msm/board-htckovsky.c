@@ -64,7 +64,6 @@
 #include "gpio_chip.h"
 
 static bool htckovsky_charger_is_ac = false;
-static bool htckovsky_block_ds2746 = false;
 
 /******************************************************************************
  * MicroP Keypad
@@ -236,7 +235,7 @@ static void htckovsky_set_charge(int flags)
 {
 	//TODO: detect battery overtemperature and low-power usb ports
 	if (flags) {
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, htckovsky_block_ds2746);
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
 		gpio_direction_output(KOVS100_N_CHG_INHIBIT, 1);
 		gpio_direction_output(KOVS100_CHG_HIGH, 1);
 	}
@@ -310,17 +309,11 @@ static struct platform_device htckovsky_powerdev = {
 		},
 };//End of power supply
 
-static void htckovsky_block_ds2746_charge(bool blocked) {
-	htckovsky_block_ds2746 = blocked;
-	htckovsky_set_charge(htckovsky_is_usb_online() || htckovsky_is_ac_online());
-}
-
 static struct ds2746_platform_data kovsky_battery_data = {
 	.resistance = 1500,
 	.capacity = 1660,
 	.high_voltage = 4200,
 	.low_voltage = 3600,
-	.block_charge = htckovsky_block_ds2746_charge,
 };
 
 /******************************************************************************
