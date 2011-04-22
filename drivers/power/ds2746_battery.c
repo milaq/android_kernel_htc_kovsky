@@ -35,7 +35,7 @@
  *	August 2010 - Made standalone
  *
  * 	Alexander Tarasikov <alexander.tarasikov@gmail.com>
- * 	October 2010 - made generic and implemented voltage drop
+ * 	October 2010 - made generic
 */
 
 /* References:
@@ -228,17 +228,10 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 		b->level = 50;
 		return 0;
 	}
-	if (bi->bat_pdata.block_charge)
-		bi->bat_pdata.block_charge(true);
-	msleep(700);
-	//ds2746 voltage is updated every 660ms
 
 	s = i2c_read(DS2746_VOLTAGE_LSB);
 	s |= i2c_read(DS2746_VOLTAGE_MSB) << 8;
 	b->batt_vol = ((s >> 4) * DS2746_VOLTAGE_RES) / 1000;
-
-	if (bi->bat_pdata.block_charge)
-		bi->bat_pdata.block_charge(false);
 
 	s = i2c_read(DS2746_CURRENT_LSB);
 	s |= i2c_read(DS2746_CURRENT_MSB) << 8;
