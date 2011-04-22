@@ -43,6 +43,7 @@
 	ds2782 battery driver
 	ds2784 battery driver in Android kernel tree
  */
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/param.h>
 #include <linux/jiffies.h>
@@ -79,11 +80,11 @@
 #define DEFAULT_HIGH_VOLTAGE		4200
 #define DEFAULT_LOW_VOLTAGE		3300
 
-#define DS2746_CURRENT_ACCUM_RES	645	// resolution of ACCUM-register in uVh * 100 per bit
+#define DS2746_CURRENT_ACCUM_RES	625	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
 
-#define FAST_POLL 30*1000
-#define SLOW_POLL 2*60*1000
+#define FAST_POLL (30 * 1000)
+#define SLOW_POLL (2 * 60 * 1000)
 
 struct i2c_client *pclient = 0;
 
@@ -93,7 +94,7 @@ static unsigned int current_accum_capacity = 500;
 module_param(battery_capacity, int, 0644);
 MODULE_PARM_DESC(battery_capacity, "Estimated battery capacity in mAh");
 
-#if 0
+#if 1
 #define DBG(fmt, x...) printk(KERN_DEBUG fmt, ##x)
 #else
 #define DBG(fmt, x...) do {} while (0)
@@ -227,14 +228,22 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 		b->level = 50;
 		return 0;
 	}
+	if (bi->bat_pdata.block_charge)
+		bi->bat_pdata.block_charge(true);
+	msleep(700);
+	//ds2746 voltage is updated every 660ms
 
 	s = i2c_read(DS2746_VOLTAGE_LSB);
 	s |= i2c_read(DS2746_VOLTAGE_MSB) << 8;
 	b->batt_vol = ((s >> 4) * DS2746_VOLTAGE_RES) / 1000;
 
+	if (bi->bat_pdata.block_charge)
+		bi->bat_pdata.block_charge(false);
+
 	s = i2c_read(DS2746_CURRENT_LSB);
 	s |= i2c_read(DS2746_CURRENT_MSB) << 8;
-	b->batt_current = ((s >> 2) * DS2746_CURRENT_ACCUM_RES) / (bi->bat_pdata.resistance);
+	s >>= 2;
+	b->batt_current = (s * DS2746_CURRENT_ACCUM_RES) / (bi->bat_pdata.resistance);
 
 	/* if battery voltage is < 3.3V and depleting, we assume it's almost empty! */
 	if (b->batt_vol < bi->bat_pdata.low_voltage && b->batt_current < 0) {
@@ -315,7 +324,6 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 static void ds2746_battery_work(struct work_struct *work)
 {
 	unsigned long next_update;
-	bool old_status = bi->charging_enabled;
 	ds2746_battery_read_status(bi);
 
 	bi->charging_enabled = false;
@@ -358,7 +366,7 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	pclient = client;
 
 	if (client->dev.platform_data)
-		pdata = *(struct ds2746_platform_data*)(client->dev.platform_data);
+		pdata = *(struct ds2746_platform_data*)client->dev.platform_data;
 
 	current_accum_capacity = pdata.capacity * pdata.resistance;
 	current_accum_capacity /= DS2746_CURRENT_ACCUM_RES;
