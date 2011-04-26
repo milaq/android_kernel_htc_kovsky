@@ -157,6 +157,22 @@ static struct mmc_platform_data htckovsky_sdslot_data = {
  ******************************************************************************/
 static struct vreg *vreg_wifi = NULL;
 
+static void fake_wifi_enable(bool enable) {
+}
+
+static struct wl12xx_platform_data wl1251_pdata = {
+	.irq = MSM_GPIO_TO_INT(29),
+	.set_power = fake_wifi_enable,
+};
+
+static struct platform_device wl1251_device = {
+	.id = -1,
+	.name = "wl1251_data",
+	.dev = {
+		.platform_data = &wl1251_pdata,
+	}
+};
+
 static struct sdio_embedded_func wifi_func = {
 	.f_class = SDIO_CLASS_WLAN,
 	.f_maxblksize = 512,
@@ -167,7 +183,7 @@ static struct embedded_sdio_data ti_wifi_emb_data = {
 		.vendor = 0x104c,
 		.device = 0x9066,
 		.blksize = 512,
-		.max_dtr = 19200000,
+		.max_dtr = 11000000,
 		},
 	.cccr = {
 		 .multi_block = 0,
@@ -284,6 +300,7 @@ static int htckovsky_mmc_probe(struct platform_device *pdev)
 
 	//set irq flags here because wl1251_sdio won't be able to use set_irq_flags
 	set_irq_flags(MSM_GPIO_TO_INT(KOVS100_WIFI_IRQ), IRQF_VALID | IRQF_NOAUTOEN);
+	platform_device_register(&wl1251_device);
 	return 0;
 
  fail_sdcc1:
