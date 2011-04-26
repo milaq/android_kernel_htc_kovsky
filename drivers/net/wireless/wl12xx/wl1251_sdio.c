@@ -73,6 +73,8 @@ static void wl1251_sdio_read(struct wl1251 *wl, int addr,
 	int ret;
 	struct sdio_func *func = wl_to_func(wl);
 
+	printk("%s: addr=%08x, buf=%08x, len=%08x, func=%08x\n",
+	__func__, addr, buf, len, func);
 	sdio_claim_host(func);
 	ret = sdio_memcpy_fromio(func, buf, addr, len);
 	if (ret)
@@ -86,6 +88,8 @@ static void wl1251_sdio_write(struct wl1251 *wl, int addr,
 	int ret;
 	struct sdio_func *func = wl_to_func(wl);
 
+	printk("%s: addr=%08x, buf=%08x, len=%08x, func=%08x\n",
+	__func__, addr, buf, len, func);
 	sdio_claim_host(func);
 	ret = sdio_memcpy_toio(func, addr, buf, len);
 	if (ret)
@@ -105,6 +109,8 @@ static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 	 * the unused bits of CMD52 as write data even if we send read
 	 * request).
 	 */
+	printk("%s: addr=%08x, val=%08x, wl_sdio=%08x, func=%08x fnum=%08x\n",
+	__func__, addr, *val, wl_sdio, func, func->num);
 	sdio_claim_host(func);
 	*val = sdio_writeb_readb(func, wl_sdio->elp_val, addr, &ret);
 	sdio_release_host(func);
@@ -115,12 +121,20 @@ static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 
 static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
 {
-	int ret = 0;
+	int ret = 0, i;
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 	struct sdio_func *func = wl_sdio->func;
 
+	printk("%s: addr=%08x, val=%08x, wl_sdio=%08x, func=%08x\n",
+	__func__, addr, val, wl_sdio, func);
 	sdio_claim_host(func);
-	sdio_writeb(func, val, addr, &ret);
+	for (i = 0; i < 1; i++) {
+		sdio_writeb(func, (val >> (8 * i)) & 0xff, addr + i, &ret);
+		if (ret < 0) {
+			wl1251_error("sdio_writeb failed (%d)", ret);
+			break;
+		}
+	}
 	sdio_release_host(func);
 
 	if (ret)
@@ -136,7 +150,6 @@ static void wl1251_sdio_reset(struct wl1251 *wl)
 static void wl1251_sdio_enable_irq(struct wl1251 *wl)
 {
 	struct sdio_func *func = wl_to_func(wl);
-
 	sdio_claim_host(func);
 	sdio_claim_irq(func, wl1251_sdio_interrupt);
 	sdio_release_host(func);
@@ -145,7 +158,6 @@ static void wl1251_sdio_enable_irq(struct wl1251 *wl)
 static void wl1251_sdio_disable_irq(struct wl1251 *wl)
 {
 	struct sdio_func *func = wl_to_func(wl);
-
 	sdio_claim_host(func);
 	sdio_release_irq(func);
 	sdio_release_host(func);
@@ -254,7 +266,7 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 			goto disable;
 		}
 
-		set_irq_type(wl->irq, IRQ_TYPE_EDGE_FALLING);
+		set_irq_type(wl->irq, IRQ_TYPE_EDGE_BOTH);
 		//disable_irq(wl->irq);
 
 		wl1251_sdio_ops.enable_irq = wl1251_enable_line_irq;
