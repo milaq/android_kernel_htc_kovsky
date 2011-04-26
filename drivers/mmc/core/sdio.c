@@ -320,7 +320,7 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 	 * Select card, as all following commands rely on that.
 	 */
 	if (!powered_resume && !mmc_host_is_spi(host)) {
-		err = mmc_select_card(card);
+		//err = mmc_select_card(card);
 		if (err)
 			goto remove;
 	}
@@ -444,7 +444,7 @@ static void mmc_sdio_detect(struct mmc_host *host)
 	/*
 	 * Just check if our card has been removed.
 	 */
-	err = mmc_select_card(host->card);
+	//err = mmc_select_card(host->card);
 
 	mmc_release_host(host);
 
@@ -711,7 +711,7 @@ int sdio_reset_comm(struct mmc_card *card)
 		mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL);
 	}
 	if (!mmc_host_is_spi(host)) {
-		err = mmc_select_card(card);
+		//err = mmc_select_card(card);
 		if (err)
 			goto err;
 	}
