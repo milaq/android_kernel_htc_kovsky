@@ -54,6 +54,7 @@
 #include <mach/board_htc.h>
 #include <mach/msm_fb.h>
 #include <mach/msm_hsusb.h>
+#include <mach/msm7200a_rfkill.h>
 #include <mach/msm_serial_hs.h>
 #include <mach/vreg.h>
 
@@ -683,9 +684,72 @@ static struct platform_device amss_device = {
 /******************************************************************************
  * Bluetooth
  ******************************************************************************/
-struct platform_device htckovsky_rfkill = {
-	.name = "htckovsky_rfkill",
+static struct vreg *vreg_bt;
+
+static int htckovsky_bt_power(void *data, bool blocked)
+{
+	if (!blocked) {
+			vreg_enable(vreg_bt);
+			gpio_direction_output(KOVS100_BT_ROUTER, 1);
+			gpio_direction_output(KOVS100_BT_POWER, 0);
+			mdelay(20);
+			gpio_direction_output(KOVS100_BT_POWER, 1);
+			mdelay(20);
+	} else {
+			gpio_direction_output(KOVS100_BT_POWER, 0);
+			vreg_disable(vreg_bt);
+			gpio_set_value(KOVS100_BT_ROUTER, 0);
+			mdelay(20);
+	}
+	return 0;
+}
+
+static int htckovsky_bt_init(struct platform_device *pdev) {
+	int rc;
+
+	vreg_bt = vreg_get_by_id(0, 5);
+	if (IS_ERR(vreg_bt)) {
+		rc = PTR_ERR(vreg_bt);
+		goto fail_vreg_bt;
+	}
+	rc = gpio_request(KOVS100_BT_POWER, "BT Power");
+	if (rc)
+		goto fail_power_gpio;
+
+	rc = gpio_request(KOVS100_BT_ROUTER, "BT Router");
+	if (rc)
+		goto fail_router_gpio;
+
+	return 0;
+
+fail_router_gpio:
+	gpio_free(KOVS100_BT_POWER);
+fail_power_gpio:
+	vreg_put(vreg_bt);
+fail_vreg_bt:
+	return rc;
+}
+
+static void htckovsky_bt_exit(struct platform_device *pdev) {
+	gpio_free(KOVS100_BT_ROUTER);
+	gpio_free(KOVS100_BT_POWER);
+	vreg_put(vreg_bt);
+}
+
+static struct msm7200a_rfkill_pdata htckovsky_rfkill_data = {
+	.init = htckovsky_bt_init,
+	.exit = htckovsky_bt_exit,
+	.set_power = htckovsky_bt_power,
+	.uart_number = 2,
+	.rfkill_name = "brf6300",
+};
+
+static struct platform_device htckovsky_rfkill = {
+	.name = "msm7200a_rfkill",
 	.id = -1,
+	.dev = {
+		.platform_data = &htckovsky_rfkill_data,
+	},
 };
 
 static struct msm_serial_hs_platform_data msm_uart_dm2_pdata = {
