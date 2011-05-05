@@ -67,6 +67,75 @@
 static bool htckovsky_charger_is_ac = false;
 
 /******************************************************************************
+ * MicroP Keypad LEDs
+ ******************************************************************************/
+static struct i2c_client *kp_client = NULL;
+
+static void htckovsky_set_keyled(struct led_classdev *, enum led_brightness);
+static void htckovsky_update_keyled(struct work_struct* work);
+static DECLARE_WORK(htckovsky_keyled_wq, htckovsky_update_keyled);
+
+static struct led_classdev htckovsky_qwerty_led = {
+	 .name = "keyboard-backlight",
+	 .brightness_set = htckovsky_set_keyled,
+};
+
+static void htckovsky_update_keyled(struct work_struct* work) {
+	uint8_t buffer[10] = {};
+	uint8_t brightness = htckovsky_qwerty_led.brightness;
+	buffer[0] = MICROP_KPD_LED_BRIGHTNESS_KOVS;
+	buffer[1] = brightness;
+	buffer[2] = brightness ? 0x40 : 0xff;
+	buffer[3] = brightness;
+	microp_ng_write(kp_client, buffer, 10);
+
+	buffer[0] = MICROP_KPD_LED_ENABLE_KOVS;
+	buffer[1] = 0;
+	buffer[2] = !!brightness;
+	microp_ng_write(kp_client, buffer, 3);
+}
+
+static void htckovsky_set_keyled(struct led_classdev *led_cdev,
+	enum led_brightness brightness) {
+	schedule_work(&htckovsky_keyled_wq);
+}
+
+static int htckovsky_keyled_probe(struct platform_device *pdev)
+{
+	kp_client = dev_get_drvdata(&pdev->dev);
+	led_classdev_register(&pdev->dev, &htckovsky_qwerty_led);
+	return 0;
+}
+
+static int htckovsky_keyled_remove(struct platform_device *pdev)
+{
+	cancel_work_sync(&htckovsky_keyled_wq);
+	led_classdev_unregister(&htckovsky_qwerty_led);
+	kp_client = NULL;
+	return 0;
+}
+
+#if CONFIG_PM
+static int htckovsky_keyled_suspend(struct platform_device *pdev, pm_message_t mesg)
+{
+	cancel_work_sync(&htckovsky_keyled_wq);
+	return 0;
+}
+#else
+#define htckovsky_keyled_suspend NULL
+#endif
+
+static struct platform_driver htckovsky_keyled_driver = {
+	.probe		= htckovsky_keyled_probe,
+	.remove		= htckovsky_keyled_remove,
+	.suspend	= htckovsky_keyled_suspend,
+	.driver		= {
+		.name		= "htckovsky-microp-keyled",
+		.owner		= THIS_MODULE,
+	},
+};
+
+/******************************************************************************
  * MicroP Keypad
  ******************************************************************************/
 static int htckovsky_microp_keymap[] = {
@@ -184,8 +253,14 @@ static struct platform_device htckovsky_keypad = {
 	},
 };
 
+static struct platform_device htckovsky_keyled = {
+	.name = "htckovsky-microp-keyled",
+	.id = -1,
+};
+
 static struct platform_device* htckovsky_microp_keypad_clients[] = {
 	&htckovsky_keypad,
+	&htckovsky_keyled,
 };
 
 static uint16_t micropksc_compatible_versions[] = {
@@ -969,8 +1044,6 @@ static struct msm_acpu_clock_platform_data htckovsky_clock_data = {
 
 static void __init htckovsky_init(void)
 {
-	int i;
-
 	msm_acpu_clock_init(&htckovsky_clock_data);
 	msm_dex_comm_init();
 	msm_add_mem_devices(&htckovsky_pmem_settings);
@@ -989,6 +1062,7 @@ static void __init htckovsky_init(void)
 
 	// Register devices
 	platform_add_devices(devices, ARRAY_SIZE(devices));
+	platform_driver_register(&htckovsky_keyled_driver);
 
 	// Register I2C devices
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
