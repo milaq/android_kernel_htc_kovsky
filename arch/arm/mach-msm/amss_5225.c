@@ -21,6 +21,15 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_smd.h>
 
+struct amss_value amss_5225_para[] = {
+	{AMSS_AUDMGR_PROG, AMSS_VAL_UINT, {.value = 0x30000013}},
+	{AMSS_AUDMGR_VERS, AMSS_VAL_UINT, { .value = 0x0}},
+	{AMSS_AUDMGR_CB_PROG, AMSS_VAL_UINT, {.value = 0x31000013}},
+	{AMSS_AUDMGR_CB_VERS, AMSS_VAL_UINT, { .value = 0x5fa922a9}},
+	{AMSS_TIME_REMOTE_MTOA_VERS, AMSS_VAL_UINT, {.value = 0}},
+	{AMSS_TIME_TOD_SET_APPS_BASES, AMSS_VAL_UINT, {.value = 1}},
+};
+
 static struct platform_device adsp_device = {
 	.name = "msm_adsp_5225",
 	.id = -1,
@@ -116,12 +125,12 @@ static struct htc_acoustic_wce_amss_data amss_5225_acoustic_data = {
 	.adie_table = (MSM_SHARED_RAM_BASE+0xfd000),
 	.codec_table = (MSM_SHARED_RAM_BASE+0xfdc00),
 	.mic_offset = (MSM_SHARED_RAM_BASE+0xfed00),
-	.voc_cal_field_size = 8,
+	.voc_cal_field_size = 0xa,
 	.mic_bias_callback = amss_5225_mic_bias_callback,
 };
 
 static struct platform_device acoustic_device = {
-	.name = "htc_acoustic_wince",
+	.name = "htc_acoustic",
 	.id = -1,
 	.dev = {
 		.platform_data = &amss_5225_acoustic_data,
