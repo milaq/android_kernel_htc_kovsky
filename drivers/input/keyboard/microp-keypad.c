@@ -23,6 +23,7 @@
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/leds.h>
 
 #include <linux/mfd/microp-ng.h>
 #include <linux/microp-keypad.h>
@@ -32,9 +33,9 @@
 #define MICROP_DEBUG 1
 
 #if defined(MICROP_DEBUG) && MICROP_DEBUG
- #define DLOG(fmt, arg...) printk(fmt, ## arg);
+	#define DLOG(fmt, arg...) printk(fmt, ## arg);
 #else
- #define DLOG(fmt, arg...) do {} while(0)
+	#define DLOG(fmt, arg...) do {} while(0)
 #endif
 
 static struct microp_keypad_t {
@@ -42,6 +43,7 @@ static struct microp_keypad_t {
 	struct i2c_client *client;
 	struct input_dev *input;
 	struct microp_keypad_platform_data *pdata;
+	struct led_trigger *bl_trigger;
 	struct work_struct keypad_work;
 	struct work_struct clamshell_work;
 	struct platform_device *pdev;
@@ -61,9 +63,10 @@ static irqreturn_t microp_clamshell_interrupt(int irq, void *handle)
 
 static void microp_keypad_work(struct work_struct *work)
 {
-	uint8_t buffer[3] = "\0\0\0";
+	static bool last_slider_open = true;
+	uint8_t buffer[3] = {};
 	uint8_t key = 0;
-	uint8_t slider_open = 1;
+	bool slider_open = true;
 	bool isdown;
 	static uint8_t last_key = 0;
 	mutex_lock(&microp_keypad.lock);
@@ -90,6 +93,11 @@ static void microp_keypad_work(struct work_struct *work)
 			}
 	} while (key);
 	input_sync(microp_keypad.input);
+	if (last_slider_open != slider_open) {
+		led_trigger_event(microp_keypad.bl_trigger,
+			slider_open ? LED_OFF : LED_FULL);
+		last_slider_open = slider_open;
+	}
 	mutex_unlock(&microp_keypad.lock);
 }
 
@@ -204,10 +212,17 @@ static int microp_keypad_probe(struct platform_device *pdev)
 		}
 	}
 
+	led_trigger_register_simple("microp-keypad", &microp_keypad.bl_trigger);
+	if (!microp_keypad.bl_trigger)
+		goto fail_ledtrig;
+
 	device_init_wakeup(&pdev->dev, 1);
 
 	return 0;
 
+fail_ledtrig:
+	if (pdata->gpio_clamshell >= 0)
+		free_irq(pdata->irq_clamshell, pdev);
 fail_clamshell:
 	free_irq(microp_keypad.pdata->irq_keypress, pdev);
 fail_irq:
@@ -227,6 +242,7 @@ static int microp_keypad_remove(struct platform_device *pdev)
 	free_irq(microp_keypad.pdata->irq_keypress, pdev);
 	input_unregister_device(microp_keypad.input);
 	input_free_device(microp_keypad.input);
+	led_trigger_unregister_simple(microp_keypad.bl_trigger);
 
 	if (microp_keypad.pdata->exit)
 		microp_keypad.pdata->exit(&pdev->dev);
@@ -238,9 +254,11 @@ static int microp_keypad_remove(struct platform_device *pdev)
 #if CONFIG_PM
 static int microp_keypad_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
+	printk("+%s\n", __func__);
 	if (microp_keypad.pdata->gpio_clamshell > 0)
 		cancel_work_sync(&microp_keypad.clamshell_work);
 	cancel_work_sync(&microp_keypad.keypad_work);
+	printk("-%s\n", __func__);
 	return 0;
 }
 
