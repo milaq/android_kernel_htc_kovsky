@@ -23,7 +23,7 @@ static struct amss_value amss_6220_para[] = {
 #define	ADSP_RTOS_MTOA_PROC_6220	0x2
 #define ADSP_RTOS_SND_PROG_6220		0x30000002
 #define ADSP_RTOS_SND_VERS_6220		0xaa2b1a44
-#define ADSP_RTOS_SND_DEV_PROC_6220		1
-#define ADSP_RTOS_SND_VOL_PROC_6220		2
+#define ADSP_RTOS_SND_DEV_PROC_6220		2
+#define ADSP_RTOS_SND_VOL_PROC_6220		3
 
 #endif
