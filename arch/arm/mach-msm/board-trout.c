@@ -529,11 +529,6 @@ static struct platform_device trout_pwr_sink = {
 	},
 };
 
-static struct platform_device trout_rfkill = {
-	.name = "trout_rfkill",
-	.id = -1,
-};
-
 static struct msm_pmem_setting pmem_setting = {
 	.pmem_start = MSM_PMEM_MDP_BASE,
 	.pmem_size = MSM_PMEM_MDP_SIZE,
@@ -564,6 +559,33 @@ static struct platform_device trout_wifi = {
 static struct platform_device trout_amss_device = {
 	.name = "amss_android",
 	.id = -1,
+};
+
+static int trout_bt_power(void *data, bool blocked)
+{
+	if (!blocked) {
+		gpio_set_value(TROUT_GPIO_BT_32K_EN, 1);
+		udelay(10);
+		gpio_direction_output(101, 1);
+	} else {
+		gpio_direction_output(101, 0);
+		gpio_set_value(TROUT_GPIO_BT_32K_EN, 0);
+	}
+	return 0;
+}
+
+static struct msm7200a_rfkill_pdata trout_rfkill_data = {
+	.set_power = trout_bt_power,
+	.uart_number = 1,
+	.rfkill_name = "brf6300",
+};
+
+static struct platform_device trout_rfkill = {
+	.name = "msm7200a_rfkill",
+	.id = -1,
+	.dev = {
+		.platform_data = &trout_rfkill_data,
+	},
 };
 
 static struct platform_device *devices[] __initdata = {
@@ -616,22 +638,6 @@ static void trout_reset(void)
 {
 	gpio_set_value(TROUT_GPIO_PS_HOLD, 0);
 }
-
-static uint32_t gpio_table[] = {
-	/* BLUETOOTH */
-#ifdef CONFIG_SERIAL_MSM_HS
-	PCOM_GPIO_CFG(43, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* RTS */
-	PCOM_GPIO_CFG(44, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* CTS */
-	PCOM_GPIO_CFG(45, 2, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* RX */
-	PCOM_GPIO_CFG(46, 3, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* TX */
-#else
-	PCOM_GPIO_CFG(43, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* RTS */
-	PCOM_GPIO_CFG(44, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* CTS */
-	PCOM_GPIO_CFG(45, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* RX */
-	PCOM_GPIO_CFG(46, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_4MA), /* TX */
-#endif
-};
-
 
 static uint32_t camera_off_gpio_table[] = {
 	/* CAMERA */
@@ -693,7 +699,6 @@ static void config_camera_off_gpios(void)
 
 static void __init config_gpios(void)
 {
-	config_gpio_table(gpio_table, ARRAY_SIZE(gpio_table));
 	config_camera_off_gpios();
 }
 

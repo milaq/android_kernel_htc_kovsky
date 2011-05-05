@@ -734,9 +734,34 @@ static struct platform_device sapphire_pwr_sink = {
 	},
 };
 
+extern int sapphire_bt_fastclock_power(int on);
+static int sapphire_bt_power(void *data, bool blocked)
+{
+	if (!blocked) {
+		sapphire_bt_fastclock_power(1);
+		gpio_set_value(SAPPHIRE_GPIO_BT_32K_EN, 1);
+		udelay(10);
+		gpio_direction_output(101, 1);
+	} else {
+		gpio_direction_output(101, 0);
+		gpio_set_value(SAPPHIRE_GPIO_BT_32K_EN, 0);
+		sapphire_bt_fastclock_power(0);
+	}
+	return 0;
+}
+
+static struct msm7200a_rfkill_pdata sapphire_rfkill_data = {
+	.set_power = sapphire_bt_power,
+	.uart_number = 1,
+	.rfkill_name = "brf6300",
+};
+
 static struct platform_device sapphire_rfkill = {
-	.name = "sapphire_rfkill",
+	.name = "msm7200a_rfkill",
 	.id = -1,
+	.dev = {
+		.platform_data = &sapphire_rfkill_data,
+	},
 };
 
 static struct msm_pmem_setting pmem_setting_32 = {
