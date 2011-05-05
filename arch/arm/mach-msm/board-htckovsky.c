@@ -996,13 +996,7 @@ static void __init htckovsky_init(void)
 	//trigger usb detection
 	htckovsky_is_usb_online();
 
-	/* A little vibrating welcome */
-	for (i = 0; i < 2; i++) {
-		dex_vibrate(1);
-		mdelay(150);
-		dex_vibrate(0);
-		mdelay(75);
-	}
+	msm_init_dex_vibrator();
 }
 
 static void __init htckovsky_map_io(void)
