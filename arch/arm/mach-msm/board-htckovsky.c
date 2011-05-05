@@ -78,6 +78,7 @@ static DECLARE_WORK(htckovsky_keyled_wq, htckovsky_update_keyled);
 static struct led_classdev htckovsky_qwerty_led = {
 	 .name = "keyboard-backlight",
 	 .brightness_set = htckovsky_set_keyled,
+	 .default_trigger = "microp-keypad",
 };
 
 static void htckovsky_update_keyled(struct work_struct* work) {
