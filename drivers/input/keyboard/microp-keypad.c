@@ -47,6 +47,7 @@ static struct microp_keypad_t {
 	struct work_struct keypad_work;
 	struct work_struct clamshell_work;
 	struct platform_device *pdev;
+	bool last_clamshell_state;
 } microp_keypad;
 
 static irqreturn_t microp_keypad_interrupt(int irq, void *handle)
@@ -63,10 +64,9 @@ static irqreturn_t microp_clamshell_interrupt(int irq, void *handle)
 
 static void microp_keypad_work(struct work_struct *work)
 {
-	static bool last_slider_open = true;
 	uint8_t buffer[3] = {};
 	uint8_t key = 0;
-	bool slider_open = true;
+	bool slider_open = false;
 	bool isdown;
 	static uint8_t last_key = 0;
 	mutex_lock(&microp_keypad.lock);
@@ -81,8 +81,8 @@ static void microp_keypad_work(struct work_struct *work)
 		if (microp_keypad.pdata->read_modifiers) {
 			microp_ng_read(microp_keypad.client,
 						MICROP_KSC_ID_MODIFIER, buffer, 2);
-			slider_open = (buffer[1] & MICROP_KSC_CLAMSHELL_MASK);
-			input_report_switch(microp_keypad.input, SW_LID, slider_open);
+			slider_open = !(buffer[1] & MICROP_KSC_CLAMSHELL_MASK);
+			input_report_switch(microp_keypad.input, SW_LID, !slider_open);
 		}
 
 		input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
@@ -93,10 +93,10 @@ static void microp_keypad_work(struct work_struct *work)
 			}
 	} while (key);
 	input_sync(microp_keypad.input);
-	if (last_slider_open != slider_open) {
+	if (microp_keypad.last_clamshell_state != slider_open) {
 		led_trigger_event(microp_keypad.bl_trigger,
-			slider_open ? LED_OFF : LED_FULL);
-		last_slider_open = slider_open;
+			slider_open ? LED_FULL : LED_OFF);
+		microp_keypad.last_clamshell_state = slider_open;
 	}
 	mutex_unlock(&microp_keypad.lock);
 }
@@ -106,9 +106,14 @@ static void microp_clamshell_work(struct work_struct *work)
 	int open = 1;
 
 	mutex_lock(&microp_keypad.lock);
-		open = gpio_get_value(microp_keypad.pdata->gpio_clamshell);
-		input_report_switch(microp_keypad.input, SW_LID, !open);
+		open = !gpio_get_value(microp_keypad.pdata->gpio_clamshell);
+		input_report_switch(microp_keypad.input, SW_LID, open);
 		input_sync(microp_keypad.input);
+		if (microp_keypad.last_clamshell_state != open) {
+		led_trigger_event(microp_keypad.bl_trigger,
+			open ? LED_FULL : LED_OFF);
+		microp_keypad.last_clamshell_state = open;
+		}
 	mutex_unlock(&microp_keypad.lock);
 }
 
@@ -258,12 +263,15 @@ static int microp_keypad_suspend(struct platform_device *pdev, pm_message_t mesg
 	if (microp_keypad.pdata->gpio_clamshell > 0)
 		cancel_work_sync(&microp_keypad.clamshell_work);
 	cancel_work_sync(&microp_keypad.keypad_work);
+	led_trigger_event(microp_keypad.bl_trigger, LED_OFF);
 	printk("-%s\n", __func__);
 	return 0;
 }
 
 static int microp_keypad_resume(struct platform_device *pdev)
 {
+	led_trigger_event(microp_keypad.bl_trigger,
+					microp_keypad.last_clamshell_state ? LED_FULL : LED_OFF);
 	return 0;
 }
 #else
