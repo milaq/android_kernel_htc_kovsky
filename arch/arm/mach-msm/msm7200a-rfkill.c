@@ -84,6 +84,36 @@ static struct msm_gpio msm_hsuart_1_off_table[] = {
 		.label = "BT TXD"},
 };
 
+static struct msm_gpio msm_pcm_on_table[] = {
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_DOUT,	1,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_DOUT"},
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_DIN,	1,
+			GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_DIN"},
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_SYNC,	2,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_SYNC"},
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_CLK,	2,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_CLK"},
+};
+
+static struct msm_gpio msm_pcm_off_table[] = {
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_DOUT,	1,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_DOUT"},
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_DIN,	1,
+			GPIO_CFG_INPUT,  GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_DIN"},
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_SYNC,	2,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_SYNC"},
+	{	.gpio_cfg = GPIO_CFG(MSM7200A_PCM_CLK,	2,
+			GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),
+		.label = "PCM_CLK"},
+};
+
 static void msm_hs_uart_configure(unsigned id, bool enable) {
 	switch (id) {
 		case 0:
@@ -91,7 +121,7 @@ static void msm_hs_uart_configure(unsigned id, bool enable) {
 
 		case 1:
 			if (enable) {
-				msm_gpios_disable(msm_hsuart_1_on_table,
+				msm_gpios_enable(msm_hsuart_1_on_table,
 					ARRAY_SIZE(msm_hsuart_1_on_table));
 			}
 			else {
@@ -102,7 +132,7 @@ static void msm_hs_uart_configure(unsigned id, bool enable) {
 
 		case 2:
 			if (enable) {
-				msm_gpios_disable(msm_hsuart_2_on_table,
+				msm_gpios_enable(msm_hsuart_2_on_table,
 					ARRAY_SIZE(msm_hsuart_2_on_table));
 			}
 			else {
@@ -113,13 +143,28 @@ static void msm_hs_uart_configure(unsigned id, bool enable) {
 	}
 }
 
+static void msm_pcm_configure(bool enable) {
+	if (enable) {
+		msm_gpios_enable(msm_pcm_on_table,
+			ARRAY_SIZE(msm_pcm_on_table));
+	}
+	else {
+		msm_gpios_enable(msm_pcm_off_table,
+			ARRAY_SIZE(msm_pcm_off_table));
+	}
+}
+
 static int bluetooth_set_power(void *data, bool blocked)
 {
 	if (!blocked) {
 		msm_hs_uart_configure(rfk_pdata->uart_number, true);
 		if (rfk_pdata->set_power)
 			rfk_pdata->set_power(data, blocked);
+		if (rfk_pdata->configure_bt_pcm)
+			msm_pcm_configure(true);
 	} else {
+		if (rfk_pdata->configure_bt_pcm)
+			msm_pcm_configure(false);
 		if (rfk_pdata->set_power)
 			rfk_pdata->set_power(data, blocked);
 		msm_hs_uart_configure(rfk_pdata->uart_number, false);
@@ -172,6 +217,13 @@ static int msm_rfkill_probe(struct platform_device *pdev)
 	if (rc)
 		goto fail_gpios;
 
+	if (pdata->configure_bt_pcm) {
+		rc = msm_gpios_request(msm_pcm_off_table,
+			ARRAY_SIZE(msm_pcm_off_table));
+		if (rc)
+			goto fail_pcm_gpios;
+	}
+
 	bt_rfk = rfkill_alloc(pdata->rfkill_name ? pdata->rfkill_name : "msm_bt",
 		&pdev->dev, RFKILL_TYPE_BLUETOOTH,
 		&msm_rfkill_ops, NULL);
@@ -191,6 +243,10 @@ static int msm_rfkill_probe(struct platform_device *pdev)
 fail_rfk_reg:
 	rfkill_destroy(bt_rfk);
 fail_rfk_alloc:
+	if (rfk_pdata->configure_bt_pcm)
+		msm_gpios_disable_free(msm_pcm_off_table,
+			ARRAY_SIZE(msm_pcm_off_table));
+fail_pcm_gpios:
 	switch (rfk_pdata->uart_number) {
 		case 0:
 		break;
@@ -218,6 +274,10 @@ static int msm_rfkill_remove(struct platform_device *pdev)
 	rfkill_destroy(bt_rfk);
 	if (rfk_pdata->exit)
 		rfk_pdata->exit(pdev);
+
+	if (rfk_pdata->configure_bt_pcm)
+		msm_gpios_disable_free(msm_pcm_off_table,
+			ARRAY_SIZE(msm_pcm_off_table));
 
 	switch (rfk_pdata->uart_number) {
 		case 0:

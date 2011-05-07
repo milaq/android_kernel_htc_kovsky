@@ -1,4 +1,4 @@
-/* include/asm/mach-msm/msm7200a_simple_rfkill.h
+/* include/asm/mach-msm/msm7200a_rfkill.h
  *
  * Copyright (C) 2011 Alexander Tarasikov <alexander.tarasikov@gmail.com>
  *
@@ -25,12 +25,18 @@
 #define MSM7200A_UART2DM_RX		21
 #define MSM7200A_UART2DM_TX		108
 
+#define MSM7200A_PCM_DOUT		68
+#define MSM7200A_PCM_DIN		69
+#define MSM7200A_PCM_SYNC		70
+#define MSM7200A_PCM_CLK		71
+
 struct msm7200a_rfkill_pdata {
 	unsigned uart_number;
 	const char* rfkill_name;
 	int (*set_power)(void* data, bool blocked);
 	int (*init)(struct platform_device *pdev);
 	void (*exit)(struct platform_device *pdev);
+	bool configure_bt_pcm;
 };
 
 #endif //__ARCH_ARM_MACH_MSM_MSM720XA_RFKILL_H__
