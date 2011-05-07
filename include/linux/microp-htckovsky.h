@@ -1,24 +1,6 @@
 #ifndef _MICROP_HTCKOVSKY_H
 #define _MICROP_HTCKOVSKY_H
 
-enum kovsky_color_led {
-	UPPER_RIGHT = 1,
-	UPPER_LEFT = 2,
-	LOWER_RIGHT = 4,
-	LOWER_LEFT = 8,
-	ALL_LEDS = UPPER_LEFT | UPPER_RIGHT | LOWER_LEFT | LOWER_RIGHT,
-};
-
-enum kovsky_pattern_cmd {
-	DISABLE = 0,
-	ENABLE = 1,
-	SET_PATTERN = 2,
-};
-
-typedef unsigned char kovsky_pattern_t[0x46];
-
-#define PATTERN_MAXSTEPCOUNT			8
-
 #define	MICROP_OJ_POWER_KOVS			0x03
 #define MICROP_VERSION_REG_KOVS			0x07
 #define MICROP_PATTERN_COMMAND_KOVS		0x11
