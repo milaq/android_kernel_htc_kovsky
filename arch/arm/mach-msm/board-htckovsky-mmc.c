@@ -105,7 +105,7 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 {
 	int rc, i;
 	if (vdd) {
-		msm_gpios_disable(sdc3_on_gpio_table,
+		msm_gpios_enable(sdc3_on_gpio_table,
 				 ARRAY_SIZE(sdc3_on_gpio_table));
 		rc = vreg_enable(vreg_sdslot);
 		if (rc)
