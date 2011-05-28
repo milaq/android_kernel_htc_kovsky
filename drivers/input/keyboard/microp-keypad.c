@@ -68,7 +68,6 @@ static void microp_keypad_work(struct work_struct *work)
 	uint8_t key = 0;
 	bool slider_open = false;
 	bool isdown;
-	static uint8_t last_key = 0;
 	mutex_lock(&microp_keypad.lock);
 
 	do {
@@ -86,9 +85,9 @@ static void microp_keypad_work(struct work_struct *work)
 		}
 
 		input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
-			if (key < microp_keypad.pdata->keypad_scancodes_size) {
+			if (key && key < microp_keypad.pdata->keypad_scancodes_size) {
 				input_report_key(microp_keypad.input,
-						last_key = microp_keypad.pdata->keypad_scancodes[key],
+						microp_keypad.pdata->keypad_scancodes[key],
 						isdown);
 			}
 	} while (key);
