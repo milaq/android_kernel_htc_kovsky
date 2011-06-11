@@ -772,6 +772,7 @@ static struct platform_device htckovsky_sdcc = {
 static struct msm7200a_wl1251_pdata htckovsky_wifi_pdata = {
 	.slot_number = 1,
 	.vreg_id = 5,
+	.gpio_irq = 29,
 	.gpio_enable = KOVS100_WIFI_PWR,
 	.gpio_reset = -1,
 	.gpio_32k_osc = -1,
