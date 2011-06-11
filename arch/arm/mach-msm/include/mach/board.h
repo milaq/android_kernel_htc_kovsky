@@ -95,6 +95,7 @@ void __init msm_clock_init(struct clk *clock_tbl, unsigned num_clocks);
 void __init msm_acpu_clock_init(struct msm_acpu_clock_platform_data *);
 int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
 			unsigned int stat_irq, unsigned long stat_irq_flags);
+void msm_delete_sdcc(unsigned int controller);
 
 #ifdef CONFIG_ANDROID_PMEM
 void __init msm_add_mem_devices(struct msm_pmem_setting *setting);
