@@ -55,6 +55,7 @@
 #include <mach/msm_fb.h>
 #include <mach/msm_hsusb.h>
 #include <mach/msm7200a_rfkill.h>
+#include <mach/msm7200a_mmc.h>
 #include <mach/msm_serial_hs.h>
 #include <mach/vreg.h>
 
@@ -724,11 +725,36 @@ static struct msm_ts_platform_data htckovsky_ts_pdata = {
 };
 
 /******************************************************************************
- * SD Card slot
+ * SD Card and WiFi chip
  ******************************************************************************/
+static struct msm7200a_mmc_pdata htckovsky_mmc_pdata = {
+	.slot_number = 3,
+	.vreg_id = 23,
+	.gpio_detection = KOVS100_N_SD_STATUS,
+};
+
 static struct platform_device htckovsky_sdcc = {
-	.name = "htckovsky-mmc",
+	.name = MSM7200A_MMC_DRV_NAME,
 	.id = -1,
+	.dev = {
+		.platform_data = &htckovsky_mmc_pdata,
+	},
+};
+
+static struct msm7200a_wl1251_pdata htckovsky_wifi_pdata = {
+	.slot_number = 1,
+	.vreg_id = 5,
+	.gpio_enable = KOVS100_WIFI_PWR,
+	.gpio_reset = -1,
+	.gpio_32k_osc = -1,
+};
+
+static struct platform_device htckovsky_wifi = {
+	.name = MSM7200A_WL1251_DRV_NAME,
+	.id = -1,
+	.dev = {
+		.platform_data = &htckovsky_wifi_pdata,
+	},
 };
 
 /******************************************************************************
@@ -1021,6 +1047,7 @@ static struct platform_device *devices[] __initdata = {
 	&msm_device_i2c,
 	&htckovsky_rtc,
 	&htckovsky_sdcc,
+	&htckovsky_wifi,
 	&htckovsky_gpio_keys,
 	&htckovsky_rfkill,
 	&msm_device_uart_dm2,
