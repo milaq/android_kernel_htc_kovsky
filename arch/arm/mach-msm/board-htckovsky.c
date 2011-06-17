@@ -453,11 +453,7 @@ static struct i2c_board_info i2c_devices[] = {
  ******************************************************************************/
 static int htckovsky_request_ulpi_gpios(void)
 {
-	static bool done = false;
 	int ret;
-
-	if (done)
-		return 0;
 
 	ret = gpio_request(0x54, "Kovsky USB Unknown");
 	if (ret)
@@ -469,7 +465,6 @@ static int htckovsky_request_ulpi_gpios(void)
 	if (ret)
 		goto free_x69;
 
-	done = true;
 	return 0;
 
 free_x69:
@@ -501,13 +496,8 @@ static void htckovsky_usb_enable(void)
 	mdelay(3);
 }
 
-static void htckovsky_phy_reset(void) {
-	htckovsky_usb_disable();
-	htckovsky_usb_enable();
-}
-
-static void htckovsky_usb_hw_reset(bool state)
-{
+static void htckovsky_usb_hw_reset(bool state) {
+	printk("[USB]: %s state=%d\n", __func__, state);
 	if (state) {
 		htckovsky_usb_disable();
 	}
@@ -522,7 +512,6 @@ static void htckovsky_usb_connected(int state) {
 
 static struct msm_hsusb_platform_data htckovsky_hsusb_pdata = {
 	.hw_reset = htckovsky_usb_hw_reset,
-	.phy_reset = htckovsky_phy_reset,
 	.usb_connected = htckovsky_usb_connected,
 };
 
