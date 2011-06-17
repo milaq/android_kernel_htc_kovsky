@@ -73,10 +73,10 @@ config MSM_LEGACY_7X00A_AMSS
 
 config MSM_AMSS_VERSION
 	int
-        default 5225 if MSM_AMSS_VERSION_5225
-        default 6120 if MSM_AMSS_VERSION_6120
-        default 6125 if MSM_AMSS_VERSION_6125
-        default 6150 if MSM_AMSS_VERSION_6150
+	default 5225 if MSM_AMSS_VERSION_5225
+	default 6120 if MSM_AMSS_VERSION_6120
+	default 6125 if MSM_AMSS_VERSION_6125
+	default 6150 if MSM_AMSS_VERSION_6150
 	default 6210 if MSM_AMSS_VERSION_6210
 	default 6220 if MSM_AMSS_VERSION_6220
 	default 6225 if MSM_AMSS_VERSION_6225
@@ -84,20 +84,19 @@ config MSM_AMSS_VERSION
 
 config MSM_AMSS_VERSION_WINCE
 	bool
-        default y if MSM_AMSS_VERSION_5225
-        default y if MSM_AMSS_VERSION_6120
-        default y if MSM_AMSS_VERSION_6125
-        default y if MSM_AMSS_VERSION_6150
-
+	default y if MSM_AMSS_VERSION_5225
+	default y if MSM_AMSS_VERSION_6120
+	default y if MSM_AMSS_VERSION_6125
+	default y if MSM_AMSS_VERSION_6150
 
 choice
 	prompt "AMSS modem firmware version"
 
 	depends on ARCH_MSM7X00A
 	default MSM_AMSS_VERSION_6225
-
-        config MSM_AMSS_VERSION_5225
-                bool "5.2.00 - WinCE compatible AMSS (GSM)"
+	
+	config MSM_AMSS_VERSION_5225
+		bool "5.2.00 - WinCE compatible AMSS (GSM)"
 		select MSM_LEGACY_7X00A_AMSS
 
 	config MSM_AMSS_VERSION_6120
@@ -107,9 +106,9 @@ choice
 	config MSM_AMSS_VERSION_6125
 		bool "6.1.25"
 		select MSM_LEGACY_7X00A_AMSS
-
-        config MSM_AMSS_VERSION_6150
-                bool "6.1.50 - WinCE compatible AMSS (CDMA) - experimental"
+		
+	config MSM_AMSS_VERSION_6150
+		bool "6.1.50 - WinCE compatible AMSS (CDMA)"
 		select MSM_LEGACY_7X00A_AMSS
 
 	config MSM_AMSS_VERSION_6210
@@ -151,11 +150,11 @@ config MACH_TROUT
 	  Support for the HTC Dream, T-Mobile G1, Android ADP1 devices.
 
 config MACH_HTCKOVSKY
-        depends on ARCH_MSM
+	depends on ARCH_MSM
 	depends on ARCH_MSM7X00A
-        bool "HTC Kovsky cellphone (aka Xperia X1)"
-        help
-          Support for the HTC Kovsky cellphone
+	bool "HTC Kovsky cellphone (aka Xperia X1)"
+	help
+		Support for the HTC Kovsky cellphone
 
 menu "HTC Kovsky devices"
 config MACH_HTCKOVSKY_CAMERA
@@ -164,13 +163,6 @@ config MACH_HTCKOVSKY_CAMERA
 	select MSM_CAMERA
 	select MT9T012VC
         bool "HTC Kovsky camera support"
-
-config MACH_HTCKOVSKY_MMC
-	depends on MACH_HTCKOVSKY
-	default y
-	select MMC
-	select MMC_MSM7X00A
-        tristate "HTC Kovsky SDHC controller support"
 
 config MACH_HTCKOVSKY_USB
 	depends on MACH_HTCKOVSKY
@@ -480,6 +472,13 @@ config MSM_SERIAL_DEBUGGER_CONSOLE
 
 config MSM_SMD
 	bool
+
+config MSM_DIAG_SMD
+	tristate "MSM DIAG via SMD"
+	depends on MSM_SMD
+	default y
+	help
+	  Provides access to DIAG via SMD
 
 config MSM_DAL
 	default n 
