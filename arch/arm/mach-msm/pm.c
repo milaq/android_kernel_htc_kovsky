@@ -222,8 +222,10 @@ msm_pm_enter_prep_hw(void)
 	// tell ARM9 we are going to suspend
 	writel(1, MSM_SHARED_RAM_BASE + 0xfc100);
 	writel(readl(MSM_SHARED_RAM_BASE + 0xfc108) + 1,MSM_SHARED_RAM_BASE + 0xfc108);
-#endif
-#if defined(CONFIG_ARCH_MSM7X30)
+	writel(0x7f, A11S_CLK_SLEEP_EN);
+	writel(8, A11S_STANDBY_CTL);
+	writel(1, A11S_PWRDOWN);
+#elif defined(CONFIG_ARCH_MSM7X30)
 	writel(1, A11S_PWRDOWN);
 	writel(4, A11S_SECOP);
 #else
@@ -253,8 +255,8 @@ msm_pm_exit_restore_hw(void)
 	writel(0, A11S_SECOP);
 	writel(0, A11S_PWRDOWN);
 #else
-	writel(0x00, A11S_CLK_SLEEP_EN);
 	writel(0, A11S_PWRDOWN);
+	writel(0x00, A11S_CLK_SLEEP_EN);
 #endif
 }
 
