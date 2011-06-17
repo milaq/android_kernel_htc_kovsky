@@ -1198,6 +1198,26 @@ const char *amss_get_str_value(enum amss_id id) {
 }
 EXPORT_SYMBOL(amss_get_str_value);
 
+/* Semaphore shared between arm9 and arm11 */
+void smem_semaphore_down(void* address, char marker)
+{
+    int current_value;
+    do {
+        current_value = readb(address);
+        writeb(1, address);
+    } while (current_value == 1);
+    writeb(marker, address+3);
+    return;
+}
+
+void smem_semaphore_up(void* address, char marker)
+{
+    int current_marker = readb(address+3);
+    if ( current_marker == marker ) {
+        writeb(0, address);
+    }
+}
+
 static int msm_smd_probe(struct platform_device *pdev)
 {
 	struct msm_smd_platform_data *smd_pdata = pdev->dev.platform_data;
