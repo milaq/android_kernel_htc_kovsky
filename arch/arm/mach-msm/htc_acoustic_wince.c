@@ -31,13 +31,17 @@
 
 #include <mach/htc_acoustic_wince.h>
 #include <mach/msm_iomap.h>
+#include <mach/msm_smd.h>
+
 #include "dex_comm.h"
+
+#define ACOUSTIC_SHARED_MUTEX_ADDR      (MSM_SHARED_RAM_BASE + 0xfc280)
+#define ACOUSTIC_ARM11_MUTEX_ID         0x11
 
 /* structs */
 struct msm_acoustic_capabilities {
     char voc_cal_field_size;
     bool dual_mic_supported;
-    bool use_tpa_2016;
 };
 
 struct msm_audio_path {
@@ -78,7 +82,7 @@ enum dex_audio_cmd {
 
 #define E(fmt, args...) printk(KERN_ERR "htc-acoustic_wince: "fmt, ##args)
 
-#if 1
+#if 0
 	#define D(fmt, args...) printk(KERN_INFO "htc-acoustic_wince: "fmt, ##args)
 #else
 	#define D(fmt, args...) do {} while (0)
@@ -118,11 +122,7 @@ static int acoustic_get_capabilities(void __user *arg)
 	if (htc_acoustic_wce_board_data) {
 		capabilities.dual_mic_supported =
 			htc_acoustic_wce_board_data->dual_mic_supported;
-		//todo: do detection in userland.
-		capabilities.use_tpa_2016 =
-			htc_acoustic_wce_board_data->use_tpa_2016;
 	}
-
 
 	if (copy_to_user((void __user *)arg,
 					&capabilities,
@@ -210,6 +210,7 @@ static int update_codec_table(void __user * arg)
 				rc = -EFAULT;
 				goto free_exit;
 			}
+			memcpy(amss_data->codec_table, table_array, table.size);
 			msm_dex_comm(&dex, 0);
 			rc = 0;
 		}
@@ -234,13 +235,17 @@ static void ADIE_Force8k(bool bOn) {
 }
 
 static void ADIE_ForceADIEAwake(bool bForce) {
-    int adie = readl(MSM_SHARED_RAM_BASE + 0xfc0d0);
+    int adie;
+
+	smem_semaphore_down(ACOUSTIC_SHARED_MUTEX_ADDR, ACOUSTIC_ARM11_MUTEX_ID);
+	adie = readl(MSM_SHARED_RAM_BASE + 0xfc0d0);
     if (bForce) {
         adie |= 0x8;
     } else {
         adie &= ~0x8;
     }
     writel(adie, MSM_SHARED_RAM_BASE + 0xfc0d0);
+	smem_semaphore_up(ACOUSTIC_SHARED_MUTEX_ADDR, ACOUSTIC_ARM11_MUTEX_ID);
 }
 
 static void ADIE_ForceADIEUpdate(bool bForce) {
@@ -326,7 +331,7 @@ static int update_audio_setting(void __user *arg)
     return ret;
 }
 
-static int turn_mic_bias_on(bool on)
+static int turn_mic_bias_on(bool on, bool enable_dualmic)
 {
 
 	D("%s(%d)\n", __func__, on);
@@ -336,7 +341,7 @@ static int turn_mic_bias_on(bool on)
 	dex_update_audio_done();
 
 	if (amss_data->mic_bias_callback)
-		amss_data->mic_bias_callback(on);
+		amss_data->mic_bias_callback(on, enable_dualmic);
 
 	return 0;
 }
@@ -356,7 +361,7 @@ static int update_hw_audio_path(void __user * arg)
 	       audio_path.enable_speaker, audio_path.enable_headset);
 
 	/* Switch microphone on/off */
-	turn_mic_bias_on(audio_path.enable_mic);
+	turn_mic_bias_on(audio_path.enable_mic, audio_path.enable_dual_mic);
 
 	/* Switch headset HW on/off */
 	headphone_amp_power(audio_path.enable_headset);
@@ -453,7 +458,7 @@ static struct file_operations acoustic_fops = {
 
 static struct miscdevice acoustic_wince_misc = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "htc-acoustic",
+	.name = "htc-acoustic-wince",
 	.fops = &acoustic_fops,
 };
 
@@ -507,7 +512,7 @@ static struct platform_driver htc_acoustic_wince_driver = {
 	.probe		= htc_acoustic_wince_probe,
 	.remove		= htc_acoustic_wince_remove,
 	.driver		= {
-		.name		= "htc_acoustic",
+		.name		= "htc_acoustic_wince",
 		.owner		= THIS_MODULE,
 	},
 };
