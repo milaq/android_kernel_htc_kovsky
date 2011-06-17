@@ -458,7 +458,7 @@ static struct file_operations acoustic_fops = {
 
 static struct miscdevice acoustic_wince_misc = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "htc-acoustic-wince",
+	.name = "htc_acoustic_wince",
 	.fops = &acoustic_fops,
 };
 
