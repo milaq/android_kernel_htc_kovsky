@@ -26,6 +26,7 @@
 #include <linux/platform_device.h>
 #include <linux/spi/wl12xx.h>
 #include <linux/irq.h>
+#include <linux/pm_runtime.h>
 
 #include "wl1251.h"
 
@@ -92,7 +93,6 @@ static void wl1251_sdio_write(struct wl1251 *wl, int addr,
 		wl1251_error("sdio write failed (%d)", ret);
 	sdio_release_host(func);
 }
-
 static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 {
 	int ret = 0;
@@ -105,6 +105,8 @@ static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 	 * the unused bits of CMD52 as write data even if we send read
 	 * request).
 	 */
+	printk("%s: addr=%08x, val=%08x, wl_sdio=%08x, func=%08x fnum=%08x\n",
+	__func__, addr, *val, wl_sdio, func, func->num);
 	sdio_claim_host(func);
 	*val = sdio_writeb_readb(func, wl_sdio->elp_val, addr, &ret);
 	sdio_release_host(func);
@@ -118,6 +120,9 @@ static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
 	int ret = 0;
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 	struct sdio_func *func = wl_sdio->func;
+
+	printk("%s: addr=%08x, val=%08x, wl_sdio=%08x, func=%08x\n",
+	__func__, addr, val, wl_sdio, func);
 
 	sdio_claim_host(func);
 	sdio_writeb(func, val, addr, &ret);
@@ -171,8 +176,38 @@ static void wl1251_disable_line_irq(struct wl1251 *wl)
 	return disable_irq(wl->irq);
 }
 
-static void wl1251_sdio_set_power(bool enable)
+static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 {
+	struct sdio_func *func = wl_to_func(wl);
+	wl1251_enter();
+
+	if (enable) {
+		/*
+		 * Power is controlled by runtime PM, but we still call board
+		 * callback in case it wants to do any additional setup,
+		 * for example enabling clock buffer for the module.
+		 */
+		if (wl->set_power)
+			wl->set_power(true);
+
+		pm_runtime_get_sync(&func->dev);
+
+		sdio_claim_host(func);
+		sdio_enable_func(func);
+		sdio_release_host(func);
+	} else {
+		sdio_claim_host(func);
+		sdio_disable_func(func);
+		sdio_release_host(func);
+
+		pm_runtime_put_sync(&func->dev);
+		
+		if (wl->set_power)
+			wl->set_power(false);
+	}
+
+	wl1251_leave();
+	return 0;
 }
 
 static struct wl1251_if_operations wl1251_sdio_ops = {
@@ -181,6 +216,7 @@ static struct wl1251_if_operations wl1251_sdio_ops = {
 	.write_elp = wl1251_sdio_write_elp,
 	.read_elp = wl1251_sdio_read_elp,
 	.reset = wl1251_sdio_reset,
+	.power = wl1251_sdio_set_power,
 };
 
 static int wl1251_platform_probe(struct platform_device *pdev)
@@ -239,7 +275,6 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 	wl_sdio->func = func;
 	wl->if_priv = wl_sdio;
 	wl->if_ops = &wl1251_sdio_ops;
-	wl->set_power = wl1251_sdio_set_power;
 
 	if (wl12xx_board_data != NULL) {
 		wl->set_power = wl12xx_board_data->set_power;
@@ -273,6 +308,10 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 		goto out_free_irq;
 
 	sdio_set_drvdata(func, wl);
+
+	/* Tell PM core that we don't need the card to be powered now */
+	pm_runtime_put_noidle(&func->dev);
+
 	return ret;
 
 out_free_irq:
@@ -294,6 +333,9 @@ static void __devexit wl1251_sdio_remove(struct sdio_func *func)
 	struct wl1251 *wl = sdio_get_drvdata(func);
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 
+	/* Undo decrement done above in wl1251_probe */
+	pm_runtime_get_noresume(&func->dev);
+
 	if (wl->irq)
 		free_irq(wl->irq, wl);
 	kfree(wl_sdio);
@@ -305,11 +347,31 @@ static void __devexit wl1251_sdio_remove(struct sdio_func *func)
 	sdio_release_host(func);
 }
 
+static int wl1251_suspend(struct device *dev)
+{
+	/*
+	 * Tell MMC/SDIO core it's OK to power down the card
+	 * (if it isn't already), but not to remove it completely.
+	 */
+	return 0;
+}
+
+static int wl1251_resume(struct device *dev)
+{
+	return 0;
+}
+
+static const struct dev_pm_ops wl1251_sdio_pm_ops = {
+	.suspend        = wl1251_suspend,
+	.resume         = wl1251_resume,
+};
+
 static struct sdio_driver wl1251_sdio_driver = {
 	.name		= "wl1251_sdio",
 	.id_table	= wl1251_devices,
 	.probe		= wl1251_sdio_probe,
 	.remove		= __devexit_p(wl1251_sdio_remove),
+	.drv.pm		= &wl1251_sdio_pm_ops,
 };
 
 static int __init wl1251_sdio_init(void)
@@ -339,4 +401,4 @@ module_init(wl1251_sdio_init);
 module_exit(wl1251_sdio_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Kalle Valo <kalle.valo@nokia.com>");
+MODULE_AUTHOR("Kalle Valo <kvalo@adurom.com>");
