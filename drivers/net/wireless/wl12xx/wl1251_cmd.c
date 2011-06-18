@@ -105,7 +105,7 @@ int wl1251_cmd_test(struct wl1251 *wl, void *buf, size_t buf_len, u8 answer)
  * @wl: wl struct
  * @id: acx id
  * @buf: buffer for the response, including all headers, must work with dma
- * @len: lenght of buf
+ * @len: length of buf
  */
 int wl1251_cmd_interrogate(struct wl1251 *wl, u16 id, void *buf, size_t len)
 {
@@ -201,7 +201,7 @@ int wl1251_cmd_vbm(struct wl1251 *wl, u8 identity,
 
 out:
 	kfree(vbm);
-	return 0;
+	return ret;
 }
 
 int wl1251_cmd_data_path(struct wl1251 *wl, u8 channel, bool enable)
@@ -420,7 +420,7 @@ int wl1251_cmd_scan(struct wl1251 *wl, u8 *ssid, size_t ssid_len,
 	struct wl1251_cmd_scan *cmd;
 	int i, ret = 0;
 
-	wl1251_debug(DEBUG_CMD, "cmd scan channels %d ssid(%d) '%s'",
+	wl1251_debug(DEBUG_CMD, "cmd scan channels %d ssid(%d) %s",
 		     n_channels, ssid_len, ssid);
 
 	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
@@ -433,8 +433,8 @@ int wl1251_cmd_scan(struct wl1251 *wl, u8 *ssid, size_t ssid_len,
 						    CFG_RX_BCN_EN);
 	cmd->params.scan_options = 0;
 
-	if (is_zero_ether_addr(wl->bssid))
-		cmd->params.scan_options |= WL1251_SCAN_OPT_PRIORITY_HIGH;
+	//if (is_zero_ether_addr(wl->bssid))
+	//	cmd->params.scan_options |= WL1251_SCAN_OPT_PRIORITY_HIGH;
 
 	cmd->params.num_channels = n_channels;
 	cmd->params.num_probe_requests = n_probes;
