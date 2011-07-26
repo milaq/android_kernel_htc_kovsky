@@ -405,7 +405,7 @@ static struct platform_driver msm7200a_mmc_driver = {
  * WiFi SDIO
  ******************************************************************************/
 // use a platform device to pass irq etc until we upgrade to the latest driver
-#define MSM7200A_WL1251_HACK 0
+#define MSM7200A_WL1251_HACK 1
 
 static struct msm7200a_wl1251_priv {
 	struct vreg *vreg;	
@@ -491,6 +491,7 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 	}
 
 pwroff:
+	#if 0
 	wl1251_priv.state = false;
 	if (wl1251_priv.vreg) {
 		vreg_disable(wl1251_priv.vreg);
@@ -506,7 +507,8 @@ pwroff:
 	}
 	mdelay(200);
 	msm_gpios_disable(wl1251_priv.gpios.off, wl1251_priv.gpios.off_length);
-	
+	#endif
+
 	return 0;
 }
 
