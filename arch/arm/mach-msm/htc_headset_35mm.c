@@ -121,8 +121,6 @@ static void insert_headset(void)
 
 	HDS_DBG("");
 
-	state = BIT_HEADSET | BIT_HEADSET_NO_MIC;
-
 	state = switch_get_state(&hi->sdev);
 	state &= ~(BIT_HEADSET_NO_MIC | BIT_HEADSET);
 
@@ -273,7 +271,7 @@ static int hds_probe(struct platform_device *pdev)
 	}
 
 	if (hi->gpio_headset_mic) {
-		ret = gpio_request(hi->gpio_headset_mic, "3.5mm_mic_detect");
+		ret = gpio_request(hi->gpio_headset_mic, "3.5mm mic detect");
 		if (ret < 0)
 			goto err_request_35mm_mic_detect_gpio;
 
@@ -294,7 +292,7 @@ static int hds_probe(struct platform_device *pdev)
 			goto err_request_btn_35mm_irq;
 	}
 
-	ret = gpio_request(hi->gpio_detect, "3.5mm headset detection");
+	ret = gpio_request(hi->gpio_detect, "3.5mm jack");
 	if (ret < 0)
 		goto err_request_detect_gpio;
 
