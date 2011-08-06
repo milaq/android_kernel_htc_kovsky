@@ -20,16 +20,16 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_smd.h>
 
-#if defined(CONFIG_MSM_AMSS_VERSION_6225)
-#include <mach/amss/amss_6225.h>
-static struct platform_device adsp_device_6225 = {
-	.name = "msm_adsp_6225",
+#if defined(CONFIG_MSM_AMSS_VERSION_6210)
+#include <mach/amss/amss_6210.h>
+static struct platform_device adsp_device_6210 = {
+	.name = "msm_adsp_6210",
 	.id = -1,
 };
 
-static struct msm_smd_platform_data smd_pdata_6225 = {
-	.amss_values = amss_6225_para,
-	.n_amss_values = ARRAY_SIZE(amss_6225_para),
+static struct msm_smd_platform_data smd_pdata_6210 = {
+	.amss_values = amss_6210_para,
+	.n_amss_values = ARRAY_SIZE(amss_6210_para),
 };
 #endif
 
@@ -46,16 +46,16 @@ static struct msm_smd_platform_data smd_pdata_6220 = {
 };
 #endif
 
-#if defined(CONFIG_MSM_AMSS_VERSION_6210)
-#include <mach/amss/amss_6210.h>
-static struct platform_device adsp_device_6210 = {
-	.name = "msm_adsp_6210",
+#if defined(CONFIG_MSM_AMSS_VERSION_6225)
+#include <mach/amss/amss_6225.h>
+static struct platform_device adsp_device_6225 = {
+	.name = "msm_adsp_6225",
 	.id = -1,
 };
 
-static struct msm_smd_platform_data smd_pdata_6210 = {
-	.amss_values = amss_6210_para,
-	.n_amss_values = ARRAY_SIZE(amss_6210_para),
+static struct msm_smd_platform_data smd_pdata_6225 = {
+	.amss_values = amss_6225_para,
+	.n_amss_values = ARRAY_SIZE(amss_6225_para),
 };
 #endif
 
@@ -127,7 +127,8 @@ static struct platform_device amss_android_snd = {
 		},
 };
 
-static int amss_android_probe(struct platform_device *pdev)
+static int amss_android_probe(struct msm_smd_platform_data *pdata,
+	struct platform_device *pdev)
 {
 	int ret;
 
@@ -137,18 +138,9 @@ static int amss_android_probe(struct platform_device *pdev)
 		printk(KERN_CRIT "%s: failed to register SMD driver\n", __func__);
 		return ret;
 	}
-#if defined(CONFIG_MSM_AMSS_VERSION_6225)
-	msm_device_smd.dev.platform_data = &smd_pdata_6225;
-	ret = platform_device_register(&adsp_device_6225);
-#elif defined(CONFIG_MSM_AMSS_VERSION_6220)
-	msm_device_smd.dev.platform_data = &smd_pdata_6220;
-	ret = platform_device_register(&adsp_device_6220);
-#elif defined(CONFIG_MSM_AMSS_VERSION_6210)
-	msm_device_smd.dev.platform_data = &smd_pdata_6210;
-	ret = platform_device_register(&adsp_device_6210);
-#else
-	return 0;
-#endif
+
+	msm_device_smd.dev.platform_data = pdata;
+	ret = platform_device_register(pdev);
 	if (ret) {
 		printk(KERN_ERR "%s: failed to register ADSP driver\n", __func__);
 		return 0;
@@ -163,17 +155,60 @@ static int amss_android_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static struct platform_driver amss_android_driver = {
-	.probe		= amss_android_probe,
+#if defined(CONFIG_MSM_AMSS_VERSION_6210)
+static int amss_6210_probe(struct platform_device *pdev) {
+	return amss_android_probe(&smd_pdata_6210, &adsp_device_6210);
+}
+
+static struct platform_driver amss_android_6210 = {
+	.probe		= amss_6210_probe,
 	.driver		= {
-		.name		= "amss_android",
+		.name		= "amss_6210",
 		.owner		= THIS_MODULE,
 	},
 };
+#endif
+
+#if defined(CONFIG_MSM_AMSS_VERSION_6220)
+static int amss_6220_probe(struct platform_device *pdev) {
+	return amss_android_probe(&smd_pdata_6220, &adsp_device_6220);
+}
+
+static struct platform_driver amss_android_6220 = {
+	.probe		= amss_6220_probe,
+	.driver		= {
+		.name		= "amss_6220",
+		.owner		= THIS_MODULE,
+	},
+};
+#endif
+
+#if defined(CONFIG_MSM_AMSS_VERSION_6225)
+static int amss_6225_probe(struct platform_device *pdev) {
+	return amss_android_probe(&smd_pdata_6225, &adsp_device_6225);
+}
+
+static struct platform_driver amss_android_6225 = {
+	.probe		= amss_6225_probe,
+	.driver		= {
+		.name		= "amss_6225",
+		.owner		= THIS_MODULE,
+	},
+};
+#endif
 
 static int __init amss_android_init(void)
 {
-	return platform_driver_register(&amss_android_driver);
+#if defined(CONFIG_MSM_AMSS_VERSION_6210)
+	platform_driver_register(&amss_android_6210);
+#endif
+#if defined(CONFIG_MSM_AMSS_VERSION_6220)
+	platform_driver_register(&amss_android_6220);
+#endif
+#if defined(CONFIG_MSM_AMSS_VERSION_6225)
+	platform_driver_register(&amss_android_6225);
+#endif
+	return 0;
 }
 
 module_init(amss_android_init);
