@@ -85,6 +85,7 @@ static struct led_classdev htckovsky_qwerty_led = {
 static void htckovsky_update_keyled(struct work_struct* work) {
 	uint8_t buffer[10] = {};
 	uint8_t brightness = htckovsky_qwerty_led.brightness;
+
 	buffer[0] = MICROP_KPD_LED_BRIGHTNESS_KOVS;
 	buffer[1] = brightness;
 	buffer[2] = brightness ? 0x40 : 0xff;
@@ -286,14 +287,18 @@ static char *supplicants[] = {
 
 static struct resource htckovsky_power_resources[] = {
 	[0] = {
-	.name = "ac",
-	.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
-	IORESOURCE_IRQ_LOWEDGE,
+		.name = "ac",
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
+		IORESOURCE_IRQ_LOWEDGE,
+		.start = MSM_GPIO_TO_INT(KOVS100_AC_DETECT),
+		.end = MSM_GPIO_TO_INT(KOVS100_AC_DETECT),
 	},
 	[1] = {
-	.name = "usb",
-	.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
-	IORESOURCE_IRQ_LOWEDGE,
+		.name = "usb",
+		.flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE |
+		IORESOURCE_IRQ_LOWEDGE,
+		.start = MSM_GPIO_TO_INT(KOVS100_AC_DETECT),
+		.end = MSM_GPIO_TO_INT(KOVS100_AC_DETECT),
 	},
 };
 
@@ -312,16 +317,9 @@ static int htckovsky_is_ac_online(void)
 static void htckovsky_set_charge(int flags)
 {
 	//TODO: detect battery overtemperature and low-power usb ports
-	if (flags) {
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, 0);
-		gpio_direction_output(KOVS100_N_CHG_INHIBIT, 1);
-		gpio_direction_output(KOVS100_CHG_HIGH, 1);
-	}
-	else {
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
-		gpio_direction_output(KOVS100_N_CHG_INHIBIT, 0);
-		gpio_direction_output(KOVS100_CHG_HIGH, 0);
-	}
+	gpio_direction_output(KOVS100_N_CHG_ENABLE, flags == 0);
+	gpio_direction_output(KOVS100_N_CHG_INHIBIT, !!flags);
+	gpio_direction_output(KOVS100_CHG_HIGH, !!flags);
 }
 
 static int htckovsky_power_init(struct device *dev)
@@ -343,11 +341,6 @@ static int htckovsky_power_init(struct device *dev)
 	rc = gpio_request(KOVS100_CHG_HIGH, "Charger High");
 	if (rc)
 		goto err_chg_high;
-
-	htckovsky_power_resources[0].start = gpio_to_irq(KOVS100_AC_DETECT);
-	htckovsky_power_resources[0].end = htckovsky_power_resources[0].start;
-	htckovsky_power_resources[1].start = gpio_to_irq(KOVS100_AC_DETECT);
-	htckovsky_power_resources[1].end = htckovsky_power_resources[1].start;
 
 	return 0;
 
@@ -384,8 +377,8 @@ static struct platform_device htckovsky_powerdev = {
 	.num_resources = ARRAY_SIZE(htckovsky_power_resources),
 	.dev = {
 		.platform_data = &htckovsky_power_data,
-		},
-};//End of power supply
+	},
+};
 
 static struct ds2746_platform_data kovsky_battery_data = {
 	.resistance = 1500,
@@ -426,25 +419,25 @@ static struct microp_platform_data htckovsky_microp_pdata = {
  ******************************************************************************/
 static struct i2c_board_info i2c_devices[] = {
 	{
-	// Battery driver
-	.type = DS2746_NAME,
-	.addr = 0x36,
-	.platform_data = &kovsky_battery_data,
+		// Battery driver
+		.type = DS2746_NAME,
+		.addr = 0x36,
+		.platform_data = &kovsky_battery_data,
 	},
 	{
-	 // LED & Backlight controller
-	 .type = "microp-ng",
-	 .addr = 0x66,
-	 .platform_data = &htckovsky_microp_pdata,
-	 },
-	 {
-	 // Keyboard controller
-	 .type = "microp-ng",
-	 .addr = 0x67,
-	 .platform_data = &htckovsky_microp_keypad_pdata,
-	 },
+		// LED & Backlight controller
+		.type = "microp-ng",
+		.addr = 0x66,
+		.platform_data = &htckovsky_microp_pdata,
+	},
 	{
-	I2C_BOARD_INFO("mt9t012vc", 0x20),
+		// Keyboard controller
+		.type = "microp-ng",
+		.addr = 0x67,
+		.platform_data = &htckovsky_microp_keypad_pdata,
+	},
+	{
+		I2C_BOARD_INFO("mt9t012vc", 0x20),
 	},
 };
 
@@ -460,16 +453,16 @@ static int htckovsky_request_ulpi_gpios(void)
 		goto free_x54;
 	ret = gpio_request(KOVS100_USB_RESET_PHY, "USB PHY Reset");
 	if (ret)
-		goto free_x64;
+		goto free_reset;
 	ret = gpio_request(KOVS100_USB_POWER_PHY, "USB PHY Power");
 	if (ret)
-		goto free_x69;
+		goto free_power;
 
 	return 0;
 
-free_x69:
+free_power:
 	gpio_free(KOVS100_USB_POWER_PHY);
-free_x64:
+free_reset:
 	gpio_free(KOVS100_USB_RESET_PHY);
 free_x54:
 	gpio_free(0x54);
@@ -497,7 +490,7 @@ static void htckovsky_usb_enable(void)
 }
 
 static void htckovsky_usb_hw_reset(bool state) {
-	printk("[USB]: %s state=%d\n", __func__, state);
+	printk(KERN_INFO "[USB]: %s state=%d\n", __func__, state);
 	if (state) {
 		htckovsky_usb_disable();
 	}
@@ -633,11 +626,11 @@ int kovsky_pull_vcm_d(int on)
 		writel(2, focus + 0x4c);
 		writel(0x1e21, focus + 0x50);
 		writel(0x1de, focus + 0x54);
-		gpio_direction_output(0x6c, 1);
+		//gpio_direction_output(0x6c, 1);
 		gpio_direction_output(0x1c, 0);
 	}
 	else {
-		gpio_direction_output(0x6c, 0);
+		//gpio_direction_output(0x6c, 0);
 		gpio_direction_output(0x1c, 0);
 		writel(0, focus + 0x4c);
 		writel(0, focus + 0x50);
@@ -657,7 +650,7 @@ int kovsky_camera_set_state(int on)
 		gpio_request(0x17 /* 23 */, "Camera");
 		gpio_request(0x1f /* 31 */, "Camera");
 		gpio_request(0x63 /* 99 */, "VFE Mux");
-		gpio_request(0x6c /* 107 */, "Camera VCM PWD");
+		//gpio_request(0x6c /* 107 */, "Camera VCM PWD");
 		gpio_request(0x1c, "Camera VCM 2");
 
 		requested = true;
@@ -951,8 +944,9 @@ static void htckovsky_set_speaker_amp(bool enable) {
 
 static void htckovsky_set_headset_amp(bool enable) {
 	char buffer[] = {MICROP_HEADSET_AMP_KOVS, enable};
-	if (mp_client)
+	if (mp_client) {
 		microp_ng_write(mp_client, buffer, ARRAY_SIZE(buffer));
+	}
 	gpio_direction_output(KOVS100_HP_AMP, enable);
 }
 
