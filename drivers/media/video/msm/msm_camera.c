@@ -218,23 +218,29 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 		info->len = len;
 
 	rc = check_pmem_info(info, len);
-	if (rc < 0)
+	if (rc < 0) {
+		CDBG("%s: bad pmem info rc=%d\n", __func__, rc);
 		return rc;
+	}
 
 	paddr += info->offset;
 	kvstart += info->offset;
 	len = info->len;
 
-	if (check_overlap(ptype, paddr, len) < 0)
+	if (check_overlap(ptype, paddr, len) < 0) {
+		CDBG("%s: memory overlaps at %x:%x\n", __func__, paddr, len);
 		return -EINVAL;
+	}
 
 	CDBG("%s: type %d, paddr 0x%lx, vaddr 0x%lx\n",
 		__func__,
 		info->type, paddr, (unsigned long)info->vaddr);
 
 	region = kmalloc(sizeof(struct msm_pmem_region), GFP_KERNEL);
-	if (!region)
+	if (!region) {
+		CDBG("%s: out of memory for new region\n", __func__);
 		return -ENOMEM;
+	}
 
 	INIT_HLIST_NODE(&region->list);
 
@@ -266,6 +272,9 @@ static uint8_t msm_pmem_region_lookup(struct hlist_head *ptype,
 	regptr = reg;
 
 	hlist_for_each_entry_safe(region, node, n, ptype, list) {
+		CDBG("%s: paddr=%lx len=%lx, type=%x vfe=%x\n",
+			__func__, region->paddr, region->len,
+			region->info.type, region->info.vfe_can_write);
 		if (region->info.type == pmem_type &&
 			region->info.vfe_can_write) {
 				*regptr = *region;
@@ -1067,8 +1076,6 @@ static int msm_config_vfe(struct msm_sync *sync, void __user *arg)
 	}
 
 	memset(&axi_data, 0, sizeof(axi_data));
-
-	CDBG("%s: cmd_type %d\n", __func__, cfgcmd.cmd_type);
 
 	switch (cfgcmd.cmd_type) {
 	case CMD_STATS_ENABLE:

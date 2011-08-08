@@ -177,6 +177,8 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 
 		default:
 			rp->type = VFE_MSG_GENERAL;
+			CDBG("%s: default: VFE_MSG_GENERAL msd_id=%x\n", __func__,
+				rp->evt_msg.msg_id);
 			break;
 		}
 		resp->vfe_resp(rp, MSM_CAM_Q_VFE_MSG, vfe_syncdata, GFP_ATOMIC);
