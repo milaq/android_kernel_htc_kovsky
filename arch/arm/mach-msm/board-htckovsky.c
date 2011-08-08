@@ -1155,18 +1155,18 @@ static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
 	mi->bank[0].start = PAGE_ALIGN(PHYS_OFFSET);
 	mi->bank[0].node = PHYS_TO_NID(mi->bank[0].start);
 #ifdef CONFIG_HOLES_IN_ZONE
-	mi->bank[0].size = 107 * 1024 * 1024;
+	mi->bank[0].size = KOVS110_MEM_BANK0_SIZE;
 #else
-	mi->bank[0].size = 104 << 20;
+	mi->bank[0].size = KOVS110_MEM_BANK0_SIZE & ~((1 << 22) - 1);
 #endif
 
 	mi->nr_banks++;
 	mi->bank[1].start = PAGE_ALIGN(PHYS_OFFSET + 0x10000000);
 	mi->bank[1].node = PHYS_TO_NID(mi->bank[1].start);
 #ifdef CONFIG_HOLES_IN_ZONE
-	mi->bank[1].size = (128 - 50) * 1024 * 1024;
+	mi->bank[1].size = KOVS110_MEM_BANK1_SIZE;
 #else
-	mi->bank[1].size = 76 << 20;
+	mi->bank[1].size = KOVS110_MEM_BANK1_SIZE & ~((1 << 22) - 1);
 #endif
 	printk(KERN_INFO "fixup: nr_banks = %d\n", mi->nr_banks);
 
