@@ -40,13 +40,6 @@ extern int kovsky_camera_set_state(int on);
 extern int kovsky_af_vdd(int on);
 extern int kovsky_pull_vcm_d(int on);
 
-enum mt9t012vc_test_mode {
-	TEST_OFF,
-	TEST_1,
-	TEST_2,
-	TEST_3
-};
-
 enum mt9t012vc_resolution {
 	QTR_SIZE,
 	FULL_SIZE,
@@ -102,7 +95,6 @@ struct mt9t012vc_ctrl {
 	enum mt9t012vc_resolution prev_res;
 	enum mt9t012vc_resolution pict_res;
 	enum mt9t012vc_resolution curr_res;
-	enum mt9t012vc_test_mode set_test;
 
 	unsigned short imgaddr;
 };
@@ -187,25 +179,6 @@ static int32_t mt9t012vc_i2c_txdata(unsigned short saddr,
 	return 0;
 }
 
-//static int32_t mt9t012vc_i2c_write_b(unsigned short saddr,
-//				unsigned short waddr, unsigned short wdata)
-//{
-//	int32_t rc = -EIO;
-//	unsigned char buf[2];
-//	CDBG("[MT9T012VC]: %s(%02x, %02x)\n", __func__, waddr, wdata);
-//
-//	memset(buf, 0, sizeof(buf));
-//	buf[0] = waddr;
-//	buf[1] = wdata;
-//	rc = mt9t012vc_i2c_txdata(saddr, buf, 2);
-//
-//	if (rc < 0)
-//		pr_err("i2c_write failed, addr = 0x%x, val = 0x%x!\n",
-//		waddr, wdata);
-//
-//	return rc;
-//}
-
 static int32_t mt9t012vc_i2c_write_w(unsigned short saddr,
 				unsigned short waddr, unsigned short wdata)
 {
@@ -247,39 +220,6 @@ static int32_t mt9t012vc_i2c_write_w_table(const struct mt9t012vc_i2c_reg_conf
 	return rc;
 }
 
-//static int32_t mt9t012vc_test(enum mt9t012vc_test_mode mo)
-//{
-//	int32_t rc = 0;
-//
-//	rc = mt9t012vc_i2c_write_w(mt9t012vc_client->addr,
-//				REG_GROUPED_PARAMETER_HOLD,
-//				GROUPED_PARAMETER_HOLD);
-//	if (rc < 0)
-//		goto ret;
-//
-//	if (mo == TEST_OFF) {
-//		goto ret;
-//	} else {
-//		rc = mt9t012vc_i2c_write_w_table(mt9t012vc_regs.ttbl,
-//						mt9t012vc_regs.ttbl_size);
-//		if (rc < 0)
-//			goto ret;
-//		rc = mt9t012vc_i2c_write_w(mt9t012vc_client->addr,
-//					REG_TEST_PATTERN_MODE,
-//					(uint16_t) mo);
-//		if (rc < 0)
-//			goto ret;
-//	}
-//
-//	rc = mt9t012vc_i2c_write_w(mt9t012vc_client->addr,
-//				REG_GROUPED_PARAMETER_HOLD,
-//				GROUPED_PARAMETER_UPDATE);
-//
-// ret:
-//	CDBG("%s: returning with %d\n", __func__, rc);
-//	return rc;
-//}
-
 static int32_t mt9t012vc_set_lc(void)
 {
 	int32_t rc;
@@ -292,33 +232,16 @@ static int32_t mt9t012vc_set_lc(void)
 	return rc;
 }
 
-#include <linux/io.h>
 static int32_t mt9t012vc_move_focus(int direction, int32_t num_steps)
 {
-	static const int max_focus = 0x1de;
-	static const int min_focus = 0x9a;
-	volatile char* focus;
+	//static const int max_focus = 0x1de;
+	//static const int min_focus = 0x9a;
 	CDBG("[MT9T012VC]: %s(dir=%d, num_steps=%d)\n", __func__, direction, num_steps);
-	focus = ioremap(0xa9d00000, 0x1000);
-
-	if (direction && (mt9t012vc_ctrl->curr_lens_pos - num_steps >= min_focus))
-		mt9t012vc_ctrl->curr_lens_pos -= num_steps;
-	else if (!direction && (mt9t012vc_ctrl->curr_lens_pos + num_steps <= max_focus))
-		mt9t012vc_ctrl->curr_lens_pos += num_steps;
-
-	gpio_direction_output(0x6c, 0);
-	gpio_direction_output(0x1c, 0);
-	writel(mt9t012vc_ctrl->curr_lens_pos, focus + 0x54);
-	iounmap(focus);
-	gpio_direction_output(0x6c, 1);
-	gpio_direction_output(0x1c, 0);
-
 	return 0;
 }
 
 static int32_t mt9t012vc_set_default_focus(uint8_t af_step)
 {
-	volatile char* focus;
 	CDBG("[MT9T012VC]: %s(%d)\n", __func__, af_step);
 	return 0;
 }
@@ -633,13 +556,11 @@ static int32_t mt9t012vc_setting(enum mt9t012vc_reg_update rupdate,
 		mdelay(5);
 		return rc;
 		break;
-
-		/*CAMSENSOR_REG_INIT */
 	default:
 		DLINE;
 		rc = -EINVAL;
 		break;
-	}			/* switch (rupdate) */
+	}
 
 	return rc;
 }
@@ -664,7 +585,7 @@ static int32_t mt9t012vc_video_config(int mode, int res)
 
 	default:
 		return -EINVAL;
-	}			/* switch */
+	}
 
 	mt9t012vc_ctrl->prev_res = res;
 	mt9t012vc_ctrl->curr_res = res;
@@ -723,6 +644,7 @@ static int mt9t012vc_probe_init_sensor(const struct msm_camera_sensor_info
 				*data)
 {
 	int rc;
+	int i = 0;
 	uint16_t chipid;
 
 //	data->set_sensor(0);
@@ -734,7 +656,6 @@ static int mt9t012vc_probe_init_sensor(const struct msm_camera_sensor_info
 
 	DLINE;
 
-	int i = 0;
 	do {
 		++i;
 		rc = mt9t012vc_i2c_write_w(mt9t012vc_client->addr, REG_SOFTWARE_RESET, 0x100);
@@ -875,7 +796,7 @@ int mt9t012vc_sensor_open_init(const struct msm_camera_sensor_info
 
 	mt9t012vc_ctrl->fps_divider = 1 * 0x00000400;
 	mt9t012vc_ctrl->pict_fps_divider = 1 * 0x00000400;
-	mt9t012vc_ctrl->set_test = TEST_OFF;
+	//mt9t012vc_ctrl->set_test = TEST_OFF;
 	mt9t012vc_ctrl->prev_res = QTR_SIZE;
 	mt9t012vc_ctrl->pict_res = FULL_SIZE;
 
@@ -1198,6 +1119,7 @@ module_init(mt9t012vc_init);
 ******************************************************************************/
 #if defined(CONFIG_DEBUG_FS)
 #include <linux/debugfs.h>
+#include <asm/io.h>
 static struct reg_struct* dbg_capture_pat = &mt9t012vc_preview_reg_pat;
 
 static int set_x_end(void *data, u64 val)
@@ -1317,21 +1239,20 @@ static int vdd_get(void *data, u64 * val)
 
 static int focus_set(void *data, u64 val)
 {
-	mt9t012vc_ctrl->curr_lens_pos = val;
-
 	volatile char* focus;
+	mt9t012vc_ctrl->curr_lens_pos = val;
 	focus = ioremap(0xa9d00000, 0x1000);
 
 	if (vdd)
 		kovsky_af_vdd(0);
-	gpio_direction_output(0x6c, 0);
+	gpio_direction_output(0x6b, 0);
 	gpio_direction_output(0x1c, 0);
 	if (vdd)
 		kovsky_af_vdd(1);
 	writel(mt9t012vc_ctrl->curr_lens_pos, focus + 0x54);
 	iounmap(focus);
-	gpio_direction_output(0x6c, 1);
-	gpio_direction_output(0x1c, 0);
+	gpio_direction_output(0x6b, 1);
+	gpio_direction_output(0x1c, 1);
 
 	return 0;
 }
