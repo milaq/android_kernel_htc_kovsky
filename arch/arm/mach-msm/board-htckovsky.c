@@ -626,11 +626,11 @@ int kovsky_pull_vcm_d(int on)
 		writel(2, focus + 0x4c);
 		writel(0x1e21, focus + 0x50);
 		writel(0x1de, focus + 0x54);
-		//gpio_direction_output(0x6c, 1);
+		gpio_direction_output(0x6b, 1);
 		gpio_direction_output(0x1c, 0);
 	}
 	else {
-		//gpio_direction_output(0x6c, 0);
+		gpio_direction_output(0x6b, 0);
 		gpio_direction_output(0x1c, 0);
 		writel(0, focus + 0x4c);
 		writel(0, focus + 0x50);
@@ -650,7 +650,7 @@ int kovsky_camera_set_state(int on)
 		gpio_request(0x17 /* 23 */, "Camera");
 		gpio_request(0x1f /* 31 */, "Camera");
 		gpio_request(0x63 /* 99 */, "VFE Mux");
-		//gpio_request(0x6c /* 107 */, "Camera VCM PWD");
+		gpio_request(0x6b /* 107 */, "Camera VCM PWD");
 		gpio_request(0x1c, "Camera VCM 2");
 
 		requested = true;
