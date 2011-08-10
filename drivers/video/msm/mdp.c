@@ -47,7 +47,7 @@ static int locked_enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
 	/* if the mask bits are already set return an error, this interrupt
 	 * is already enabled */
 	if (mdp_irq_mask & mask) {
-		pr_err("mdp irq already on %x %x\n", mdp_irq_mask, mask);
+		dev_dbg(&mdp->mdp_dev.dev, "mdp irq already on %x %x\n", mdp_irq_mask, mask);
 		return -1;
 	}
 	/* if the mdp irq is not already enabled enable it */
@@ -84,7 +84,7 @@ static int locked_disable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
 {
 	/* this interrupt is already disabled! */
 	if (!(mdp_irq_mask & mask)) {
-		printk(KERN_ERR "mdp irq already off %x %x\n",
+		dev_dbg(&mdp->mdp_dev.dev, "mdp irq already off %x %x\n",
 		       mdp_irq_mask, mask);
 		return -1;
 	}
@@ -219,7 +219,7 @@ static void mdp_dma_wait(struct mdp_device *mdp_dev, int interface)
 		wq = &mdp->out_if[interface].dma_waitqueue;
 		break;
 	default:
-		pr_err("%s: Unknown interface %d\n", __func__, interface);
+		dev_err(&mdp_dev->dev, "%s: Unknown interface %d\n", __func__, interface);
 		BUG();
 	}
 
@@ -229,7 +229,7 @@ static void mdp_dma_wait(struct mdp_device *mdp_dev, int interface)
 		timeout_count = 0;
 
 	if (timeout_count > MDP_MAX_TIMEOUTS) {
-		printk(KERN_ERR "mdp: dma failed %d times, somethings wrong!\n",
+		dev_err(&mdp_dev->dev, "mdp: dma failed %d times, somethings wrong!\n",
 		       MDP_MAX_TIMEOUTS);
 		BUG();
 	}
@@ -245,14 +245,14 @@ static void mdp_dma(struct mdp_device *mdp_dev, uint32_t addr, uint32_t stride,
 
 	if (interface < 0 || interface > MSM_MDP_NUM_INTERFACES ||
 	    !mdp->out_if[interface].registered) {
-		pr_err("%s: Unknown interface: %d\n", __func__, interface);
+		dev_err(&mdp_dev->dev, "%s: Unknown interface: %d\n", __func__, interface);
 		BUG();
 	}
 	out_if = &mdp->out_if[interface];
 
 	spin_lock_irqsave(&mdp->lock, flags);
 	if (locked_enable_mdp_irq(mdp, out_if->dma_mask)) {
-		pr_err("%s: busy\n", __func__);
+		dev_dbg(&mdp_dev->dev, "%s: busy\n", __func__);
 		goto done;
 	}
 
@@ -355,14 +355,14 @@ int mdp_out_if_register(struct mdp_device *mdp_dev, int interface,
 	int ret = 0;
 
 	if (interface < 0 || interface >= MSM_MDP_NUM_INTERFACES) {
-		pr_err("%s: invalid interface (%d)\n", __func__, interface);
+		dev_err(&mdp_dev->dev, "%s: invalid interface (%d)\n", __func__, interface);
 		return -EINVAL;
 	}
 
 	spin_lock_irqsave(&mdp->lock, flags);
 
 	if (mdp->out_if[interface].registered) {
-		pr_err("%s: interface (%d) already registered\n", __func__,
+		dev_err(&mdp_dev->dev, "%s: interface (%d) already registered\n", __func__,
 		       interface);
 		ret = -EINVAL;
 		goto done;
@@ -388,10 +388,10 @@ int mdp_out_if_req_irq(struct mdp_device *mdp_dev, int interface,
 	int ret = 0;
 
 	if (interface < 0 || interface >= MSM_MDP_NUM_INTERFACES) {
-		pr_err("%s: invalid interface (%d)\n", __func__, interface);
+		dev_err(&mdp_dev->dev, "%s: invalid interface (%d)\n", __func__, interface);
 		BUG();
 	} else if (!mdp->out_if[interface].registered) {
-		pr_err("%s: interface (%d) not registered\n", __func__,
+		dev_err(&mdp_dev->dev, "%s: interface (%d) not registered\n", __func__,
 		       interface);
 		BUG();
 	}
@@ -401,7 +401,7 @@ int mdp_out_if_req_irq(struct mdp_device *mdp_dev, int interface,
 	if (mask) {
 		ret = locked_enable_mdp_irq(mdp, mask);
 		if (ret) {
-			pr_err("%s: busy\n", __func__);
+			dev_err(&mdp_dev->dev, "%s: busy\n", __func__);
 			goto done;
 		}
 		mdp->out_if[interface].irq_mask = mask;
@@ -435,7 +435,7 @@ int mdp_probe(struct platform_device *pdev)
 
 	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!resource) {
-		pr_err("mdp: can not get mdp mem resource!\n");
+		dev_err(&pdev->dev, "mdp: can not get mdp mem resource!\n");
 		return -ENOMEM;
 	}
 
@@ -447,7 +447,7 @@ int mdp_probe(struct platform_device *pdev)
 
 	mdp->irq = platform_get_irq(pdev, 0);
 	if (mdp->irq < 0) {
-		pr_err("mdp: can not get mdp irq\n");
+		dev_err(&pdev->dev, "mdp: can not get mdp irq\n");
 		ret = mdp->irq;
 		goto error_get_irq;
 	}
@@ -455,7 +455,7 @@ int mdp_probe(struct platform_device *pdev)
 	mdp->base = ioremap(resource->start,
 			    resource->end - resource->start);
 	if (mdp->base == 0) {
-		printk(KERN_ERR "msmfb: cannot allocate mdp regs!\n");
+		dev_err(&pdev->dev, "msmfb: cannot allocate mdp regs!\n");
 		ret = -ENOMEM;
 		goto error_ioremap;
 	}
@@ -472,7 +472,7 @@ int mdp_probe(struct platform_device *pdev)
 
 	mdp->clk = clk_get(&pdev->dev, "mdp_clk");
 	if (IS_ERR(mdp->clk)) {
-		printk(KERN_INFO "mdp: failed to get mdp clk");
+		dev_info(&pdev->dev, "mdp: failed to get mdp clk");
 		ret = PTR_ERR(mdp->clk);
 		goto error_get_mdp_clk;
 	}
@@ -483,7 +483,7 @@ int mdp_probe(struct platform_device *pdev)
 
 	mdp->ebi1_clk = clk_get(NULL, "ebi1_clk");
 	if (IS_ERR(mdp->ebi1_clk)) {
-		pr_err("mdp: failed to get ebi1 clk\n");
+		dev_info(&pdev->dev, "mdp: failed to get ebi1 clk\n");
 		ret = PTR_ERR(mdp->ebi1_clk);
 		goto error_get_ebi1_clk;
 	}
@@ -514,7 +514,7 @@ int mdp_probe(struct platform_device *pdev)
 
 	the_mdp = mdp;
 
-	pr_info("%s: initialized\n", __func__);
+	dev_info(&pdev->dev, "%s: initialized\n", __func__);
 
 	return 0;
 

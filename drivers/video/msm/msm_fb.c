@@ -225,7 +225,7 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
 	if (time_since_request > 20 * NSEC_PER_MSEC) {
 		uint32_t us;
 		us = do_div(time_since_request, NSEC_PER_MSEC) / NSEC_PER_USEC;
-		printk(KERN_WARNING "msmfb_start_dma %lld.%03u ms after vsync "
+		dev_dbg(&mdp->dev, "msmfb_start_dma %lld.%03u ms after vsync "
 			"request\n", time_since_request, us);
 	}
 	if (msmfb->frame_done == msmfb->frame_requested) {
@@ -248,7 +248,7 @@ static int msmfb_start_dma(struct msmfb_info *msmfb)
 	msmfb->update_info.ebottom = 0;
 	if (unlikely(w > msmfb->xres || h > msmfb->yres ||
 		     w == 0 || h == 0)) {
-		printk(KERN_INFO "invalid update: %d %d %d "
+		dev_dbg(&mdp->dev, "invalid update: %d %d %d "
 				"%d\n", x, y, w, h);
 		msmfb->frame_done = msmfb->frame_requested;
 		goto error;
@@ -336,10 +336,10 @@ restart:
 				panel->request_vsync(panel,
 					&msmfb->vsync_callback);
 				retry = 0;
-				printk(KERN_WARNING "msmfb_pan_display timeout "
+				dev_dbg(&mdp->dev, "msmfb_pan_display timeout "
 					"rerequest vsync\n");
 			} else {
-				printk(KERN_WARNING "msmfb_pan_display timeout "
+				dev_dbg(&mdp->dev, "msmfb_pan_display timeout "
 					"waiting for frame start, %d %d\n",
 					msmfb->frame_requested,
 					msmfb->frame_done);
