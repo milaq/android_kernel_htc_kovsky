@@ -309,9 +309,9 @@ static struct adsp_info info = {
 static int adsp_probe_5225(struct platform_device *pdev)
 {
   	int rc;
-	printk("+%s\n", __func__);
+	pr_debug("+%s\n", __func__);
 	rc = msm_adsp_probe(&info);
-	printk("-%s rc=%d\n", __func__, rc);
+	pr_debug("-%s rc=%d\n", __func__, rc);
 	return rc;
 }
 

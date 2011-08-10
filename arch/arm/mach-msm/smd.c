@@ -667,7 +667,7 @@ static int smd_alloc_v2(struct smd_channel *ch)
 
 	shared2 = smem_alloc(SMEM_SMD_BASE_ID + ch->n, sizeof(struct smd_shared_v2));
 	if (!shared2) {
-		pr_err("%s cid %d does not exist\n", __func__, ch->n);
+		pr_debug("%s cid %d does not exist\n", __func__, ch->n);
 		return -1;
 	}
 
@@ -699,7 +699,7 @@ static int smd_alloc_v1(struct smd_channel *ch)
 	struct smd_shared_v1 *shared1;
 	shared1 = smem_alloc(ID_SMD_CHANNELS + ch->n, sizeof(struct smd_shared_v1));
 	if (!shared1) {
-		pr_err("smd_alloc_channel() cid %d does not exist\n", ch->n);
+		pr_debug("%s cid %d does not exist\n", __func__, ch->n);
 		return -1;
 	}
 	ch->send = &shared1->ch0;
@@ -942,7 +942,7 @@ void *smem_find(unsigned id, unsigned size_in)
 
 	size_in = ALIGN(size_in, 8);
 	if (size_in != size) {
-		pr_err("smem_find(%d, %d): wrong size %d\n", id, size_in, size);
+		pr_debug("smem_find(%d, %d): wrong size %d\n", id, size_in, size);
 		return 0;
 	}
 
@@ -1121,7 +1121,7 @@ static bool amss_get_pdata_num_value(enum amss_id id, uint32_t * out)
 	if (!pdata) {
 		//we should not ever get here.
 		//but leave it here until it is tested
-		printk(KERN_ERR "%s: adsp_info is NULL\n", __func__);
+		pr_err("%s: adsp_info is NULL\n", __func__);
 		return false;
 	}
 
@@ -1141,9 +1141,8 @@ bool amss_get_num_value(enum amss_id id, uint32_t *out) {
 		return true;
 	}
 	else {
-		printk(KERN_INFO
-				"%s: could not look up value %d, falling back to default\n",
-				__func__, id);
+		pr_debug("%s: could not look up value %d, falling back to default\n",
+			__func__, id);
 	}
 
 	for (i = 0; i < n_amss_fallback_params; i++) {
@@ -1164,7 +1163,7 @@ static const char *amss_get_pdata_str_value(enum amss_id id)
 	if (!pdata) {
 		//we should not ever get here.
 		//but leave it here until it is tested
-		printk(KERN_ERR "%s: adsp_info is NULL\n", __func__);
+		pr_err("%s: adsp_info is NULL\n", __func__);
 		return NULL;
 	}
 	for (i = 0; i < pdata->n_amss_values; i++) {
@@ -1182,8 +1181,7 @@ const char *amss_get_str_value(enum amss_id id) {
 		return ret;
 	}
 	else {
-		printk(KERN_INFO
-				"%s: could not look up value %d, falling back to default\n",
+		pr_debug("%s: could not look up value %d, falling back to default\n",
 				__func__, id);
 	}
 
@@ -1223,7 +1221,7 @@ static int msm_smd_probe(struct platform_device *pdev)
 	struct msm_smd_platform_data *smd_pdata = pdev->dev.platform_data;
 	if (smd_pdata)
 		pdata = smd_pdata;
-	pr_info("+%s\n", __func__);
+	pr_debug("+%s\n", __func__);
 
 	init_waitqueue_head(&rpccall_wait);
 	if (pdata && pdata->use_v2_alloc_elm)
@@ -1246,7 +1244,7 @@ static int msm_smd_probe(struct platform_device *pdev)
 	smd_initialized = 1;
 	wait_event_interruptible(rpccall_wait, rpccall_done == 1);
 
-	printk(KERN_INFO "-%s()\n", __func__);
+	pr_debug("-%s()\n", __func__);
 	return 0;
 }
 

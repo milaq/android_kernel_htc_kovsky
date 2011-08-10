@@ -1346,7 +1346,7 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 	if (rc < 0)
 		goto fail_destroy_workqueue;
 
-	printk("RPC Init done\n");
+	D("RPC Init done\n");
 
 	/* Open up SMD channel 2 */
 	initialized = 0;
@@ -1354,7 +1354,7 @@ static int msm_rpcrouter_probe(struct platform_device *pdev)
 	if (rc < 0)
 		goto fail_remove_devices;
 
-	printk(KERN_DEBUG "RPCCALL opened\n");
+	D("RPCCALL opened\n");
 
 	queue_work(rpcrouter_workqueue, &work_read_data);
 
