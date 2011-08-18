@@ -40,6 +40,11 @@ enum clk_reset_action {
 	CLK_RESET_ASSERT	= 1
 };
 
+enum clk_flags {
+	VFE_CLK_EXTERNAL = 0x100,
+	VFE_CLK_INTERNAL = 0x200,
+};
+
 struct clk;
 
 /* Rate is minimum clock rate in Hz */
