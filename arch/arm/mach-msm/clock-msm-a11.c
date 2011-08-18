@@ -887,7 +887,7 @@ static int a11_clk_set_flags(unsigned id, unsigned flags)
 			writel((readl(MSM_CLK_CTL_BASE + 0x44) | (1 << 14)),
 			       MSM_CLK_CTL_BASE + 0x44);
 			D("Setting external clock for VFE_CLK\n");
-		} else if (flags & VFE_CLK_EXTERNAL) {
+		} else if (flags & VFE_CLK_INTERNAL) {
 			writel((readl(MSM_CLK_CTL_BASE + 0x44) & ~(1 << 14)),
 			       MSM_CLK_CTL_BASE + 0x44);
 			D("Setting internal clock for VFE_CLK\n");
