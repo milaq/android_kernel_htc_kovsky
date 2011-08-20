@@ -35,10 +35,10 @@ enum {
 void __init msm_add_usb_devices(void (*phy_reset) (void));
 void __init msm_init_pmic_vibrator(void);
 
-struct mmc_platform_data;
+struct msm_mmc_platform_data;
 
 int __init msm_add_serial_devices(unsigned uart);
-int __init msm_add_sdcc_devices(unsigned int controller, struct mmc_platform_data *plat);
+int __init msm_add_sdcc_devices(unsigned int controller, struct msm_mmc_platform_data *plat);
 
 int __init board_mfg_mode(void);
 int __init parse_tag_smi(const struct tag *tags);

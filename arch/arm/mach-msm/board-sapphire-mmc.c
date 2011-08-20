@@ -37,7 +37,7 @@
 
 #define DEBUG_SDSLOT_VDD 0
 
-extern int msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat,
+extern int msm_add_sdcc(unsigned int controller, struct msm_mmc_platform_data *plat,
 			unsigned int stat_irq, unsigned long stat_irq_flags);
 
 /* ---- COMMON ---- */
@@ -174,7 +174,7 @@ static unsigned int sapphire_sdslot_status(struct device *dev)
 			| MMC_VDD_25_26 | MMC_VDD_26_27 | MMC_VDD_27_28 \
 			| MMC_VDD_28_29 | MMC_VDD_29_30)
 
-static struct mmc_platform_data sapphire_sdslot_data = {
+static struct msm_mmc_platform_data sapphire_sdslot_data = {
 	.ocr_mask	= SAPPHIRE_MMC_VDD,
 	.status		= sapphire_sdslot_status,
 	.translate_vdd	= sapphire_sdslot_switchvdd,
@@ -342,7 +342,7 @@ void sapphire_wifi_reset(int on)
 EXPORT_SYMBOL(sapphire_wifi_reset);
 #endif
 
-static struct mmc_platform_data sapphire_wifi_data = {
+static struct msm_mmc_platform_data sapphire_wifi_data = {
 	.ocr_mask		= MMC_VDD_28_29,
 	.status			= sapphire_wifi_status,
 	.register_status_notify	= sapphire_wifi_status_register,
