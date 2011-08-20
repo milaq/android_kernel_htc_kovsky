@@ -431,30 +431,14 @@ static struct platform_device wl1251_device = {
 };
 #endif
 
-#if 0
-static struct sdio_embedded_func wifi_func = {
-	.f_class = SDIO_CLASS_WLAN,
-	.f_maxblksize = 512,
-};
+static void wifi_init_card(struct mmc_card *card) {
+	card->quirks |= MMC_QUIRK_NONSTD_FUNC_IF;
 
-static struct embedded_sdio_data ti_wifi_emb_data = {
-	.cis = {
-		.vendor = 0x104c,
-		.device = 0x9066,
-		.blksize = 512,
-		.max_dtr = 11000000,
-		},
-	.cccr = {
-		 .multi_block = 0,
-		 .low_speed = 0,
-		 .wide_bus = 1,
-		 .high_power = 0,
-		 .high_speed = 0,
-		 },
-	.funcs = &wifi_func,
-	.num_funcs = 1,
-};
-#endif
+	card->cis.vendor = 0x104c;
+	card->cis.device = 0x9066;
+	card->cis.blksize = 512;
+	card->cis.max_dtr = 11000000;
+}
 
 static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 {
@@ -515,9 +499,8 @@ pwroff:
 }
 
 static struct msm_mmc_platform_data msm7200a_wl1251_data = {
-	//.built_in = 1,
 	.ocr_mask = MMC_VDD_28_29,
-	//.embedded_sdio = &ti_wifi_emb_data,
+	.init_card = wifi_init_card,
 	.translate_vdd = wifi_switchvdd,
 };
 
