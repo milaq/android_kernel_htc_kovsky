@@ -296,7 +296,7 @@ static unsigned int msm7200a_sdslot_get_status(struct device *dev)
 	return !gpio_get_value(sdslot_priv.pdata->gpio_detection);
 }
 
-static struct mmc_platform_data msm7200a_sdslot_data = {
+static struct msm_mmc_platform_data msm7200a_sdslot_data = {
 	.ocr_mask = MSM_MMC_VDD,
 	.status = msm7200a_sdslot_get_status,
 	.translate_vdd = sdslot_switchvdd,
@@ -431,6 +431,7 @@ static struct platform_device wl1251_device = {
 };
 #endif
 
+#if 0
 static struct sdio_embedded_func wifi_func = {
 	.f_class = SDIO_CLASS_WLAN,
 	.f_maxblksize = 512,
@@ -453,6 +454,7 @@ static struct embedded_sdio_data ti_wifi_emb_data = {
 	.funcs = &wifi_func,
 	.num_funcs = 1,
 };
+#endif
 
 static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 {
@@ -512,10 +514,10 @@ pwroff:
 	return 0;
 }
 
-static struct mmc_platform_data msm7200a_wl1251_data = {
-	.built_in = 1,
+static struct msm_mmc_platform_data msm7200a_wl1251_data = {
+	//.built_in = 1,
 	.ocr_mask = MMC_VDD_28_29,
-	.embedded_sdio = &ti_wifi_emb_data,
+	//.embedded_sdio = &ti_wifi_emb_data,
 	.translate_vdd = wifi_switchvdd,
 };
 
