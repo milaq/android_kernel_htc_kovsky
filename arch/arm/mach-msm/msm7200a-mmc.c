@@ -412,7 +412,7 @@ static struct msm7200a_wl1251_priv {
 	struct msm7200a_wl1251_pdata* pdata;
 	struct msm7200a_sdcc_gpios gpios;
 	bool state;
-} wl1251_priv;
+} wl1251_priv = {};
 
 #if MSM7200A_WL1251_HACK
 static void fake_wifi_enable(bool enable) {
@@ -438,6 +438,9 @@ static void wifi_init_card(struct mmc_card *card) {
 	card->cis.device = 0x9066;
 	card->cis.blksize = 512;
 	card->cis.max_dtr = 11000000;
+
+	card->cccr.wide_bus = 1,
+	printk("%s: done\n", __func__);
 }
 
 static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
@@ -477,7 +480,6 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 	}
 
 pwroff:
-	#if 0
 	wl1251_priv.state = false;
 	if (wl1251_priv.vreg) {
 		vreg_disable(wl1251_priv.vreg);
@@ -493,7 +495,6 @@ pwroff:
 	}
 	mdelay(200);
 	msm_gpios_disable(wl1251_priv.gpios.off, wl1251_priv.gpios.off_length);
-	#endif
 
 	return 0;
 }
