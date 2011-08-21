@@ -23,6 +23,8 @@
 #include <linux/mod_devicetable.h>
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/sdio_ids.h>
+#include <linux/mmc/card.h>
+#include <linux/mmc/host.h>
 #include <linux/platform_device.h>
 #include <linux/spi/wl12xx.h>
 #include <linux/irq.h>
@@ -178,6 +180,7 @@ static void wl1251_disable_line_irq(struct wl1251 *wl)
 
 static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 {
+	int ret = 0;
 	struct sdio_func *func = wl_to_func(wl);
 	wl1251_enter();
 
@@ -190,7 +193,9 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 		if (wl->set_power)
 			wl->set_power(true);
 
-		pm_runtime_get_sync(&func->dev);
+		ret = pm_runtime_get_sync(&func->dev);
+		//if (ret < 0)
+		//	goto out;
 
 		sdio_claim_host(func);
 		sdio_enable_func(func);
@@ -200,12 +205,15 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 		sdio_disable_func(func);
 		sdio_release_host(func);
 
-		pm_runtime_put_sync(&func->dev);
+		ret = pm_runtime_put_sync(&func->dev);
+		//if (ret < 0)
+		//	goto out;
 		
 		if (wl->set_power)
 			wl->set_power(false);
 	}
 
+out:
 	wl1251_leave();
 	return 0;
 }
@@ -262,6 +270,12 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 		ret = -ENOMEM;
 		goto out_free_hw;
 	}
+	
+	/* Grab access to FN0 for ELP reg. */
+	func->card->quirks |= MMC_QUIRK_LENIENT_FN0;
+
+	/* Use block mode for transferring over one block size of data */
+	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
 
 	sdio_claim_host(func);
 	ret = sdio_enable_func(func);
