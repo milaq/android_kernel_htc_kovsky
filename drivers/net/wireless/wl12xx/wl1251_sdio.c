@@ -28,7 +28,6 @@
 #include <linux/platform_device.h>
 #include <linux/spi/wl12xx.h>
 #include <linux/irq.h>
-#include <linux/pm_runtime.h>
 
 #include "wl1251.h"
 
@@ -185,17 +184,8 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 	wl1251_enter();
 
 	if (enable) {
-		/*
-		 * Power is controlled by runtime PM, but we still call board
-		 * callback in case it wants to do any additional setup,
-		 * for example enabling clock buffer for the module.
-		 */
 		if (wl->set_power)
 			wl->set_power(true);
-
-		ret = pm_runtime_get_sync(&func->dev);
-		//if (ret < 0)
-		//	goto out;
 
 		sdio_claim_host(func);
 		sdio_enable_func(func);
@@ -205,10 +195,6 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 		sdio_disable_func(func);
 		sdio_release_host(func);
 
-		ret = pm_runtime_put_sync(&func->dev);
-		//if (ret < 0)
-		//	goto out;
-		
 		if (wl->set_power)
 			wl->set_power(false);
 	}
@@ -323,9 +309,6 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 
 	sdio_set_drvdata(func, wl);
 
-	/* Tell PM core that we don't need the card to be powered now */
-	pm_runtime_put_noidle(&func->dev);
-
 	return ret;
 
 out_free_irq:
@@ -347,8 +330,6 @@ static void __devexit wl1251_sdio_remove(struct sdio_func *func)
 	struct wl1251 *wl = sdio_get_drvdata(func);
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 
-	/* Undo decrement done above in wl1251_probe */
-	pm_runtime_get_noresume(&func->dev);
 
 	if (wl->irq)
 		free_irq(wl->irq, wl);
