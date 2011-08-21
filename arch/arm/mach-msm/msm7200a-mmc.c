@@ -433,6 +433,7 @@ static struct platform_device wl1251_device = {
 
 static void wifi_init_card(struct mmc_card *card) {
 	card->quirks |= MMC_QUIRK_NONSTD_FUNC_IF;
+	card->quirks |= MMC_QUIRK_NONSTD_SDIO;
 
 	card->cis.vendor = 0x104c;
 	card->cis.device = 0x9066;
@@ -480,6 +481,7 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 	}
 
 pwroff:
+	#if 0
 	wl1251_priv.state = false;
 	if (wl1251_priv.vreg) {
 		vreg_disable(wl1251_priv.vreg);
@@ -495,7 +497,7 @@ pwroff:
 	}
 	mdelay(200);
 	msm_gpios_disable(wl1251_priv.gpios.off, wl1251_priv.gpios.off_length);
-
+	#endif
 	return 0;
 }
 
