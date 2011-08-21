@@ -141,13 +141,18 @@ out:
 static void wl1251_fw_wakeup(struct wl1251 *wl)
 {
 	u32 elp_reg;
+	int i = 0;
 
-	elp_reg = ELPCTRL_WAKE_UP;
-	wl1251_write_elp(wl, HW_ACCESS_ELP_CTRL_REG_ADDR, elp_reg);
-	elp_reg = wl1251_read_elp(wl, HW_ACCESS_ELP_CTRL_REG_ADDR);
+	do {
+		elp_reg = ELPCTRL_WAKE_UP;
+		wl1251_write_elp(wl, HW_ACCESS_ELP_CTRL_REG_ADDR, elp_reg);
+		elp_reg = wl1251_read_elp(wl, HW_ACCESS_ELP_CTRL_REG_ADDR);
 
-	if (!(elp_reg & ELPCTRL_WLAN_READY))
-		wl1251_warning("WLAN not ready");
+		if (!(elp_reg & ELPCTRL_WLAN_READY))
+			wl1251_warning("WLAN not ready");
+
+		msleep(100);
+	} while ((!(elp_reg & ELPCTRL_WLAN_READY)) && ++i < 20);
 }
 
 static int wl1251_chip_wakeup(struct wl1251 *wl)
@@ -157,7 +162,7 @@ static int wl1251_chip_wakeup(struct wl1251 *wl)
 	ret = wl1251_power_on(wl);
 	if (ret < 0)
 		return ret;
-	msleep(WL1251_POWER_ON_SLEEP);
+	msleep(200 * WL1251_POWER_ON_SLEEP);
 	wl->if_ops->reset(wl);
 
 	/* We don't need a real memory partition here, because we only want
@@ -172,8 +177,6 @@ static int wl1251_chip_wakeup(struct wl1251 *wl)
 	wl1251_fw_wakeup(wl);
 
 	/* whal_FwCtrl_BootSm() */
-
-	/* 0. read chip id from CHIP_ID */
 	wl->chip_id = wl1251_reg_read32(wl, CHIP_ID_B);
 
 	/* 1. check if chip id is valid */

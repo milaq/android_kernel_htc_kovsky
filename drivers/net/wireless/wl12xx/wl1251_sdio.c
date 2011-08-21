@@ -106,7 +106,7 @@ static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 	 * the unused bits of CMD52 as write data even if we send read
 	 * request).
 	 */
-	printk("%s: addr=%08x, val=%08x, wl_sdio=%08x, func=%08x fnum=%08x\n",
+	printk("%s: addr=%08x, val=%08x, wl_sdio=%p, func=%p fnum=%08x\n",
 	__func__, addr, *val, wl_sdio, func, func->num);
 	sdio_claim_host(func);
 	*val = sdio_writeb_readb(func, wl_sdio->elp_val, addr, &ret);
@@ -122,7 +122,7 @@ static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 	struct sdio_func *func = wl_sdio->func;
 
-	printk("%s: addr=%08x, val=%08x, wl_sdio=%08x, func=%08x\n",
+	printk("%s: addr=%08x, val=%08x, wl_sdio=%p, func=%p\n",
 	__func__, addr, val, wl_sdio, func);
 
 	sdio_claim_host(func);
@@ -187,6 +187,12 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 		if (wl->set_power)
 			wl->set_power(true);
 
+		ret = mmc_power_restore_host(func->card->host);
+		if (ret) {
+			wl1251_error("failed to restore host power");
+			goto out;
+		}
+
 		sdio_claim_host(func);
 		sdio_enable_func(func);
 		sdio_release_host(func);
@@ -194,6 +200,11 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 		sdio_claim_host(func);
 		sdio_disable_func(func);
 		sdio_release_host(func);
+		ret = mmc_power_save_host(func->card->host);
+		if (ret) {
+			wl1251_error("failed to disable host power");
+			goto out;
+		}
 
 		if (wl->set_power)
 			wl->set_power(false);
