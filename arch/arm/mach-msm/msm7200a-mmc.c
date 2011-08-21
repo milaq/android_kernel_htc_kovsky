@@ -481,7 +481,6 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 	}
 
 pwroff:
-	#if 0
 	wl1251_priv.state = false;
 	if (wl1251_priv.vreg) {
 		vreg_disable(wl1251_priv.vreg);
@@ -497,7 +496,6 @@ pwroff:
 	}
 	mdelay(200);
 	msm_gpios_disable(wl1251_priv.gpios.off, wl1251_priv.gpios.off_length);
-	#endif
 	return 0;
 }
 
