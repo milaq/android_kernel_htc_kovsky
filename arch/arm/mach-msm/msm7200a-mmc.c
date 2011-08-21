@@ -476,7 +476,7 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 		if (wl1251_priv.pdata->gpio_enable >= 0) {
 			gpio_direction_output(wl1251_priv.pdata->gpio_enable, 1);
 		}
-		mdelay(100);
+		mdelay(250);
 		return 0;
 	}
 
