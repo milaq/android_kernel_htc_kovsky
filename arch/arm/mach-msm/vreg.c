@@ -176,7 +176,7 @@ int vreg_set_level(struct vreg *vreg, unsigned mv)
 		.data = (1U << id) };
 	// This reg appears to only be used by vreg_set_level()
 	writel(mv, MSM_SHARED_RAM_BASE + 0xfc130);
-	printk(KERN_DEBUG "vreg_set_level %d -> %u\n", id, mv);
+	pr_debug("%s %d -> %u\n", __func__, id, mv);
 	vreg->status = msm_dex_comm(&dex, 0);
 #else
 	vreg->status = msm_proc_comm(PCOM_VREG_SET_LEVEL, &id, &mv);

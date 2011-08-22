@@ -47,11 +47,8 @@ static unsigned a11_clk_is_enabled(unsigned id);
 static int a11_clk_enable(unsigned id);
 static void a11_clk_disable(unsigned id);
 
-#if 1
-#define D(x...) printk(KERN_WARNING "clock-msm-a11: " x)
-#else
-#define D(x...) do {} while (0)
-#endif
+#define DEBUG
+#define D(fmt, x...) pr_debug("clock-msm-a11: " fmt, ##x)
 
 #define MSM_GLBL_CLK_STATE      ( MSM_CLK_CTL_BASE+0x4 )
 #define MSM_CAM_MD_REG          ( MSM_CLK_CTL_BASE+0x40 )
@@ -270,7 +267,7 @@ set_ns:
 		default:
 		break;
 	}
-	printk("%s: rate=%d, ns_val=%08x\n", __func__, freq, ns_val);
+	D("%s: rate=%d, ns_val=%08x\n", __func__, freq, ns_val);
 	return ns_val;
 }
 
@@ -362,7 +359,6 @@ static void set_vdc_rail(int on)
 		return;
 	state = on;
 
-	printk("+%s(%d)\n", __func__, on);
 	if (state) {
 		REG_OR(MSM_CLK_CTL_BASE + 0xF0, 0x800);
 		if (readl(MSM_CLK_CTL_BASE + 0xF0) & 0x60) {
@@ -413,7 +409,6 @@ static void set_vdc_rail(int on)
 
 		REG_SET(MSM_VDD_VDC_GFS_CTL, 0x1f);
 	}
-	printk("-%s(%d)\n", __func__, on);
 }
 
 static void set_vfe_rail(int enable)
@@ -422,7 +417,6 @@ static void set_vfe_rail(int enable)
 	int status = 0;
 	static int is_enabled = 0;
 
-	printk("+%s(%d)\n", __func__, enable);
 	if (is_enabled == enable)
 		return;
 
@@ -469,7 +463,6 @@ static void set_vfe_rail(int enable)
 		REG_ANDM_OR(MSM_RAIL_CLAMP_IO, 0x3F, 8);
 		REG_SET(MSM_VDD_VFE_GFS_CTL, 0x1F);
 	}
-	printk("-%s(%d)\n", __func__, enable);
 }
 
 static inline struct msm_clock_params msm_clk_get_params(unsigned id)
@@ -513,7 +506,7 @@ static int set_mdns_host_clock(unsigned id, unsigned freq)
 		  params.idx, params.offset);
 
 	if (!params.offset) {
-		D("%s: FIXME! Don't know how to set clock %u - no known Md/Ns reg\n", __func__, id);
+		D("%s: FIXME! no known Md/Ns reg for clock %u\n", __func__, id);
 		return 0;
 		//return -ENOTSUPP;
 	}
@@ -695,7 +688,6 @@ static int a11_clk_enable(unsigned id)
 		break;
 
 	case MDC_CLK:
-		printk("Enabling MDC clock\n");
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x800,
 		       MSM_CLK_CTL_BASE + params.offset);
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) | 0x200,
@@ -798,7 +790,6 @@ static void a11_clk_disable(unsigned id)
 		break;
 
 	case MDC_CLK:
-		D("disabling MDC clock\n");
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x200,
 		       MSM_CLK_CTL_BASE + params.offset);
 		writel(readl(MSM_CLK_CTL_BASE + params.offset) & ~0x800,
@@ -839,7 +830,7 @@ static int a11_clk_set_rate(unsigned id, unsigned rate)
 	int retval;
 	retval = 0;
 
-	if (DEBUG_MDNS)
+	if (debug_mask & DEBUG_MDNS)
 		D("%s: id=%u rate=%u\n", __func__, id, rate);
 
 	retval = set_mdns_host_clock(id, rate);
@@ -852,7 +843,7 @@ static int a11_clk_set_min_rate(unsigned id, unsigned rate)
 	if (id < NR_CLKS)
 		min_clk_rate[id] = rate;
 	else if (debug_mask & DEBUG_UNKNOWN_ID)
-		D(" FIXME! clk_set_min_rate not implemented; %u:%u NR_CLKS=%d\n", id, rate, NR_CLKS);
+		D(" FIXME! %s not implemented; %u:%u\n", __func__, id, rate);
 
 	return 0;
 }
@@ -862,7 +853,7 @@ static int a11_clk_set_max_rate(unsigned id, unsigned rate)
 	if (id < NR_CLKS)
 		max_clk_rate[id] = rate;
 	else if (debug_mask & DEBUG_UNKNOWN_ID)
-		D(" FIXME! clk_set_min_rate not implemented; %u:%u NR_CLKS=%d\n", id, rate, NR_CLKS);
+		D(" FIXME! %s not implemented %u:%u\n", __func__, id, rate);
 
 	return 0;
 }
@@ -892,9 +883,10 @@ static int a11_clk_set_flags(unsigned id, unsigned flags)
 			       MSM_CLK_CTL_BASE + 0x44);
 			D("Setting internal clock for VFE_CLK\n");
 		}
-	} else if (debug_mask & DEBUG_UNKNOWN_CMD)
+	} else if (debug_mask & DEBUG_UNKNOWN_CMD) {
 		D("%s not implemented for clock: id=%u, flags=%u\n",
-		  __func__, id, flags);
+			__func__, id, flags);
+	}
 	return 0;
 }
 
@@ -905,9 +897,8 @@ static unsigned a11_clk_is_enabled(unsigned id)
 	bit = msm_clk_enable_bit(id);
 	if (bit > 0) {
 		is_enabled = (readl(MSM_CLK_CTL_BASE) & bit) != 0;
-	} else if (debug_mask & DEBUG_UNKNOWN_CMD) {
+	} else if (debug_mask & DEBUG_UNKNOWN_CMD)
 		D("%s not implemented for clock: id=%d\n", __func__, id);
-	}
 	return is_enabled;
 }
 
@@ -919,11 +910,9 @@ static long a11_clk_round_rate(unsigned id, unsigned rate)
 
 int a11_clk_reset(unsigned id, enum clk_reset_action action)
 {
-	if (debug_mask & DEBUG_UNKNOWN_CMD) {
-		D("%s implemented for clock: id=%d, action = 0x%x\n", __func__,
-		  id, action);
-	}
-
+	if (debug_mask & DEBUG_UNKNOWN_CMD)
+		D("%s not implemented for clock: id=%d, action = 0x%x\n",
+			__func__, id, action);
 	return 0;
 }
 
@@ -947,9 +936,9 @@ static void msm_clock_a11_reset_imem(void)
 		return;
 
 	writel(0, MSM_IMEM_BASE);
-	pr_info("IMEM OLD: VAL = %d\n", readl(MSM_IMEM_BASE));
+	D("IMEM OLD: VAL = %d\n", readl(MSM_IMEM_BASE));
 	msleep(100);
-	pr_info("IMEM NEW: VAL = %d\n", readl(MSM_IMEM_BASE));
+	D("IMEM NEW: VAL = %d\n", readl(MSM_IMEM_BASE));
 }
 
 struct clk_ops clk_ops_a11 = {

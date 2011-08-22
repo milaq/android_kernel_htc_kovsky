@@ -38,7 +38,7 @@ int microp_ng_write(struct i2c_client *client_ptr, uint8_t *sendbuf, int len)
 	};
 
 	if (!client_ptr) {
-		printk(KERN_ERR "%s: client_ptr is null\n", __func__);
+		pr_err("%s: client_ptr is null\n", __func__);
 		return -EIO;
 	}
 
@@ -51,12 +51,11 @@ int microp_ng_write(struct i2c_client *client_ptr, uint8_t *sendbuf, int len)
 			goto exit;
 		}
 		msleep(10);
-		printk(KERN_WARNING "microp_ng, i2c write retry\n");
+		pr_err("microp_ng, i2c write retry\n");
 	}
 
 	if (retry >= I2C_WRITE_RETRY_TIMES) {
-		printk(KERN_ERR
-		       "microp_ng_write, i2c_write_block retry over %d\n",
+		pr_err("microp_ng_write, i2c_write_block retry over %d\n",
 		       I2C_WRITE_RETRY_TIMES);
 		rc = -ETIMEDOUT;
 	}
@@ -88,7 +87,7 @@ int microp_ng_read(struct i2c_client *client_ptr, uint8_t id, uint8_t *buf, int 
 	};
 
 	if (!client_ptr) {
-		printk(KERN_ERR "%s: client_ptr is null\n", __func__);
+		pr_err("%s: client_ptr is null\n", __func__);
 		return -EIO;
 	}
 
@@ -101,7 +100,7 @@ int microp_ng_read(struct i2c_client *client_ptr, uint8_t id, uint8_t *buf, int 
 			goto exit;
 		}
 		msleep(10);
-		printk(KERN_WARNING "microp_ng, i2c read retry\n");
+		pr_err("microp_ng, i2c read retry\n");
 	}
 
 	if (retry >= I2C_WRITE_RETRY_TIMES) {
@@ -132,10 +131,10 @@ static uint16_t microp_ng_get_version(struct i2c_client *client, unsigned char r
 
 	int ret = microp_ng_read(client, reg, version, 2);
 	if (ret < 0) {
-	  printk(KERN_ERR "%s: error reading microp version %d\n", __func__, ret);
+	  pr_err("%s: error reading microp version %d\n", __func__, ret);
 	  return false;
 	}
-	printk("%s: version %x%x\n", __func__, version[0], version[1]);
+	pr_info("%s: version %x%x\n", __func__, version[0], version[1]);
 	return ((version[0] << 8) | version[1]);
 }
 
@@ -148,13 +147,13 @@ static int microp_ng_probe(struct i2c_client *client,
 	bool found = 0;
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA)) {
-		printk(KERN_ERR "%s: i2c bus not supported\n", __func__);
+		pr_err("%s: i2c bus not supported\n", __func__);
 		r = -EINVAL;
 		goto fail;
 	}
 
 	if (!client->dev.platform_data) {
-		printk(KERN_ERR "%s: platform data is null\n", __func__);
+		pr_err("%s: platform data is null\n", __func__);
 		r = -EINVAL;
 		goto fail;
 	}
@@ -162,13 +161,13 @@ static int microp_ng_probe(struct i2c_client *client,
 	data = (struct microp_platform_data *)(client->dev.platform_data);
 
 	if (!data->nclients) {
-	  printk(KERN_ERR "%s: platform did not specify any clients\n", __func__);
+	  pr_err("%s: platform did not specify any clients\n", __func__);
 	  r = -EINVAL;
 	  goto fail;
 	}
 
 	if (!data->comp_versions || !data->n_comp_versions) {
-		printk(KERN_ERR "%s: platform did not specify compatible versions\n",
+		pr_err("%s: platform did not specify compatible versions\n",
 				 __func__);
 		r = -EINVAL;
 		goto fail;
@@ -183,7 +182,7 @@ static int microp_ng_probe(struct i2c_client *client,
 	}
 
 	if (!found) {
-		printk(KERN_ERR "%s: no compatible version was found\n",
+		pr_err("%s: no compatible version was found\n",
 				 __func__);
 		r = -EINVAL;
 		goto fail;
@@ -211,25 +210,6 @@ static const struct i2c_device_id microp_ng_ids[] = {
 	{}
 };
 
-#if CONFIG_PM
-static int microp_ng_suspend(struct platform_device *pdev, pm_message_t mesg)
-{
-	printk("[MICROP] +%s\n", __func__);
-	printk("[MICROP] -%s\n", __func__);
-	return 0;
-}
-
-static int microp_ng_resume(struct platform_device *pdev)
-{
-	printk("[MICROP] +%s\n", __func__);
-	printk("[MICROP] -%s\n", __func__);
-	return 0;
-}
-#else
-#define htckovsky_microp_suspend NULL
-#define htckovsky_microp_resume NULL
-#endif
-
 static struct i2c_driver microp_ng_driver = {
 	.driver = {
 		.name = "microp-ng",
@@ -238,19 +218,17 @@ static struct i2c_driver microp_ng_driver = {
 	.id_table = microp_ng_ids,
 	.probe = microp_ng_probe,
 	.remove = microp_ng_remove,
-	.suspend	= microp_ng_suspend,
-	.resume		= microp_ng_resume,
 };
 
 static int __init microp_ng_init(void)
 {
-	printk(KERN_INFO "microp-ng: Registering MicroP-LED driver\n");
+	pr_info("microp-ng: Registering MicroP-LED driver\n");
 	return i2c_add_driver(&microp_ng_driver);
 }
 
 static void __exit microp_ng_exit(void)
 {
-	printk(KERN_INFO "microp-ng: Unregistered MicroP-LED driver\n");
+	pr_info("microp-ng: Unregistered MicroP-LED driver\n");
 	i2c_del_driver(&microp_ng_driver);
 }
 

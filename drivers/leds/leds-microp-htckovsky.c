@@ -132,7 +132,6 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
 	int ret = 0;
 	int i;
 
-	printk(KERN_INFO "+%s\n", __func__);
 	client = dev_get_drvdata(&pdev->dev);
 
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
@@ -141,7 +140,6 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
 			goto led_fail;
 		}
 	}
-	printk(KERN_INFO "-%s\n", __func__);
 
 	return 0;
 
@@ -165,18 +163,17 @@ static int htckovsky_leds_remove(struct platform_device *pdev)
 #if CONFIG_PM
 static int htckovsky_leds_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
-	printk("[MICROP] +%s\n", __func__);
+	pr_debug("+%s\n", __func__);
 	cancel_work_sync(&colorled_wq);
 	cancel_work_sync(&backlight_wq);
 	cancel_work_sync(&buttonlight_wq);
-	printk("[MICROP] -%s\n", __func__);
+	pr_debug("-%s\n", __func__);
 	return 0;
 }
 
 static int htckovsky_leds_resume(struct platform_device *pdev)
 {
-	printk("[MICROP] +%s\n", __func__);
-	printk("[MICROP] -%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 #else
