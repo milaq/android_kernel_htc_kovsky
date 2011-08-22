@@ -1410,6 +1410,8 @@ struct ieee80211_hw *wl1251_alloc_hw(void)
 	for (i = 0; i < FW_TX_CMPLT_BLOCK_SIZE; i++)
 		wl->tx_frames[i] = NULL;
 
+	spin_lock_init(&wl->wl_lock);
+	
 	wl->next_tx_complete = 0;
 
 	INIT_WORK(&wl->irq_work, wl1251_irq_work);
