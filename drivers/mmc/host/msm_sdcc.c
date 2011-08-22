@@ -58,7 +58,7 @@ static unsigned int msmsdcc_fmax = 50000000;
 static unsigned int msmsdcc_4bit = 1;
 static unsigned int msmsdcc_pwrsave = 1;
 static unsigned int msmsdcc_piopoll = 1;
-static unsigned int msmsdcc_sdioirq;
+static unsigned int msmsdcc_sdioirq = 1;
 
 #define PIO_SPINMAX 30
 #define CMD_SPINMAX 20
