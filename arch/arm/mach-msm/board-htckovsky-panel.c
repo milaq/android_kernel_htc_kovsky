@@ -442,9 +442,9 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 	return;
 	printk("htckovsky_mddi_power_client(%d)\n", on);
 	if (on) {
-		printk(KERN_DEBUG "%s: +powering up panel\n", __func__);
+		pr_debug("%s: +powering up panel\n", __func__);
 		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		printk(KERN_DEBUG "%s: enabled panel power\n", __func__);
+		pr_debug("%s: enabled panel power\n", __func__);
 
 		vreg_enable(vreg_18v);
 		vreg_enable(vreg_26v);
@@ -452,25 +452,25 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 		msleep(5);
 		htckovsky_mddi_bridge_reset(1);
 
-		printk(KERN_DEBUG "%s: enabled mddi bridge power\n", __func__);
-		printk(KERN_DEBUG "%s: -powering up panel\n", __func__);
+		pr_debug("%s: enabled mddi bridge power\n", __func__);
+		pr_debug("%s: -powering up panel\n", __func__);
 	} else {
 
-		printk(KERN_DEBUG "%s: +shutting down panel\n", __func__);
+		pr_debug("%s: +shutting down panel\n", __func__);
 		htckovsky_mddi_bridge_reset(0);
 		vreg_disable(vreg_aux2);
 		vreg_disable(vreg_26v);
 		vreg_disable(vreg_18v);
 		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
 		msleep(10);
-		printk(KERN_DEBUG "%s: disabled panel power\n", __func__);
-		printk(KERN_DEBUG "%s: -shutting down panel\n", __func__);
+		pr_debug("%s: disabled panel power\n", __func__);
+		pr_debug("%s: -shutting down panel\n", __func__);
 	}
 }
 
 static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data *bridge_data,
 					struct msm_mddi_client_data *client_data) {
-	printk(KERN_DEBUG "%s: +unblank panel\n", __func__);
+	pr_debug("%s: +unblank panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
 	htckovsky_process_mddi_table(client_data,
 				mddi_epson_init_table_1,
@@ -485,7 +485,7 @@ static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data *br
 				ARRAY_SIZE(mddi_epson_init_table_2));
 
 	client_data->auto_hibernate(client_data, 1);
-	printk(KERN_DEBUG "%s: -unblank panel\n", __func__);
+	pr_debug("%s: -unblank panel\n", __func__);
 	return 0;
 
 }
@@ -494,13 +494,13 @@ static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data
 				      *bridge_data,
 				      struct msm_mddi_client_data *client_data)
 {
-	printk(KERN_DEBUG "%s: +blank panel\n", __func__);
+	pr_debug("%s: +blank panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
 	htckovsky_process_mddi_table(client_data,
 				     mddi_epson_deinit_table,
 				     ARRAY_SIZE(mddi_epson_deinit_table));
 	client_data->auto_hibernate(client_data, 1);
-	printk(KERN_DEBUG "%s: -blank panel\n", __func__);
+	pr_debug("%s: -blank panel\n", __func__);
 	return 0;
 }
 
@@ -569,10 +569,10 @@ int __init htckovsky_init_panel(void)
 {
 	int ret;
 
-	printk(KERN_INFO "%s: Initializing panel\n", __func__);
+	pr_debug("%s: Initializing panel\n", __func__);
 
 	if (!machine_is_htckovsky()) {
-		printk(KERN_INFO "%s: disabling kovsky panel\n", __func__);
+		pr_info("%s: disabling kovsky panel\n", __func__);
 		return 0;
 	}
 
@@ -582,21 +582,21 @@ int __init htckovsky_init_panel(void)
 
 	vreg_18v = vreg_get_by_id(0, 7);
 	if (IS_ERR(vreg_18v)) {
-		printk(KERN_ERR "%s: couldn't request vreg_18v\n", __func__);
+		pr_err("%s: couldn't request vreg_18v\n", __func__);
 		ret = PTR_ERR(vreg_18v);
 		goto fail_vreg_18v;
 	}
 
 	vreg_26v = vreg_get_by_id(0, 18);
 	if (IS_ERR(vreg_26v)) {
-		printk(KERN_ERR "%s: couldn't request vreg_26v\n", __func__);
+		pr_err("%s: couldn't request vreg_26v\n", __func__);
 		ret = PTR_ERR(vreg_26v);
 		goto fail_vreg_26v;
 	}
 
 	vreg_aux2 = vreg_get_by_id(0, 22);
 	if (IS_ERR(vreg_aux2)) {
-		printk(KERN_ERR "%s: couldn't request vreg_aux2\n", __func__);
+		pr_err("%s: couldn't request vreg_aux2\n", __func__);
 		ret = PTR_ERR(vreg_aux2);
 		goto fail_vreg_aux2;
 	}
