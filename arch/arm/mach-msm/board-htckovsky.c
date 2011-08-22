@@ -490,7 +490,7 @@ static void htckovsky_usb_enable(void)
 }
 
 static void htckovsky_usb_hw_reset(bool state) {
-	printk(KERN_INFO "[USB]: %s state=%d\n", __func__, state);
+	pr_debug("[USB]: %s state=%d\n", __func__, state);
 	if (state) {
 		htckovsky_usb_disable();
 	}
@@ -1063,13 +1063,13 @@ static void htckovsky_gpios_init(void) {
 	rc = msm_gpios_request(kovsky_gpios_init_off,
 		ARRAY_SIZE(kovsky_gpios_init_off));
 	if (rc) {
-		printk(KERN_ERR "%s: unable to request off gpios\n", __func__);
+		pr_err("%s: unable to request off gpios\n", __func__);
 		return;
 	}
 	rc = msm_gpios_request(kovsky_gpios_init_on,
 		ARRAY_SIZE(kovsky_gpios_init_on));
 	if (rc) {
-		printk(KERN_ERR "%s: unable to request on gpios\n", __func__);
+		pr_err("%s: unable to request on gpios\n", __func__);
 		goto free_off;
 	}
 
@@ -1168,10 +1168,10 @@ static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
 #else
 	mi->bank[1].size = KOVS110_MEM_BANK1_SIZE & ~((1 << 22) - 1);
 #endif
-	printk(KERN_INFO "fixup: nr_banks = %d\n", mi->nr_banks);
+	pr_info("fixup: nr_banks = %d\n", mi->nr_banks);
 
 	for (i = 0; i < mi->nr_banks; i++) {
-		printk(KERN_INFO "fixup: bank%d start=%08lx, node=%08x, size=%08lx\n",
+		pr_info("fixup: bank%d start=%08lx, node=%08x, size=%08lx\n",
 		i, mi->bank[i].start, mi->bank[i].node, mi->bank[i].size);
 	}
 }
