@@ -94,11 +94,7 @@ static unsigned int current_accum_capacity = 500;
 module_param(battery_capacity, int, 0644);
 MODULE_PARM_DESC(battery_capacity, "Estimated battery capacity in mAh");
 
-#if 1
-#define DBG(fmt, x...) printk(KERN_DEBUG fmt, ##x)
-#else
-#define DBG(fmt, x...) do {} while (0)
-#endif
+#define DBG(fmt, x...) pr_debug(fmt, ##x)
 
 struct ds2746_info {
 	u32 batt_id;		/* Battery ID from ADC */
@@ -175,7 +171,6 @@ ds2746_bat_get_property(struct power_supply *bat_ps,
 
 static void ds2746_ext_power_changed(struct power_supply *psy)
 {
-	printk("%s\n", __func__);
 	cancel_delayed_work(&bat_work);
 	queue_delayed_work(monitor_wqueue, &bat_work, 0);
 }
@@ -224,9 +219,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 
 
 	if (!pclient) {
-		printk(KERN_INFO "client is null\n");
-		b->level = 50;
-		return 0;
+		pr_err("client is null\n");
+		return -ENODEV;
 	}
 
 	s = i2c_read(DS2746_VOLTAGE_LSB);
@@ -346,15 +340,14 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	// Try and check if we actually have the ds2746 on this device
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		printk(KERN_INFO "ds2746: DS-2746 chip not present");
+		pr_err("ds2746: DS-2746 chip not present");
 		return -ENODEV;
 	}
 	bi = kzalloc(sizeof(*bi), GFP_KERNEL);
 	if (!bi) {
 		return -ENOMEM;
 	}
-	printk(KERN_INFO
-	       "ds2746: Initializing DS-2746 chip driver at addr: 0x%02x\n",
+	pr_info("ds2746: Initializing DS-2746 chip driver at addr: 0x%02x\n",
 	       client->addr);
 	pclient = client;
 
@@ -367,7 +360,7 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	bi->bat_pdata = pdata;
 	bi->full_bat = 100;
 
-	printk(KERN_INFO "ds2746: resistance = %d, capacity = %d, "
+	DBG("ds2746: resistance = %d, capacity = %d, "
 		"high_voltage = %d, low_voltage = %d, softACR = %d\n",
 		pdata.resistance, pdata.capacity,
 		pdata.high_voltage, pdata.low_voltage,
@@ -432,16 +425,11 @@ static struct i2c_driver ds2746_battery_driver = {
 
 static int __init ds2746_battery_init(void)
 {
-	printk(KERN_INFO "ds2746: Registering driver (v2)\n");
-	printk(KERN_INFO
-	       "ds2746: Battery capacity is %d mAh (current_accum_capacity=%u)\n",
-	       battery_capacity, current_accum_capacity);
 	return i2c_add_driver(&ds2746_battery_driver);
 }
 
 static void __exit ds2746_battery_exit(void)
 {
-	printk(KERN_INFO "ds2746_battery: Unregistered driver\n");
 	i2c_del_driver(&ds2746_battery_driver);
 }
 
