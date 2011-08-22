@@ -205,8 +205,7 @@ static void sdio_single_irq_set(struct mmc_card *card)
 
 	card->sdio_single_irq = NULL;
 	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
-	    (card->host->sdio_irqs == 1 || card->sdio_funcs == 1)) {
-		printk("%s\n", __func__);
+	    (card->host->sdio_irqs == 1)) {
 		for (i = 0; i < card->sdio_funcs; i++) {
 		       func = card->sdio_func[i];
 		       if (func && func->irq_handler) {
