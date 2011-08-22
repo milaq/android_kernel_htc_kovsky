@@ -196,7 +196,7 @@ static void msm7200a_setup_gpios(unsigned sdcc_id,
 	struct msm7200a_sdcc_gpios* gpios) {
 	
 	if (!gpios) {
-		printk(KERN_ERR "%s: gpios structure is NULL\n", __func__);
+		pr_err("%s: gpios structure is NULL\n", __func__);
 		return;
 	}
 
@@ -226,7 +226,7 @@ static void msm7200a_setup_gpios(unsigned sdcc_id,
 			gpios->off_length = ARRAY_SIZE(sdc4_off_gpio_table);
 			break;
 		default:
-			printk(KERN_ERR "%s: invalid sdcc id %d\n", __func__, sdcc_id);
+			pr_err("%s: invalid sdcc id %d\n", __func__, sdcc_id);
 	}
 }
 
@@ -244,48 +244,46 @@ static uint32_t sdslot_switchvdd(struct device *dev, unsigned int vdd)
 {
 	int rc, i;
 	if (vdd) {
-		msm_gpios_enable(sdslot_priv.gpios.on, sdslot_priv.gpios.on_length);
-		if (!sdslot_priv.vreg)
+		if (sdslot_priv.state) {
 			return 0;
-		
-		if (!sdslot_priv.state) {
-			rc = vreg_enable(sdslot_priv.vreg);
-			if (rc) {
-					printk(KERN_ERR
-						"%s: Error enabling sd slot error code %d\n",
-						__func__, rc);
-					return rc;
-				}
-			sdslot_priv.state = true;
 		}
+		
+		rc = vreg_enable(sdslot_priv.vreg);
+		if (rc) {
+			pr_err("%s: Error enabling sd vreg %d\n", __func__, rc);
+			return rc;
+		}
+		
+		sdslot_priv.state = true;
+		msm_gpios_enable(sdslot_priv.gpios.on, sdslot_priv.gpios.on_length);
 
 		for (i = 0; i < ARRAY_SIZE(mmc_vdd_table); i++) {
 			if (mmc_vdd_table[i].mask == (1 << vdd)) {
 				rc = vreg_set_level(sdslot_priv.vreg, mmc_vdd_table[i].level);
-				if (rc) {
-					printk(KERN_ERR
-						   "%s: Error setting vreg level (%d)\n",
-						   __func__, rc);
+				if (!rc) {
+					return 0;
 				}
-				return rc;
+				pr_err("%s: Error setting vreg level (%d)\n", __func__, rc);
 			}
 		}
-		printk(KERN_ERR "%s: Invalid VDD %d specified\n", __func__, vdd);
-	} else {
-		if (sdslot_priv.vreg && sdslot_priv.state) {
-			rc = vreg_disable(sdslot_priv.vreg);
-			if (rc) {
-				printk(KERN_ERR
-			    	   "%s: Error disabling sd slot error code %d\n",
-				       __func__, rc);
-				return rc;
-			}
-			sdslot_priv.state = false;
-		}
+		pr_err("%s: Invalid VDD %d specified\n", __func__, vdd);
 		msm_gpios_disable(sdslot_priv.gpios.off, sdslot_priv.gpios.off_length);
+		vreg_disable(sdslot_priv.vreg);
+		return rc;
 	}
+	
+	if (!sdslot_priv.state) {
+		return 0;
+	}
+	sdslot_priv.state = false;
 
-	return 0;
+	rc = vreg_disable(sdslot_priv.vreg);
+	if (rc) {
+		pr_err("%s: Error disabling sd vreg %d\n", __func__, rc);
+	}
+	msm_gpios_disable(sdslot_priv.gpios.off, sdslot_priv.gpios.off_length);
+
+	return rc;
 }
 
 static unsigned int msm7200a_sdslot_get_status(struct device *dev)
@@ -309,15 +307,16 @@ static int msm7200a_mmc_probe(struct platform_device *pdev)
 	struct msm7200a_mmc_pdata *pdata = pdev->dev.platform_data;
 
 	if (!pdata) {
-		printk(KERN_ERR "%s: no platform data\n", __func__);
+		pr_err("%s: no platform data\n", __func__);
 		return -EINVAL;
 	}
 
 	if (pdata->slot_number < 1 || pdata->slot_number > 4) {
-		printk(KERN_ERR "%s: invalid slot number %d\n", __func__,
+		pr_err("%s: invalid slot number %d\n", __func__,
 			pdata->slot_number);
 		return -EINVAL;
 	}
+	memset(&sdslot_priv, 0, sizeof(sdslot_priv));
 
 	if (pdata->gpio_detection >= 0) {
 		rc = gpio_request(pdata->gpio_detection, "SD Status");
@@ -342,7 +341,6 @@ static int msm7200a_mmc_probe(struct platform_device *pdev)
 	}
 	
 	sdslot_priv.pdata = pdata;
-	sdslot_priv.state = false;
 
 	if (pdata->gpio_detection >= 0) {
 		set_irq_wake(gpio_to_irq(pdata->gpio_detection), 1);
@@ -412,7 +410,7 @@ static struct msm7200a_wl1251_priv {
 	struct msm7200a_wl1251_pdata* pdata;
 	struct msm7200a_sdcc_gpios gpios;
 	bool state;
-} wl1251_priv = {};
+} wl1251_priv;
 
 #if MSM7200A_WL1251_HACK
 static void fake_wifi_enable(bool enable) {
@@ -440,26 +438,27 @@ static void wifi_init_card(struct mmc_card *card) {
 	card->cis.blksize = 512;
 	card->cis.max_dtr = 11000000;
 
-	card->cccr.wide_bus = 1,
-	printk("%s: done\n", __func__);
+	card->cccr.wide_bus = 1;
 }
 
 static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 {
 	int rc;
-	printk("%s: vdd=%d\n", __func__, vdd);
-
+	
 	if (vdd) {
-		if (!wl1251_priv.state) {
-			if (wl1251_priv.vreg) {
-				rc = vreg_enable(wl1251_priv.vreg);
-				if (rc) {
-					printk(KERN_ERR "%s: failed to enable vreg %d\n",
-						   __func__, rc);
-					goto pwroff;
-				}
+		if (wl1251_priv.state) {
+			return 0;
+		}
+		wl1251_priv.state = true;
+		
+		if (wl1251_priv.vreg) {
+			rc = vreg_enable(wl1251_priv.vreg);
+			if (rc) {
+				pr_err("%s: failed to enable vreg %d\n",
+					   __func__, rc);
+				wl1251_priv.state = false;
+				return rc;
 			}
-			wl1251_priv.state = true;
 		}
 		mdelay(10);
 		msm_gpios_enable(wl1251_priv.gpios.on, wl1251_priv.gpios.on_length);
@@ -480,7 +479,10 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 		return 0;
 	}
 
-pwroff:
+	if (!wl1251_priv.state) {
+		return 0;
+	}
+
 	wl1251_priv.state = false;
 	if (wl1251_priv.vreg) {
 		vreg_disable(wl1251_priv.vreg);
@@ -496,6 +498,7 @@ pwroff:
 	}
 	mdelay(200);
 	msm_gpios_disable(wl1251_priv.gpios.off, wl1251_priv.gpios.off_length);
+
 	return 0;
 }
 
@@ -512,15 +515,16 @@ static int msm7200a_wl1251_probe(struct platform_device *pdev)
 	struct msm7200a_wl1251_pdata *pdata = pdev->dev.platform_data;
 
 	if (!pdata) {
-		printk(KERN_ERR "%s: no platform data\n", __func__);
+		pr_err("%s: no platform data\n", __func__);
 		return -EINVAL;
 	}
 
 	if (pdata->slot_number < 1 || pdata->slot_number > 4) {
-		printk(KERN_ERR "%s: invalid slot number %d\n", __func__,
+		pr_err("%s: invalid slot number %d\n", __func__,
 			pdata->slot_number);
 		return -EINVAL;
 	}
+	memset(&wl1251_priv, 0, sizeof(wl1251_priv));
 
 	if (pdata->gpio_irq >= 0) {
 		rc = gpio_request(pdata->gpio_irq, "WiFi IRQ");
