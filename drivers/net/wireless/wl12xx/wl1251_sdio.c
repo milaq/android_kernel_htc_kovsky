@@ -164,11 +164,13 @@ static irqreturn_t wl1251_line_irq(int irq, void *cookie)
 
 static void wl1251_enable_line_irq(struct wl1251 *wl)
 {
+	wl1251_sdio_enable_irq(wl);
 	return enable_irq(wl->irq);
 }
 
 static void wl1251_disable_line_irq(struct wl1251 *wl)
 {
+	wl1251_sdio_disable_irq(wl);
 	return disable_irq(wl->irq);
 }
 
@@ -176,7 +178,6 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 {
 	int ret = 0;
 	struct sdio_func *func = wl_to_func(wl);
-	wl1251_enter();
 
 	if (enable) {
 		if (wl->set_power)
@@ -206,8 +207,7 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 	}
 
 out:
-	wl1251_leave();
-	return 0;
+	return ret;
 }
 
 static struct wl1251_if_operations wl1251_sdio_ops = {
@@ -295,7 +295,7 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 			goto disable;
 		}
 
-		set_irq_type(wl->irq, IRQ_TYPE_EDGE_BOTH);
+		set_irq_type(wl->irq, IRQ_TYPE_EDGE_RISING);
 		//disable_irq(wl->irq);
 
 		wl1251_sdio_ops.enable_irq = wl1251_enable_line_irq;
