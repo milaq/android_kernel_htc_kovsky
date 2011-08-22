@@ -106,14 +106,12 @@ static void wl1251_sdio_read_elp(struct wl1251 *wl, int addr, u32 *val)
 	 * the unused bits of CMD52 as write data even if we send read
 	 * request).
 	 */
-	printk("%s: addr=%08x, val=%08x, wl_sdio=%p, func=%p fnum=%08x\n",
-	__func__, addr, *val, wl_sdio, func, func->num);
 	sdio_claim_host(func);
 	*val = sdio_writeb_readb(func, wl_sdio->elp_val, addr, &ret);
 	sdio_release_host(func);
 
 	if (ret)
-		wl1251_error("sdio_readb failed (%d)", ret);
+		wl1251_error("elp sdio_readb failed (%d)", ret);
 }
 
 static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
@@ -122,15 +120,12 @@ static void wl1251_sdio_write_elp(struct wl1251 *wl, int addr, u32 val)
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 	struct sdio_func *func = wl_sdio->func;
 
-	printk("%s: addr=%08x, val=%08x, wl_sdio=%p, func=%p\n",
-	__func__, addr, val, wl_sdio, func);
-
 	sdio_claim_host(func);
 	sdio_writeb(func, val, addr, &ret);
 	sdio_release_host(func);
 
 	if (ret)
-		wl1251_error("sdio_writeb failed (%d)", ret);
+		wl1251_error("elp sdio_writeb failed (%d)", ret);
 	else
 		wl_sdio->elp_val = val;
 }
