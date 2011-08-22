@@ -208,6 +208,7 @@ static void dex_reset(void)
 	printk(KERN_INFO "%s: Soft reset done.\n", __func__);
 }
 
+#ifdef CONFIG_EARLY_SUSPEND
 static void dex_early_suspend(struct early_suspend *h) {
 	struct msm_dex_command dex;
 	printk("Sending arm9_low_speed 2\n");
@@ -231,6 +232,7 @@ static struct early_suspend early_suspend = {
 	.resume = dex_late_resume,
 	.level = 48,
 };
+#endif
 
 // Initialize PCOM registers
 int msm_dex_comm_init()
@@ -254,8 +256,9 @@ int msm_dex_comm_init()
 
 	msm_hw_reset_hook = dex_reset;
 	msm_register_halt_hook(dex_power_off);
+#ifdef CONFIG_EARLY_SUSPEND
 	register_early_suspend(&early_suspend);
-
+#endif
 	return 0;
 #endif
 }
