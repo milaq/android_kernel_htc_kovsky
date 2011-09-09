@@ -397,18 +397,25 @@ int __msm_adsp_write(struct msm_adsp_module *module, unsigned dsp_queue_addr,
 	spin_lock_irqsave(&adsp_cmd_lock, flags);
 
 	if (module->state != ADSP_STATE_ENABLED) {
-		spin_unlock_irqrestore(&adsp_cmd_lock, flags);
 		pr_err("adsp: module %s not enabled before write\n",
 		       module->name);
-		return -ENODEV;
+		ret_status = -ENODEV;
+		goto fail;
 	}
 	if (adsp_validate_module(module->id)) {
-		spin_unlock_irqrestore(&adsp_cmd_lock, flags);
 		pr_info("adsp: module id validation failed %s  %d\n",
 			module->name, module->id);
-		return -ENXIO;
+		ret_status = -ENXIO;
+		goto fail;
 	}
 	dsp_q_addr = adsp_get_queue_offset(info, dsp_queue_addr);
+	if (!dsp_q_addr) {
+		pr_err("adsp: invalid queue requested %s %d\n",
+			module->name, module->id);
+		ret_status = -ENXIO;
+		goto fail;
+	}
+	
 	dsp_q_addr &= ADSP_RTOS_WRITE_CTRL_WORD_DSP_ADDR_M;
 
 	/* Poll until the ADSP is ready to accept a command.
