@@ -40,11 +40,6 @@
 #endif 
 
 #define MSM_FB_REFRESH_RATE 25
-#define MSMFB_DEBUG 1
-#ifdef CONFIG_FB_MSM_LOGO
-#define INIT_IMAGE_FILE "/logo.rle"
-extern int load_565rle_image(char *filename);
-#endif
 
 #define PRINT_FPS 0
 #define PRINT_BLIT_TIME 0
@@ -124,8 +119,6 @@ static void msmfb_update(struct fb_info *info, uint32_t left, uint32_t top,
 			 uint32_t eright, uint32_t ebottom);
 
 struct task_struct *msmfb_thread_task = NULL;
-static struct task_struct *start_msmfb_refresh_thread(void);
-static int stop_msmfb_refresh_thread(struct task_struct *thread_task);
 
 static int msmfb_refresh_thread(void *v)
 {
@@ -133,20 +126,19 @@ static int msmfb_refresh_thread(void *v)
 	struct completion exit;
 	siginfo_t info;
 
-	printk("+%s\n", __func__);
 	daemonize("msmfb_refreshd");
 	allow_signal(SIGKILL);
 
 	init_completion(&exit);
 	
-	while ( true ){
+	while (true){
 		if (signal_pending(current)){
 			if (dequeue_signal_lock(current,
 					&current->blocked, 
 					&info) == SIGKILL)
 				goto die;
-		       
-		}else{
+		}
+		else{
 			msleep(MSM_FB_REFRESH_RATE);
 			
 			if (num_registered_fb > 0) {
@@ -160,17 +152,20 @@ die:
 	complete_and_exit(&exit,0);
 }
 
-static struct task_struct *start_msmfb_refresh_thread(){
+static void start_msmfb_refresh_thread_locked(void){
 	void *v = NULL;
-	struct task_struct *thread_task;
-	thread_task = kthread_create(msmfb_refresh_thread, v,"msmfb_refreshd");	
-	wake_up_process(thread_task);
-	return thread_task;
+	if (msmfb_thread_task) {
+		return;
+	}
+	msmfb_thread_task = kthread_create(msmfb_refresh_thread, v, "msmfb_refreshd");	
+	wake_up_process(msmfb_thread_task);
 }
 
-static int stop_msmfb_refresh_thread(struct task_struct *thread_task){
-	send_sig(SIGKILL,thread_task,0);
- 	return 0;
+static void stop_msmfb_refresh_thread_locked(void){
+	if (msmfb_thread_task) {
+		send_sig(SIGKILL, msmfb_thread_task, 0);
+		msmfb_thread_task = NULL;
+	}
 }
 #endif
 
@@ -180,12 +175,6 @@ static void msmfb_handle_dma_interrupt(struct msmfb_callback *callback)
 	unsigned long irq_flags;
 	struct msmfb_info *msmfb  = container_of(callback, struct msmfb_info,
 					       dma_callback);
-#if PRINT_FPS
-	int64_t dt;
-	ktime_t now;
-	static int64_t frame_count;
-	static ktime_t last_sec;
-#endif
 
 	spin_lock_irqsave(&msmfb->update_lock, irq_flags);
 	msmfb->frame_done = msmfb->frame_requested;
@@ -194,18 +183,6 @@ static void msmfb_handle_dma_interrupt(struct msmfb_callback *callback)
 		DLOG(SUSPEND_RESUME, "full update completed\n");
 		queue_work(msmfb->resume_workqueue, &msmfb->resume_work);
 	}
-#if PRINT_FPS
-	now = ktime_get();
-	dt = ktime_to_ns(ktime_sub(now, last_sec));
-	frame_count++;
-	if (dt > NSEC_PER_SEC) {
-		int64_t fps = frame_count * NSEC_PER_SEC * 100;
-		frame_count = 0;
-		last_sec = ktime_get();
-		do_div(fps, dt);
-		DLOG(FPS, "fps * 100: %llu\n", fps);
-	}
-#endif
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
 	wake_up(&msmfb->frame_wq);
 }
@@ -296,12 +273,6 @@ static void msmfb_pan_update(struct fb_info *info, uint32_t left, uint32_t top,
 	unsigned long irq_flags;
 	int sleeping;
 	int retry = 1;
-#if PRINT_FPS
-	ktime_t t1, t2;
-	static uint64_t pans;
-	static uint64_t dt;
-	t1 = ktime_get();
-#endif
 
 	DLOG(SHOW_UPDATES, "update %d %d %d %d %d %d\n",
 		left, top, eright, ebottom, yoffset, pan_display);
@@ -348,22 +319,6 @@ restart:
 		}
 		goto restart;
 	}
-
-#if PRINT_FPS
-	t2 = ktime_get();
-	if (pan_display) {
-		uint64_t temp = ktime_to_ns(ktime_sub(t2, t1));
-		do_div(temp, 1000);
-		dt += temp;
-		pans++;
-		if (pans > 1000) {
-			do_div(dt, pans);
-			DLOG(FPS, "ave_wait_time: %lld\n", dt);
-			dt = 0;
-			pans = 0;
-		}
-	}
-#endif
 
 	msmfb->frame_requested++;
 	/* if necessary, update the y offset, if this is the
@@ -506,25 +461,16 @@ static int msmfb_blank(int blank_mode,struct fb_info *info){
 	unsigned long irq_flags;
 
 	printk("%s(%d)\n", __func__, blank_mode != FB_BLANK_UNBLANK);
-	mutex_lock(&msmfb->panel_init_lock);
-
-	if (blank_mode == FB_BLANK_UNBLANK){
-
 #ifdef CONFIG_FB_MSM_REFRESH
-		if (msmfb_thread_task == NULL)
-			msmfb_thread_task = start_msmfb_refresh_thread();
-#endif
-
+	mutex_lock(&msmfb->panel_init_lock);
+	if (blank_mode == FB_BLANK_UNBLANK){
+		start_msmfb_refresh_thread_locked();
 	}
 	else if(blank_mode == FB_BLANK_POWERDOWN){
-
-#ifdef CONFIG_FB_MSM_REFRESH
-		stop_msmfb_refresh_thread(msmfb_thread_task);
-		msmfb_thread_task = NULL;
-#endif
+		stop_msmfb_refresh_thread_locked();
 	}
-
 	mutex_unlock(&msmfb->panel_init_lock);
+#endif
 	return 0;
 }
 #endif
@@ -583,13 +529,6 @@ int msmfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 	/* "UPDT" */
 	if ((panel->caps & MSMFB_CAP_PARTIAL_UPDATES) &&
 	    (var->reserved[0] == 0x54445055)) {
-#if 0
-		printk(KERN_INFO "pan frame %d-%d, rect %d %d %d %d\n",
-		       msmfb->frame_requested, msmfb->frame_done,
-		       var->reserved[1] & 0xffff,
-		       var->reserved[1] >> 16, var->reserved[2] & 0xffff,
-		       var->reserved[2] >> 16);
-#endif
 		msmfb_pan_update(info, var->reserved[1] & 0xffff,
 				 var->reserved[1] >> 16,
 				 var->reserved[2] & 0xffff,
@@ -653,24 +592,13 @@ static int msmfb_ioctl(struct fb_info *p, unsigned int cmd, unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
 	int ret;
-#if PRINT_BLIT_TIME
-	ktime_t t1, t2;
-#endif
 
 	switch (cmd) {
 	case MSMFB_GRP_DISP:
 		mdp->set_grp_disp(mdp, arg);
 		break;
 	case MSMFB_BLIT:
-#if PRINT_BLIT_TIME
-		t1 = ktime_get();
-#endif
 		ret = msmfb_blit(p, argp);
-#if PRINT_BLIT_TIME
-		t2 = ktime_get();
-		DLOG(BLIT_TIME, "total %lld\n",
-		       ktime_to_ns(t2) - ktime_to_ns(t1));
-#endif
 		if (ret)
 			return ret;
 		break;
@@ -700,45 +628,6 @@ static struct fb_ops msmfb_ops = {
 
 static unsigned PP[16];
 
-
-#if MSMFB_DEBUG
-static ssize_t debug_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-	return 0;
-}
-
-
-static ssize_t debug_read(struct file *file, char __user *buf, size_t count,
-			  loff_t *ppos)
-{
-	const int debug_bufmax = 4096;
-	static char buffer[4096];
-	int n = 0;
-	struct msmfb_info *msmfb = (struct msmfb_info *)file->private_data;
-	unsigned long irq_flags;
-
-	spin_lock_irqsave(&msmfb->update_lock, irq_flags);
-	n = scnprintf(buffer, debug_bufmax, "yoffset %d\n", msmfb->yoffset);
-	n += scnprintf(buffer + n, debug_bufmax, "frame_requested %d\n",
-		       msmfb->frame_requested);
-	n += scnprintf(buffer + n, debug_bufmax, "frame_done %d\n",
-		       msmfb->frame_done);
-	n += scnprintf(buffer + n, debug_bufmax, "sleeping %d\n",
-		       msmfb->sleeping);
-	n += scnprintf(buffer + n, debug_bufmax, "update_frame %d\n",
-		       msmfb->update_frame);
-	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
-	n++;
-	buffer[n] = 0;
-	return simple_read_from_buffer(buf, count, ppos, buffer, n);
-}
-
-static struct file_operations debug_fops = {
-	.read = debug_read,
-	.open = debug_open,
-};
-#endif
 
 static void setup_fb_info(struct msmfb_info *msmfb)
 {
@@ -891,11 +780,6 @@ static int msmfb_probe(struct platform_device *pdev)
 	register_early_suspend(&msmfb->earlier_suspend);
 #endif
 
-#if MSMFB_DEBUG
-	debugfs_create_file("msm_fb", S_IFREG | S_IRUGO, NULL,
-			    (void *)fb->par, &debug_fops);
-#endif
-
 	printk(KERN_INFO "msmfb_probe() installing %d x %d panel\n",
 	       msmfb->xres, msmfb->yres);
 
@@ -913,20 +797,6 @@ static int msmfb_probe(struct platform_device *pdev)
 
 	msmfb->sleeping = WAKING;
 
-#ifdef CONFIG_FB_MSM_LOGO
-	printk(KERN_INFO "msmfb logo requested... attemping to download '" CONFIG_FB_MSM_LOGO_SOURCE "' \n");
-
-	if (!load_565rle_image(CONFIG_FB_MSM_LOGO_SOURCE)) {
-		printk(KERN_INFO "msmfb logo download ok, blitting now\n");
-		/* Flip buffer */
-		msmfb->update_info.left = 0;
-		msmfb->update_info.top = 0;
-		msmfb_pan_update(fb, 0, 0, fb->var.xres, fb->var.yres, 0, 1);
-	}
-	else {
-		printk(KERN_INFO "msmfb logo download failed :/\n");
-	}
-#endif
 	return 0;
 
 error_register_framebuffer:
