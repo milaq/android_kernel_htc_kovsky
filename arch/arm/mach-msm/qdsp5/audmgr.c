@@ -206,12 +206,12 @@ int audmgr_open(struct audmgr *am)
 	int rc;
 
 	uint32_t audmgr_prog, audmgr_vers;
-	if (!amss_get_num_value(AMSS_AUDMGR_PROG, &audmgr_prog)) {
+	if (!amss_get_id(AMSS_AUDMGR_PROG, &audmgr_prog)) {
 		printk(KERN_ERR "%s: unable to get AUDMGR_PROG\n", __func__);
 		return -EINVAL;
 	}
 
-	if (!amss_get_num_value(AMSS_AUDMGR_VERS, &audmgr_vers)) {
+	if (!amss_get_id(AMSS_AUDMGR_VERS, &audmgr_vers)) {
 		printk(KERN_ERR "%s: unable to get AUDMGR_PROG\n", __func__);
 		return -EINVAL;
 	}
@@ -258,7 +258,7 @@ int audmgr_enable(struct audmgr *am, struct audmgr_config *cfg)
 	int rc;
 
 	uint32_t audmgr_prog;
-	if (!amss_get_num_value(AMSS_AUDMGR_PROG, &audmgr_prog)) {
+	if (!amss_get_id(AMSS_AUDMGR_PROG, &audmgr_prog)) {
 		printk(KERN_ERR "%s: unable to get AUDMGR_PROG\n", __func__);
 		return -EINVAL;
 	}
@@ -310,7 +310,7 @@ int audmgr_disable(struct audmgr *am)
 	int rc;
 
 	uint32_t audmgr_prog;
-	if (!amss_get_num_value(AMSS_AUDMGR_PROG, &audmgr_prog)) {
+	if (!amss_get_id(AMSS_AUDMGR_PROG, &audmgr_prog)) {
 		printk(KERN_ERR "%s: unable to get AUDMGR_PROG\n", __func__);
 		return -EINVAL;
 	}

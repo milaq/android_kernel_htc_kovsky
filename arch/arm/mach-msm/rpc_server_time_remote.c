@@ -62,12 +62,12 @@ static struct msm_rpc_server rpc_server = {
 static int __init rpc_server_init(void)
 {
 	uint32_t time_vers;
-	if (!amss_get_num_value(AMSS_TIME_REMOTE_MTOA_VERS, &time_vers)) {
+	if (!amss_get_id(AMSS_TIME_REMOTE_MTOA_VERS, &time_vers)) {
 		printk(KERN_ERR "%s: failed to get AMSS_TIME_REMOTE_MTOA_VERS\n",
 				__func__);
 		return -1;
 	}
-	if (!amss_get_num_value(AMSS_TIME_TOD_SET_APPS_BASES, &tod_app_bases)) {
+	if (!amss_get_id(AMSS_TIME_TOD_SET_APPS_BASES, &tod_app_bases)) {
 		printk(KERN_ERR "%s: failed to get AMSS_TIME_TOD_SET_APPS_BASES\n",
 				__func__);
 		return -1;

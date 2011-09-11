@@ -22,12 +22,16 @@
 #include <mach/msm_smd.h>
 
 struct amss_value amss_6125_para[] = {
-	{AMSS_AUDMGR_PROG, AMSS_VAL_UINT, {.value = 0x30000013}},
-	{AMSS_AUDMGR_VERS, AMSS_VAL_UINT, { .value = 0x0}},
-	{AMSS_AUDMGR_CB_PROG, AMSS_VAL_UINT, {.value = 0x31000013}},
-	{AMSS_AUDMGR_CB_VERS, AMSS_VAL_UINT, { .value = 0x5fa922a9}},
-	{AMSS_TIME_REMOTE_MTOA_VERS, AMSS_VAL_UINT, {.value = 0}},
-	{AMSS_TIME_TOD_SET_APPS_BASES, AMSS_VAL_UINT, {.value = 1}},
+	{AMSS_AUDMGR_PROG, .value = 0x30000013},
+	{AMSS_AUDMGR_VERS, .value = 0x0},
+	{AMSS_AUDMGR_CB_PROG, .value = 0x31000013},
+	{AMSS_AUDMGR_CB_VERS, .value = 0x5fa922a9},
+	{AMSS_TIME_REMOTE_MTOA_VERS, .value = 0},
+	{AMSS_TIME_TOD_SET_APPS_BASES, .value = 1},
+	{AMSS_SND_PROG, .value = ADSP_RTOS_SND_PROG_6125},
+	{AMSS_SND_VERS, .value = ADSP_RTOS_SND_VERS_6125},
+	{AMSS_SND_SET_DEVICE_PROC, .value = ADSP_RTOS_SND_DEV_PROC_6125},
+	{AMSS_SND_SET_VOLUME_PROC, .value = ADSP_RTOS_SND_VOL_PROC_6125},
 };
 
 static struct platform_device adsp_device = {

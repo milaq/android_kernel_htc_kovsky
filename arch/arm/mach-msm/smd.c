@@ -1115,29 +1115,35 @@ int smd_core_init(void)
 
 extern void msm_init_last_radio_log(struct module *);
 
-static bool amss_get_pdata_num_value(enum amss_id id, uint32_t * out)
+static bool amss_get_pdata_id(enum amss_id id, uint32_t * out)
 {
 	int i;
 	if (!pdata) {
 		//we should not ever get here.
 		//but leave it here until it is tested
-		pr_err("%s: adsp_info is NULL\n", __func__);
+		pr_debug("%s: adsp_info is NULL\n", __func__);
 		return false;
 	}
 
 	for (i = 0; i < pdata->n_amss_values; i++) {
-		if (pdata->amss_values[i].id == id
-		    && pdata->amss_values[i].type == AMSS_VAL_UINT) {
+		if (pdata->amss_values[i].id == id) {
 			*out = pdata->amss_values[i].value;
 			return true;
 		}
 	}
+	pr_debug("%s: id=%d failed to look up value\n", __func__, id);
 	return false;
 }
 
-bool amss_get_num_value(enum amss_id id, uint32_t *out) {
+bool amss_get_id(enum amss_id id, uint32_t *out) {
 	int i;
-	if (amss_get_pdata_num_value(id, out)) {
+	
+	if (!out) {
+		pr_debug("%s: id=%d out pointer is NULL\n", __func__, id);
+		return false;
+	}
+	
+	if (amss_get_pdata_id(id, out)) {
 		return true;
 	}
 	else {
@@ -1146,55 +1152,16 @@ bool amss_get_num_value(enum amss_id id, uint32_t *out) {
 	}
 
 	for (i = 0; i < n_amss_fallback_params; i++) {
-		if (amss_fallback_params[i].id == id
-		    && amss_fallback_params[i].type == AMSS_VAL_UINT) {
+		if (amss_fallback_params[i].id == id) {
 			*out = amss_fallback_params[i].value;
 			return true;
 		}
 	}
 
+	pr_debug("%s: id=%d failed to look up fallback value\n", __func__, id);
 	return false;
 }
-EXPORT_SYMBOL(amss_get_num_value);
-
-static const char *amss_get_pdata_str_value(enum amss_id id)
-{
-	int i;
-	if (!pdata) {
-		//we should not ever get here.
-		//but leave it here until it is tested
-		pr_err("%s: adsp_info is NULL\n", __func__);
-		return NULL;
-	}
-	for (i = 0; i < pdata->n_amss_values; i++) {
-		if (pdata->amss_values[i].id == id
-		    && pdata->amss_values[i].type == AMSS_VAL_STRING)
-			return pdata->amss_values[i].string;
-	}
-	return NULL;
-}
-
-const char *amss_get_str_value(enum amss_id id) {
-	int i;
-	char* ret = NULL;
-	if ((ret = amss_get_pdata_str_value(id))) {
-		return ret;
-	}
-	else {
-		pr_debug("%s: could not look up value %d, falling back to default\n",
-				__func__, id);
-	}
-
-	for (i = 0; i < n_amss_fallback_params; i++) {
-		if (amss_fallback_params[i].id == id
-		    && amss_fallback_params[i].type == AMSS_VAL_STRING) {
-			return amss_fallback_params[i].string;
-		}
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL(amss_get_str_value);
+EXPORT_SYMBOL(amss_get_id);
 
 /* Semaphore shared between arm9 and arm11 */
 void smem_semaphore_down(void* address, char marker)

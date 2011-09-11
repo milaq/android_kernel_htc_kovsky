@@ -40,19 +40,19 @@ static struct msm_rpc_server rpc_server;
 
 static int __init rpc_server_init(void)
 {
-	if (!amss_get_num_value(AMSS_RPC_DOG_KEEPALIVE_PROG, &dog_prog)) {
+	if (!amss_get_id(AMSS_DOG_KEEPALIVE_PROG, &dog_prog)) {
 		printk(KERN_ERR "%s: failed to get AMSS_RPC_DOG_KEEPALIVE_PROG\n",
 				__func__);
 		return -1;
 	}
 
-	if (!amss_get_num_value(AMSS_RPC_DOG_KEEPALIVE_VERS, &dog_vers)) {
+	if (!amss_get_id(AMSS_DOG_KEEPALIVE_VERS, &dog_vers)) {
 		printk(KERN_ERR "%s: failed to get AMSS_RPC_DOG_KEEPALIVE_VERS\n",
 				__func__);
 		return -1;
 	}
 
-	if (!amss_get_num_value(AMSS_RPC_DOG_KEEPALIVE_BEACON, &dog_beacon)) {
+	if (!amss_get_id(AMSS_DOG_KEEPALIVE_BEACON, &dog_beacon)) {
 		printk(KERN_ERR "%s: failed to get AMSS_RPC_DOG_KEEPALIVE_BEACON\n",
 				__func__);
 		return -1;
