@@ -26,19 +26,11 @@
 #include <linux/slab.h>
 
 #include <mach/msm_rpcrouter.h>
+#include <mach/msm_smd.h>
 
 #define RTC_DEBUG 0
 
 extern void msm_pm_set_max_sleep_time(int64_t sleep_time_ns);
-
-static const char *rpc_versions[] = {
-#if !defined(CONFIG_MSM_LEGACY_7X00A_AMSS)
-	"rs30000048:00040000",
-	"rs30000048:00010000",
-#else
-	"rs30000048:0da5b528",
-#endif
-};
 
 #define TIMEREMOTE_PROCEEDURE_SET_JULIAN	6
 #define TIMEREMOTE_PROCEEDURE_GET_JULIAN	7
@@ -199,13 +191,18 @@ msmrtc_alarmtimer_expired(unsigned long _data)
 static int
 msmrtc_probe(struct platform_device *pdev)
 {
-	struct rpcsvr_platform_device *rdev =
-		container_of(pdev, struct rpcsvr_platform_device, base);
-
+	uint32_t prog, vers;
 	if (rtc)
 		return -EBUSY;
+	
+	if (!amss_get_id(AMSS_RTC_PROG, &prog))
+		return -ENODEV;
 
-	ep = msm_rpc_connect(rdev->prog, rdev->vers, 0);
+	if (!amss_get_id(AMSS_RTC_VERS, &vers))
+		return -ENODEV;
+
+	
+	ep = msm_rpc_connect(prog, vers, 0);
 	if (IS_ERR(ep)) {
 		printk(KERN_ERR "%s: init rpc failed! rc = %ld\n",
 		       __func__, PTR_ERR(ep));
@@ -264,39 +261,20 @@ msmrtc_resume(struct platform_device *dev)
 	return 0;
 }
 
+static struct platform_driver msm_rtc_driver = {
+	.probe = msmrtc_probe,
+	.suspend = msmrtc_suspend,
+	.resume = msmrtc_resume,
+	.driver = {
+		.name = "msm-rtc-rpc",
+		.owner = THIS_MODULE,
+	}
+};
+
 static int __init msmrtc_init(void)
 {
-	int i;
-	int ret;
-	struct platform_driver *pdrv[ARRAY_SIZE(rpc_versions)];
-
 	rtcalarm_time = 0;
-
-	/* register the devices for all the major versions we support, only
-	 * one should match */
-	for (i = 0; i < ARRAY_SIZE(rpc_versions); i++) {
-		pdrv[i] = kzalloc(sizeof(struct platform_driver), GFP_KERNEL);
-		if (!pdrv[i]) {
-			ret = -ENOMEM;
-			goto err;
-		}
-		pdrv[i]->probe = msmrtc_probe;
-		pdrv[i]->suspend = msmrtc_suspend;
-		pdrv[i]->resume = msmrtc_resume;
-		pdrv[i]->driver.name = rpc_versions[i];
-		pdrv[i]->driver.owner = THIS_MODULE;
-		ret = platform_driver_register(pdrv[i]);
-		if (ret) {
-			kfree(pdrv[i]);
-			goto err;
-		}
-	}
-	return 0;
-
-err:
-	for (--i; i >= 0; i--)
-		platform_driver_unregister(pdrv[i]);
-	return ret;
+	return platform_driver_register(&msm_rtc_driver);
 }
 
 module_init(msmrtc_init);
