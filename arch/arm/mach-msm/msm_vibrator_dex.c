@@ -103,6 +103,7 @@ void __init msm_init_dex_vibrator(void)
 
 	timed_output_dev_register(&dex_vibrator);
 
+	#ifdef DEBUG
 	/* A little vibrating welcome */
 	for (i = 0; i < 2; i++) {
 		dex_vibrate(1);
@@ -110,6 +111,7 @@ void __init msm_init_dex_vibrator(void)
 		dex_vibrate(0);
 		msleep(75);
 	}
+	#endif
 }
 
 MODULE_DESCRIPTION("timed output dex vibrator device");
