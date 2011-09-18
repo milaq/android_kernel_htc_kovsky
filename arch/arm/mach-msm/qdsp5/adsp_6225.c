@@ -132,7 +132,6 @@ static uint32_t qdsp_gaudio_queue_offset_table[QDSP_MAX_NUM_QUEUES] = {
 	[QDSP_vfeCommandQueue] = QDSP_RTOS_NO_QUEUE,
 	[QDSP_vfeCommandScaleQueue] = QDSP_RTOS_NO_QUEUE,
 	[QDSP_vfeCommandTableQueue] = QDSP_RTOS_NO_QUEUE,
-	[QDSP_uPDiagQueue] = QDSP_RTOS_NO_QUEUE,
 };
 
 /* Table of modules indexed by task ID for the COMBO image */
@@ -200,7 +199,6 @@ static uint32_t qdsp_combo_queue_offset_table[QDSP_MAX_NUM_QUEUES] = {
 	[QDSP_vfeCommandQueue] = 0x6d8,
 	[QDSP_vfeCommandScaleQueue] = 0x6e0,
 	[QDSP_vfeCommandTableQueue] = 0x6dc,
-	[QDSP_uPDiagQueue] = 0x6d4,
 };
 
 /* Table of modules indexed by task ID for the QTV_LP image */
@@ -268,7 +266,6 @@ static uint32_t qdsp_qtv_lp_queue_offset_table[] = {
 	[QDSP_vfeCommandQueue] = QDSP_RTOS_NO_QUEUE,
 	[QDSP_vfeCommandScaleQueue] = QDSP_RTOS_NO_QUEUE,
 	[QDSP_vfeCommandTableQueue] = QDSP_RTOS_NO_QUEUE,
-	[QDSP_uPDiagQueue] = QDSP_RTOS_NO_QUEUE,
 };
 
 /* Tables to convert tasks to modules */
