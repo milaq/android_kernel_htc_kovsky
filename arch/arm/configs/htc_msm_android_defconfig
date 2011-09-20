@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.7
-# Mon Aug 22 16:42:22 2011
+# Mon Sep 19 00:34:45 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -803,7 +803,8 @@ CONFIG_MTD_CFI_I2=y
 #
 # Self-contained MTD device drivers
 #
-CONFIG_MTD_MSM_NAND=y
+# CONFIG_MTD_MSM_NAND is not set
+CONFIG_MTD_MSM_NAND_WINCE=y
 # CONFIG_MTD_SLRAM is not set
 # CONFIG_MTD_PHRAM is not set
 # CONFIG_MTD_MTDRAM is not set
