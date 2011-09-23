@@ -51,7 +51,6 @@ int microp_ng_write(struct i2c_client *client_ptr, uint8_t *sendbuf, int len)
 			goto exit;
 		}
 		msleep(10);
-		pr_err("microp_ng, i2c write retry\n");
 	}
 
 	if (retry >= I2C_WRITE_RETRY_TIMES) {
