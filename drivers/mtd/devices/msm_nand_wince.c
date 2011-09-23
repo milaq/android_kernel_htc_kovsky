@@ -127,7 +127,7 @@ static struct nand_ecclayout msm_nand_oob_64 =
 	}
 };
 
-#define NUM_PROTECTED_BLOCKS (0x188)
+#define NUM_PROTECTED_BLOCKS (321)
 
 struct flash_identification {
 	uint32_t flash_id;
