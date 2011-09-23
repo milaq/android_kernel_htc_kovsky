@@ -1067,7 +1067,7 @@ int msm_adsp_probe(struct adsp_info *new_adsp_info)
 	unsigned count;
 	int rc, i;
 	int max_module_id;
-	pr_info("adsp: probe\n");
+	pr_debug("Loading ADSP driver\n");
 	if (!new_adsp_info) {
 		printk(KERN_ERR "%s: new_adsp_info is NULL\n", __func__);
 		rc = -EINVAL;

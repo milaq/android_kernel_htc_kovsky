@@ -134,7 +134,7 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		dmsg.args.cb_func = -1;
 		dmsg.args.client_data = 0;
 
-		pr_info("snd_set_device %d %d %d\n", dev.device,
+		pr_debug("snd_set_device %d %d %d\n", dev.device,
 						 dev.ear_mute, dev.mic_mute);
 
 		rc = msm_rpc_call(snd->ept,
@@ -161,7 +161,7 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		vmsg.args.cb_func = -1;
 		vmsg.args.client_data = 0;
 
-		pr_info("snd_set_volume %d %d %d\n", vol.device,
+		pr_debug("snd_set_volume %d %d %d\n", vol.device,
 						vol.method, vol.volume);
 
 		rc = msm_rpc_call(snd->ept,
@@ -247,7 +247,7 @@ static int snd_probe(struct platform_device *pdev)
 {
 	int rc;
 	struct snd_ctxt *snd = &the_snd;
-	printk("+%s()\n", __func__);
+	pr_debug("Loading MSM sound driver\n");
 	if (!adsp_info) {
 		printk(KERN_ERR "%s: ADSP is not registered, aborting\n", __func__);
 		rc = -ENODEV;
@@ -257,7 +257,7 @@ static int snd_probe(struct platform_device *pdev)
 	snd->snd_pdata = (struct msm_snd_platform_data *)pdev->dev.platform_data;
 	rc = misc_register(&snd_misc);
 ret:
-	printk("-%s() rc=%d\n", __func__, rc);
+	pr_debug("Loaded MSM sound driver rc=%d\n", rc);
 	return rc;
 }
 
