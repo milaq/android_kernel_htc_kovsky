@@ -22,6 +22,7 @@
 #include <mach/msm_iomap.h>
 #include <mach/dma.h>
 #include <mach/gpio.h>
+#include <mach/msm_i2c.h>
 #include <mach/msm_hsusb.h>
 #include "devices.h"
 
@@ -191,13 +192,6 @@ static struct resource resources_i2c[] = {
 	},
 };
 
-struct platform_device msm_device_i2c = {
-	.name		= "msm_i2c",
-	.id		= 0,
-	.num_resources	= ARRAY_SIZE(resources_i2c),
-	.resource	= resources_i2c,
-};
-
 #define GPIO_I2C_CLK 60
 #define GPIO_I2C_DAT 61
 static struct msm_gpio i2c_on_gpio_table[] = {
@@ -218,22 +212,37 @@ static struct msm_gpio i2c_off_gpio_table[] = {
 						 .label = "I2C_SDA" },
 };
 
-void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat)
+static void msm_set_i2c_mux(int iface, int config_type)
 {
 	int rc;
-	if (gpio) {
+	if (config_type) {
 		rc = msm_gpios_request_enable(i2c_on_gpio_table,
 										ARRAY_SIZE(i2c_on_gpio_table));
 		if (rc) {
 			printk(KERN_ERR "%s: unable to request/enable gpios\n", __func__);
 		}
-		*gpio_clk = GPIO_I2C_CLK;
-		*gpio_dat = GPIO_I2C_DAT;
 	} else {
 		msm_gpios_disable_free(i2c_off_gpio_table,
 								ARRAY_SIZE(i2c_off_gpio_table));
 	}
 }
+
+static struct msm_i2c_platform_data i2c_pdata = {
+	.pri_clk = GPIO_I2C_CLK,
+	.pri_dat = GPIO_I2C_DAT,
+	.clk_freq = 400000,
+	.msm_i2c_config_gpio = msm_set_i2c_mux,
+};
+
+struct platform_device msm_device_i2c = {
+	.name		= "msm_i2c",
+	.id		= 0,
+	.num_resources	= ARRAY_SIZE(resources_i2c),
+	.resource	= resources_i2c,
+	.dev = {
+		.platform_data = &i2c_pdata,
+	}
+};
 
 static struct msm_gpio msm72k_usb_on_table[] = {
 	{.gpio_cfg = GPIO_CFG(0x6f, 1, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA),.label = "ULPI DATA0"},
