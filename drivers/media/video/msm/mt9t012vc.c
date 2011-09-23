@@ -184,7 +184,7 @@ static int32_t mt9t012vc_i2c_write_w(unsigned short saddr,
 {
 	int32_t rc = -EIO;
 	unsigned char buf[4];
-	CDBG("[MT9T012VC]: %s(%02x, %02x)\n", __func__, waddr, wdata);
+	pr_debug("[MT9T012VC]: %s(%02x, %02x)\n", __func__, waddr, wdata);
 
 	memset(buf, 0, sizeof(buf));
 	buf[0] = (waddr & 0xFF00) >> 8;
@@ -236,13 +236,13 @@ static int32_t mt9t012vc_move_focus(int direction, int32_t num_steps)
 {
 	//static const int max_focus = 0x1de;
 	//static const int min_focus = 0x9a;
-	CDBG("[MT9T012VC]: %s(dir=%d, num_steps=%d)\n", __func__, direction, num_steps);
+	pr_debug("[MT9T012VC]: %s(dir=%d, num_steps=%d)\n", __func__, direction, num_steps);
 	return 0;
 }
 
 static int32_t mt9t012vc_set_default_focus(uint8_t af_step)
 {
-	CDBG("[MT9T012VC]: %s(%d)\n", __func__, af_step);
+	pr_debug("[MT9T012VC]: %s(%d)\n", __func__, af_step);
 	return 0;
 }
 
@@ -337,12 +337,12 @@ static int32_t mt9t012vc_set_fps(struct fps_cfg *fps)
 	if (rc < 0)
 		return -EBUSY;
 
-	CDBG("mt9t012vc_set_fps: fps_div is %d, frame_rate is %d\n",
+	pr_debug("mt9t012vc_set_fps: fps_div is %d, frame_rate is %d\n",
 	fps->fps_div,
 	(uint16_t) (mt9t012vc_regs.preview_reg_pat->
 			frame_length_lines * fps->fps_div / 0x00000400));
 
-	CDBG("mt9t012vc_set_fps: fps_mult is %d, frame_rate is %d\n",
+	pr_debug("mt9t012vc_set_fps: fps_mult is %d, frame_rate is %d\n",
 	fps->f_mult,
 	(uint16_t) (mt9t012vc_regs.preview_reg_pat->line_length_pck *
 			fps->f_mult / 0x00000400));
@@ -410,7 +410,7 @@ static int32_t mt9t012vc_write_exp_gain(uint16_t gain, uint32_t line)
 	} else
 		line_length_ratio = 0x00000400;
 
-	CDBG("[MT9T012VC] %s(gain = 0x%x, line = %d)\n", __func__, gain, line);
+	pr_debug("[MT9T012VC] %s(gain = 0x%x, line = %d)\n", __func__, gain, line);
 
 	rc = mt9t012vc_i2c_write_w(mt9t012vc_client->addr, REG_GROUPED_PARAMETER_HOLD, GROUPED_PARAMETER_HOLD);
 	if (rc < 0)
@@ -890,7 +890,7 @@ int mt9t012vc_sensor_config(void __user * argp)
 
 	down(&mt9t012vc_sem);
 
-	CDBG("mt9t012vc_sensor_config: cfgtype = %d\n", cdata.cfgtype);
+	pr_debug("mt9t012vc_sensor_config: cfgtype = %d\n", cdata.cfgtype);
 	switch (cdata.cfgtype) {
 	case CFG_GET_PICT_FPS:
 		mt9t012vc_get_pict_fps(cdata.cfg.gfps.prevfps,
