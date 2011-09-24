@@ -1176,7 +1176,7 @@ static void __init htckovsky_fixup(struct machine_desc *desc, struct tag *tags,
 	}
 }
 
-MACHINE_START(HTCKOVSKY, "HTC Kovsky GSM phone (aka Xperia X1)")
+MACHINE_START(HTCKOVSKY, "kovsky")
 	.fixup = htckovsky_fixup,
 	.boot_params = 0x10000100,
 	.map_io = htckovsky_map_io,
