@@ -164,13 +164,11 @@ static irqreturn_t wl1251_line_irq(int irq, void *cookie)
 
 static void wl1251_enable_line_irq(struct wl1251 *wl)
 {
-	wl1251_sdio_enable_irq(wl);
 	return enable_irq(wl->irq);
 }
 
 static void wl1251_disable_line_irq(struct wl1251 *wl)
 {
-	wl1251_sdio_disable_irq(wl);
 	return disable_irq(wl->irq);
 }
 
