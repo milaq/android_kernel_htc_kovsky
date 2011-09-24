@@ -352,11 +352,15 @@ static int wl1251_suspend(struct device *dev)
 	 * Tell MMC/SDIO core it's OK to power down the card
 	 * (if it isn't already), but not to remove it completely.
 	 */
+	struct sdio_func *func = dev_to_sdio_func(dev);
+	sdio_release_host(func);
 	return 0;
 }
 
 static int wl1251_resume(struct device *dev)
 {
+	struct sdio_func *func = dev_to_sdio_func(dev);
+	sdio_claim_host(func);
 	return 0;
 }
 
