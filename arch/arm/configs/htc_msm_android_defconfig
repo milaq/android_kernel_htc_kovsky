@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.7
-# Sat Sep 24 00:44:43 2011
+# Sat Sep 24 04:03:00 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -943,8 +943,8 @@ CONFIG_WLAN=y
 # CONFIG_P54_COMMON is not set
 # CONFIG_RT2X00 is not set
 CONFIG_WL12XX=y
-CONFIG_WL1251=m
-CONFIG_WL1251_SDIO=m
+CONFIG_WL1251=y
+CONFIG_WL1251_SDIO=y
 
 #
 # Enable WiMAX (Networking options) to see the WiMAX drivers
