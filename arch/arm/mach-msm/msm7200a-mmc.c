@@ -34,7 +34,6 @@
 #include <mach/mmc.h>
 #include <mach/vreg.h>
 #include <mach/msm7200a_mmc.h>
-#include <linux/wakelock.h>
 
 #include "devices.h"
 
@@ -411,7 +410,6 @@ static struct msm7200a_wl1251_priv {
 	struct msm7200a_wl1251_pdata* pdata;
 	struct msm7200a_sdcc_gpios gpios;
 	bool state;
-	struct wake_lock wake_lock;
 } wl1251_priv;
 
 #if MSM7200A_WL1251_HACK
@@ -452,7 +450,6 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 			return 0;
 		}
 		wl1251_priv.state = true;
-		wake_lock(&wl1251_priv.wake_lock);
 		
 		if (wl1251_priv.vreg) {
 			rc = vreg_enable(wl1251_priv.vreg);
@@ -501,7 +498,6 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 	}
 	mdelay(200);
 	msm_gpios_disable(wl1251_priv.gpios.off, wl1251_priv.gpios.off_length);
-	wake_unlock(&wl1251_priv.wake_lock);
 
 	return 0;
 }
@@ -576,7 +572,6 @@ static int msm7200a_wl1251_probe(struct platform_device *pdev)
 	}
 	
 	wl1251_priv.pdata = pdata;
-	wake_lock_init(&wl1251_priv.wake_lock, WAKE_LOCK_SUSPEND, "WiFi Power");
 
 	rc = msm_add_sdcc(pdata->slot_number, &msm7200a_wl1251_data, 0, 0);
 	if (rc) {
