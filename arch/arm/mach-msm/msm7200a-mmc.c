@@ -476,6 +476,10 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 			gpio_direction_output(wl1251_priv.pdata->gpio_enable, 1);
 		}
 		mdelay(250);
+
+		if (wl1251_priv.pdata->gpio_irq >= 0) {
+			set_irq_wake(gpio_to_irq(wl1251_priv.pdata->gpio_irq), 1);
+		}
 		return 0;
 	}
 
@@ -484,6 +488,9 @@ static uint32_t wifi_switchvdd(struct device *dev, unsigned int vdd)
 	}
 
 	wl1251_priv.state = false;
+	if (wl1251_priv.pdata->gpio_irq >= 0) {
+		set_irq_wake(gpio_to_irq(wl1251_priv.pdata->gpio_irq), 0);
+	}
 	if (wl1251_priv.vreg) {
 		vreg_disable(wl1251_priv.vreg);
 	}
