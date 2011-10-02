@@ -53,7 +53,7 @@ enum {
 	MSM_PM_DEBUG_IDLE = 1U << 6,
 	MSM_PM_DEBUG_CLOCK_VOTE = 1U << 7
 };
-static int msm_pm_debug_mask = MSM_PM_DEBUG_CLOCK_VOTE;
+static int msm_pm_debug_mask = ~MSM_PM_DEBUG_IDLE;
 module_param_named(debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 enum {
@@ -202,12 +202,22 @@ msm_pm_wait_state(uint32_t wait_all_set, uint32_t wait_all_clear,
 	int i;
 	uint32_t state;
 
+
+
 	for (i = 0; i < 100000; i++) {
 		state = smsm_get_state(PM_SMSM_READ_STATE);
-		if (((wait_all_set || wait_all_clear) &&
+#if !defined(CONFIG_MSM_AMSS_VERSION_WINCE)
+		if (((wait_all_set || wait_all_clear) && 
 		     !(~state & wait_all_set) && !(state & wait_all_clear)) ||
 		    (state & wait_any_set) || (~state & wait_any_clear))
 			return 0;
+#else
+		if (((state & wait_all_set) == wait_all_set) &&
+		    ((~state & wait_all_clear) == wait_all_clear) &&
+		    (wait_any_set == 0 || (state & wait_any_set) ||
+		     wait_any_clear == 0 || (state & wait_any_clear)))
+			return 0;
+#endif
 		udelay(1);
 	}
 	pr_err("msm_pm_wait_state(%x, %x, %x, %x) failed %x\n",	wait_all_set,
@@ -223,9 +233,13 @@ msm_pm_enter_prep_hw(void)
 	writel(1, MSM_SHARED_RAM_BASE + 0xfc100);
 	writel(readl(MSM_SHARED_RAM_BASE + 0xfc108) + 1,MSM_SHARED_RAM_BASE + 0xfc108);
 	writel(0x7f, A11S_CLK_SLEEP_EN);
-	writel(8, A11S_STANDBY_CTL);
 	writel(1, A11S_PWRDOWN);
-#elif defined(CONFIG_ARCH_MSM7X30)
+	writel(8, A11S_STANDBY_CTL);
+	writel(0, A11RAMBACKBIAS);
+	return;
+#endif
+
+#if defined(CONFIG_ARCH_MSM7X30)
 	writel(1, A11S_PWRDOWN);
 	writel(4, A11S_SECOP);
 #else
@@ -255,8 +269,8 @@ msm_pm_exit_restore_hw(void)
 	writel(0, A11S_SECOP);
 	writel(0, A11S_PWRDOWN);
 #else
+	writel(0, A11S_CLK_SLEEP_EN);
 	writel(0, A11S_PWRDOWN);
-	writel(0x00, A11S_CLK_SLEEP_EN);
 #endif
 }
 
