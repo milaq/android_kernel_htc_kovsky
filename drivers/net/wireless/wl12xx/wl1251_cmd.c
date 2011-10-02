@@ -162,6 +162,7 @@ int wl1251_cmd_configure(struct wl1251 *wl, u16 id, void *buf, size_t len)
 		wl1251_warning("CONFIGURE command NOK");
 		return ret;
 	}
+	wl1251_leave();
 
 	return 0;
 }

@@ -138,18 +138,22 @@ static void wl1251_sdio_enable_irq(struct wl1251 *wl)
 {
 	struct sdio_func *func = wl_to_func(wl);
 
+	wl1251_enter();
 	sdio_claim_host(func);
 	sdio_claim_irq(func, wl1251_sdio_interrupt);
 	sdio_release_host(func);
+	wl1251_leave();
 }
 
 static void wl1251_sdio_disable_irq(struct wl1251 *wl)
 {
 	struct sdio_func *func = wl_to_func(wl);
 
+	wl1251_enter();
 	sdio_claim_host(func);
 	sdio_release_irq(func);
 	sdio_release_host(func);
+	wl1251_leave();
 }
 
 /* Interrupts when using dedicated WLAN_IRQ pin */
@@ -164,12 +168,16 @@ static irqreturn_t wl1251_line_irq(int irq, void *cookie)
 
 static void wl1251_enable_line_irq(struct wl1251 *wl)
 {
-	return enable_irq(wl->irq);
+	wl1251_enter();
+	enable_irq(wl->irq);
+	wl1251_leave();
 }
 
 static void wl1251_disable_line_irq(struct wl1251 *wl)
 {
-	return disable_irq(wl->irq);
+	wl1251_enter();
+	disable_irq(wl->irq);
+	wl1251_leave();
 }
 
 static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
@@ -177,6 +185,7 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 	int ret = 0;
 	struct sdio_func *func = wl_to_func(wl);
 
+	wl1251_enter();
 	if (enable) {
 		if (wl->set_power)
 			wl->set_power(true);
@@ -187,24 +196,34 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 			goto out;
 		}
 
+		wl1251_info("sdio_claim_host");
 		sdio_claim_host(func);
+		wl1251_info("sdio_enable_func");
 		sdio_enable_func(func);
+		wl1251_info("sdio_release_host");
 		sdio_release_host(func);
+		wl1251_info("sdio_done");
 	} else {
+		wl1251_info("sdio_claim_host");
 		sdio_claim_host(func);
+		wl1251_info("sdio_disable_func");
 		sdio_disable_func(func);
+		wl1251_info("sdio_release_host");
 		sdio_release_host(func);
+		wl1251_info("power_save_host");
 		ret = mmc_power_save_host(func->card->host);
 		if (ret) {
 			wl1251_error("failed to disable host power");
 			goto out;
 		}
+		wl1251_info("power_save done");
 
 		if (wl->set_power)
 			wl->set_power(false);
 	}
 
 out:
+	wl1251_leave();
 	return ret;
 }
 
@@ -352,11 +371,13 @@ static int wl1251_suspend(struct device *dev)
 	 * Tell MMC/SDIO core it's OK to power down the card
 	 * (if it isn't already), but not to remove it completely.
 	 */
+	wl1251_enter();
 	return 0;
 }
 
 static int wl1251_resume(struct device *dev)
 {
+	wl1251_enter();
 	return 0;
 }
 

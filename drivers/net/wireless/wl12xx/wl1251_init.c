@@ -119,6 +119,8 @@ int wl1251_hw_init_phy_config(struct wl1251 *wl)
 {
 	int ret;
 
+	wl1251_enter();
+
 	ret = wl1251_acx_pd_threshold(wl);
 	if (ret < 0)
 		return ret;
@@ -138,6 +140,7 @@ int wl1251_hw_init_phy_config(struct wl1251 *wl)
 	ret = wl1251_acx_rts_threshold(wl, RTS_THRESHOLD_DEF);
 	if (ret < 0)
 		return ret;
+	wl1251_leave();
 
 	return 0;
 }
