@@ -51,7 +51,7 @@
 
 #define DRIVER_NAME "msm-sdcc"
 
-#define BUSCLK_PWRSAVE 1
+#define BUSCLK_PWRSAVE 0
 #define BUSCLK_TIMEOUT (HZ)
 static unsigned int msmsdcc_fmin = 144000;
 static unsigned int msmsdcc_fmax = 50000000;
