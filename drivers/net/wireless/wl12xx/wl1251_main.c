@@ -595,6 +595,9 @@ static int wl1251_op_config(struct ieee80211_hw *hw, u32 changed)
 
 	mutex_lock(&wl->mutex);
 
+	if (wl->state == WL1251_STATE_OFF)
+		goto out;
+
 	ret = wl1251_ps_elp_wakeup(wl);
 	if (ret < 0)
 		goto out;
@@ -886,6 +889,9 @@ static int wl1251_op_hw_scan(struct ieee80211_hw *hw,
 
 	mutex_lock(&wl->mutex);
 
+	if (wl->state == WL1251_STATE_OFF)
+		goto out;
+
 	if (wl->scanning) {
 		wl1251_debug(DEBUG_SCAN, "scan already in progress");
 		ret = -EINVAL;
@@ -938,6 +944,9 @@ static int wl1251_op_set_rts_threshold(struct ieee80211_hw *hw, u32 value)
 	int ret;
 
 	mutex_lock(&wl->mutex);
+
+	if (wl->state == WL1251_STATE_OFF)
+		goto out;
 
 	ret = wl1251_ps_elp_wakeup(wl);
 	if (ret < 0)
@@ -1163,6 +1172,9 @@ static int wl1251_op_conf_tx(struct ieee80211_hw *hw, u16 queue,
 	int ret;
 
 	mutex_lock(&wl->mutex);
+
+	if (wl->state == WL1251_STATE_OFF)
+		goto out;
 
 	wl1251_debug(DEBUG_MAC80211, "mac80211 conf tx %d", queue);
 
