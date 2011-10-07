@@ -53,7 +53,7 @@ enum {
 	MSM_PM_DEBUG_IDLE = 1U << 6,
 	MSM_PM_DEBUG_CLOCK_VOTE = 1U << 7
 };
-static int msm_pm_debug_mask = ~MSM_PM_DEBUG_IDLE;
+static int msm_pm_debug_mask = ~(MSM_PM_DEBUG_IDLE|MSM_PM_DEBUG_CLOCK);
 module_param_named(debug_mask, msm_pm_debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 enum {
@@ -206,16 +206,16 @@ msm_pm_wait_state(uint32_t wait_all_set, uint32_t wait_all_clear,
 
 	for (i = 0; i < 100000; i++) {
 		state = smsm_get_state(PM_SMSM_READ_STATE);
-#if !defined(CONFIG_MSM_AMSS_VERSION_WINCE)
-		if (((wait_all_set || wait_all_clear) && 
-		     !(~state & wait_all_set) && !(state & wait_all_clear)) ||
-		    (state & wait_any_set) || (~state & wait_any_clear))
-			return 0;
-#else
+#if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
 		if (((state & wait_all_set) == wait_all_set) &&
 		    ((~state & wait_all_clear) == wait_all_clear) &&
 		    (wait_any_set == 0 || (state & wait_any_set) ||
 		     wait_any_clear == 0 || (state & wait_any_clear)))
+			return 0;
+#else
+		if (((wait_all_set || wait_all_clear) && 
+		     !(~state & wait_all_set) && !(state & wait_all_clear)) ||
+		    (state & wait_any_set) || (~state & wait_any_clear))
 			return 0;
 #endif
 		udelay(1);
@@ -236,6 +236,9 @@ msm_pm_enter_prep_hw(void)
 	writel(1, A11S_PWRDOWN);
 	writel(8, A11S_STANDBY_CTL);
 	writel(0, A11RAMBACKBIAS);
+	if (msm_pm_debug_mask & MSM_PM_DEBUG_SUSPEND) {
+		pr_info("ARM11 entering suspend mode\n");
+	}
 	return;
 #endif
 
@@ -269,9 +272,12 @@ msm_pm_exit_restore_hw(void)
 	writel(0, A11S_SECOP);
 	writel(0, A11S_PWRDOWN);
 #else
-	writel(0, A11S_CLK_SLEEP_EN);
 	writel(0, A11S_PWRDOWN);
+	writel(0, A11S_CLK_SLEEP_EN);
 #endif
+	if (msm_pm_debug_mask & MSM_PM_DEBUG_SUSPEND) {
+		pr_info("ARM11 entering run mode\n");
+	}
 }
 
 #ifdef CONFIG_MSM_FIQ_SUPPORT
@@ -363,39 +369,38 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 	msm_gpio_enter_sleep(from_idle);
 
 	if (enter_state) {
-		/* Make sure last sleep request did not end with a timeout */
-		ret = msm_pm_wait_state(PM_SMSM_READ_RUN, 0, 0, 0);
-		if (ret) {
-			printk(KERN_ERR "msm_sleep(): invalid inital state\n");
-			invalid_inital_state = true;
-		}
 
 		if (sleep_delay == 0 && sleep_mode >= MSM_PM_SLEEP_MODE_APPS_SLEEP)
 			sleep_delay = 192000*5; /* APPS_SLEEP does not allow infinite timeout */
-		ret = smsm_set_sleep_duration(sleep_delay);
-		if (ret) {
-			printk(KERN_ERR "msm_sleep(): smsm_set_sleep_duration %x failed\n", enter_state);
-			enter_state = 0;
-			exit_state = 0;
-		}
-		if ((!from_idle && (msm_pm_debug_mask & MSM_PM_DEBUG_CLOCK_VOTE)) ||
-			(from_idle && (msm_pm_debug_mask & MSM_PM_DEBUG_IDLE)))
-			clks_print_running();
-
+		smsm_set_sleep_duration(sleep_delay);
 		ret = smsm_change_state(PM_SMSM_WRITE_STATE, PM_SMSM_WRITE_RUN, enter_state);
 		if (ret) {
 			printk(KERN_ERR "msm_sleep(): smsm_change_state %x failed\n", enter_state);
 			enter_state = 0;
 			exit_state = 0;
+			msm_irq_exit_sleep1();
+			goto getout;
 		}
 		ret = msm_pm_wait_state(enter_wait_set, enter_wait_clear, 0, 0);
-		if (ret || invalid_inital_state) {
+		if (ret) {
 			printk(KERN_INFO "msm_sleep(): msm_pm_wait_state failed, %x\n", smsm_get_state(PM_SMSM_READ_STATE));
-			goto enter_failed;
+			msm_irq_exit_sleep1();
+			smsm_change_state(PM_SMSM_WRITE_STATE, enter_state, exit_state);
+			msm_pm_wait_state(exit_wait_any_set, exit_wait_clear, 0, 0);			
+			smsm_change_state(PM_SMSM_WRITE_STATE, exit_state, PM_SMSM_WRITE_RUN);
+			msm_pm_wait_state(PM_SMSM_WRITE_RUN, 0, 0, 0);			
+			goto getout;
 		}
 	}
-	if (msm_irq_enter_sleep2(!!enter_state, from_idle))
-		goto enter_failed;
+	if (msm_irq_enter_sleep2(!!enter_state, from_idle)) {
+		msm_irq_exit_sleep1();
+		msm_irq_exit_sleep2();
+		smsm_change_state(PM_SMSM_WRITE_STATE, enter_state, exit_state);
+		msm_pm_wait_state(exit_wait_any_set, exit_wait_clear, 0, 0);			
+		smsm_change_state(PM_SMSM_WRITE_STATE, exit_state, PM_SMSM_WRITE_RUN);
+		msm_pm_wait_state(PM_SMSM_WRITE_RUN, 0, 0, 0);			
+		goto getout;
+	}
 
 	if (enter_state) {
 		msm_pm_enter_prep_hw();
@@ -472,12 +477,13 @@ static int msm_sleep(int sleep_mode, uint32_t sleep_delay, int from_idle)
 		       smsm_get_state(PM_SMSM_READ_STATE));
 ramp_down_failed:
 	msm_irq_exit_sleep1();
-enter_failed:
 	if (enter_state) {
 		msm_pm_exit_restore_hw();
-
 		smsm_change_state(PM_SMSM_WRITE_STATE, enter_state, exit_state);
-		msm_pm_wait_state(0, exit_wait_clear, exit_wait_any_set, 0);
+		msm_pm_wait_state(exit_wait_any_set, exit_wait_clear, 0, 0);
+		smsm_change_state(PM_SMSM_WRITE_STATE, exit_state, PM_SMSM_WRITE_RUN);
+		msm_pm_wait_state(PM_SMSM_WRITE_RUN, 0, 0, 0);
+
 		if (msm_pm_debug_mask & MSM_PM_DEBUG_STATE)
 			printk(KERN_INFO "msm_sleep(): sleep exit "
 			       "A11S_CLK_SLEEP_EN %x, A11S_PWRDOWN %x, "
@@ -487,15 +493,7 @@ enter_failed:
 			smsm_print_sleep_info();
 	}
 	msm_irq_exit_sleep2();
-	if (enter_state) {
-		smsm_change_state(PM_SMSM_WRITE_STATE, exit_state, PM_SMSM_WRITE_RUN);
-		msm_pm_wait_state(PM_SMSM_READ_RUN, 0, 0, 0);
-		if (msm_pm_debug_mask & MSM_PM_DEBUG_STATE)
-			printk(KERN_INFO "msm_sleep(): sleep exit "
-			       "A11S_CLK_SLEEP_EN %x, A11S_PWRDOWN %x, "
-			       "smsm_get_state %x\n", readl(A11S_CLK_SLEEP_EN),
-			       readl(A11S_PWRDOWN), smsm_get_state(PM_SMSM_READ_STATE));
-	}
+getout:
 	msm_irq_exit_sleep3();
 	msm_gpio_exit_sleep();
 	smd_sleep_exit();
