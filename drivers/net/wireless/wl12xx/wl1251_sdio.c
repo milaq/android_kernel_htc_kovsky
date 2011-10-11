@@ -287,12 +287,15 @@ static int wl1251_sdio_probe(struct sdio_func *func,
 	func->card->quirks |= MMC_QUIRK_BLKSZ_FOR_BYTE_MODE;
 
 	sdio_claim_host(func);
+	pr_info("%s: claimed host\n", __func__);
 	ret = sdio_enable_func(func);
 	if (ret)
 		goto release;
+	pr_info("%s: enabled host\n", __func__);
 
 	sdio_set_block_size(func, 512);
 	sdio_release_host(func);
+	pr_info("%s: released host\n", __func__);
 
 	SET_IEEE80211_DEV(hw, &func->dev);
 	wl_sdio->func = func;
@@ -354,15 +357,22 @@ static void __devexit wl1251_sdio_remove(struct sdio_func *func)
 	struct wl1251_sdio *wl_sdio = wl->if_priv;
 
 
-	if (wl->irq)
-		free_irq(wl->irq, wl);
-	kfree(wl_sdio);
-	wl1251_free_hw(wl);
+	wl1251_enter();
+	
+	pr_info("%s: disabling irq\n", __func__);
+	wl1251_sdio_ops.disable_irq(wl);
+	pr_info("%s: disabled irq\n", __func__);
 
-	sdio_claim_host(func);
-	sdio_release_irq(func);
-	sdio_disable_func(func);
-	sdio_release_host(func);
+	if (wl->irq) {
+		free_irq(wl->irq, wl);
+		pr_info("%s: freed wl irq\n", __func__);
+	}
+	kfree(wl_sdio);
+	pr_info("%s: kfreed sdio\n", __func__);
+	wl1251_free_hw(wl);
+	pr_info("%s: freed HW\n", __func__);
+
+	wl1251_leave();
 }
 
 static int wl1251_suspend(struct device *dev)
