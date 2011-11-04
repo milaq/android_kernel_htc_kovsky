@@ -391,8 +391,13 @@ static struct ds2746_platform_data kovsky_battery_data = {
  * MicroP
  ******************************************************************************/
 static struct platform_device htckovsky_microp_leds = {
-  .id = -1,
-  .name = "htckovsky-microp-leds",
+	.id = -1,
+	.name = "htckovsky-microp-leds",
+};
+
+static struct platform_device htckovsky_microp_oj = {
+	.id = -1,
+	.name = "htckovsky-microp-oj",
 };
 
 static struct platform_device htckovsky_microp_acoustic;
@@ -400,6 +405,7 @@ static struct platform_device htckovsky_microp_acoustic;
 static struct platform_device* htckovsky_microp_clients[] = {
 	&htckovsky_microp_leds,
 	&htckovsky_microp_acoustic,
+	&htckovsky_microp_oj,
 };
 
 static uint16_t micropklt_compatible_versions[] = {
