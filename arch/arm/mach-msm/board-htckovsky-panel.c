@@ -265,124 +265,6 @@ static struct mddi_table mddi_epson_init_table_2[] = {
 	{1, 0xa},
 };
 
-/*
-static struct mddi_table mddi_tsb_init_table[] = {
-	{0x0010801c,0x4ED000A2},
-	{0x00108020,0x00000110},
-	{0x00108024,0x00000000},
-	{0x00108028,0x00000001},{1,1},
-	{0x0010802c,0x00000001},
-	{0x00160004,0x000000fd},
-	{0x00150000,0x03FC0044},
-	{0x00150004,0x000003fc},
-	{0x00170000,0x00000000},
-	{0x00150028,0x00000000},
-	{0x00160000,0x00000000},
-	{0x00150014,0x00000001},
-	{0x0016000c,0x00000001},
-	{0x00160008,0x00000001},
-	{0x00160004,0x000000ff},
-	{0x120000, 0x799},
-	{0x120004, 0x100},
-	{0x160010, 0x0},
-	{0x120000, 0x79b},
-	{0x108044, 0x32001e0},
-	{0x108048, 0x0},
-	{0x10804c, 0x0},
-	{0x108050, 0x0},
-	{0x108054, 0x0},
-	{0x160004, 0xa1ff},
-	{1, 0x64},
-	{0x110010, 0x10},
-	{0x110004, 0x1},
-	{0x11000c, 0x8},
-	{0x110020, 0x0},
-	{0x110034, 0xf9},
-	{0x110038, 0x2},
-	{0x11003c, 0x7},
-	{0x110040, 0xef},
-	{0x110044, 0x333},
-	{0x110048, 0x5},
-	{0x11004c, 0x9},
-	{0x110050, 0x31f},
-	{0x160010, 0x0},
-	{0x11005c, 0x1},
-	{0x110054, 0x5},
-	{0x110008, 0x1},
-	{0x1, 0xa},
-	{0x120000, 0x771},
-	{0x120004, 0x100},
-	{0x160010, 0},
-	{0x120000, 0x773},
-};
-
-static struct spi_table toshiba_spi_init_table[] = {
-	{2, 0},
-	{3, 0},
-	{4, 0},
-	{0x10, 0x210},
-	{0x20, 2},
-	{0x21, 0x2a31},
-	{0x22, 0x3e},
-	{0x23, 0x7400},
-	{0x24, 0x7400},
-	{0x25, 0x6a06},
-	{0x26, 0x7400},
-	{0x27, 0x1c06},
-	{0x28, 0x1c28},
-	{0x29, 0x1c4a},
-	{0x2a, 0x666},
-	{0x100, 0x33},
-	{0x101, 0x3},
-	{0x102, 0x3700},
-	{0x300, 0x7777},
-	{0x301, 0x2116},
-	{0x302, 0xc114},
-	{0x303, 0x2177},
-	{0x304, 0x7110},
-	{0x305, 0xc316},
-	{0x402, 0},
-	{0x501, 0xffff},
-	{0x502, 0xffff},
-	{0x503, 0xffff},
-	{0x504, 0xff},
-	{0x2, 0x200, 0xa},
-	{0x1, 0x1, 0x2},
-	{0x2, 0x8210, 0x14},
-	{0x2, 0x8310, 0x14},
-	{0x2, 0x710, 0x14},
-	{0x2, 0x1730, 0x14},
-	{0x1, 0x12},
-	{0x1, 0x32},
-	{0x23, 0, 0x14},
-	{0x1, 0x33},
-	{0x23, 0x7400},
-};
-
-static inline void htckovsky_process_toshiba_spi_table(struct msm_mddi_client_data *client_data,
-					struct spi_table *table,
-					size_t count) {
-	int i;
-
-	while (!(client_data->remote_read(client_data, 0x108014) & 0x1000));
-	for (i = 0; i < count; i++) {
-		client_data->remote_write(client_data, 0x771, 0x120000);
-		client_data->remote_write(client_data, 0x100, 0x120004);
-		client_data->remote_write(client_data, 0x80010, 0x120008);
-		client_data->remote_write(client_data, (table[i].reg & 0xffff) | 0x10000, 0x120000);
-		client_data->remote_write(client_data, 0x773, 0x120000);
-
-		client_data->remote_write(client_data, 0x771, 0x120000);
-		client_data->remote_write(client_data, 0x100, 0x120004);
-		client_data->remote_write(client_data, 0x80012, 0x120008);
-		client_data->remote_write(client_data, (table[i].value & 0xffff) | 0x10000, 0x120000);
-		client_data->remote_write(client_data, 0x773, 0x120000);
-		if (table[i].delay)
-			mdelay(table[i].delay);
-	}
-}
-*/
-
 static struct vreg *vreg_26v = NULL, *vreg_18v = NULL, *vreg_aux2 = NULL;
 
 static inline void htckovsky_process_epson_spi_table(struct msm_mddi_client_data *client_data,
@@ -468,9 +350,9 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 	}
 }
 
-static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data *bridge_data,
+static int htckovsky_mddi_panel_init(struct msm_mddi_bridge_platform_data *bridge_data,
 					struct msm_mddi_client_data *client_data) {
-	pr_debug("%s: +unblank panel\n", __func__);
+	pr_debug("%s: +init panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
 	htckovsky_process_mddi_table(client_data,
 				mddi_epson_init_table_1,
@@ -485,9 +367,35 @@ static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data *br
 				ARRAY_SIZE(mddi_epson_init_table_2));
 
 	client_data->auto_hibernate(client_data, 1);
-	pr_debug("%s: -unblank panel\n", __func__);
+	pr_debug("%s: -init panel\n", __func__);
 	return 0;
 
+}
+
+static int htckovsky_mddi_panel_deinit(struct msm_mddi_bridge_platform_data
+				      *bridge_data,
+				      struct msm_mddi_client_data *client_data)
+{
+	pr_debug("%s: +deinit panel\n", __func__);
+	client_data->auto_hibernate(client_data, 0);
+	htckovsky_process_mddi_table(client_data,
+				     mddi_epson_deinit_table,
+				     ARRAY_SIZE(mddi_epson_deinit_table));
+	client_data->auto_hibernate(client_data, 1);
+	pr_debug("%s: -deinit panel\n", __func__);
+	return 0;
+}
+
+static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data
+				      *bridge_data,
+				      struct msm_mddi_client_data *client_data)
+{
+	pr_debug("%s: +unblank panel\n", __func__);
+	client_data->auto_hibernate(client_data, 0);
+	client_data->remote_write(client_data, (1 << 14), 0x600);
+	client_data->auto_hibernate(client_data, 1);
+	pr_debug("%s: -unblank panel\n", __func__);
+	return 0;
 }
 
 static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data
@@ -496,9 +404,7 @@ static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data
 {
 	pr_debug("%s: +blank panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
-	htckovsky_process_mddi_table(client_data,
-				     mddi_epson_deinit_table,
-				     ARRAY_SIZE(mddi_epson_deinit_table));
+	client_data->remote_write(client_data, (1 << 14) | (1 << 7), 0x600);
 	client_data->auto_hibernate(client_data, 1);
 	pr_debug("%s: -blank panel\n", __func__);
 	return 0;
@@ -513,8 +419,8 @@ static struct resource htckovsky_fb_resources[] = {
 };
 
 static struct msm_mddi_bridge_platform_data epson_client_data = {
-	.init = htckovsky_mddi_panel_unblank,
-	.uninit = htckovsky_mddi_panel_blank,
+	.init = htckovsky_mddi_panel_init,
+	.uninit = htckovsky_mddi_panel_deinit,
 	.blank = htckovsky_mddi_panel_blank,
 	.unblank = htckovsky_mddi_panel_unblank,
 	.fb_data = {
