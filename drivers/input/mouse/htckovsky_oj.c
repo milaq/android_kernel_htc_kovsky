@@ -272,6 +272,9 @@ static int htckovsky_oj_probe(struct platform_device *pdev)
 		goto fail_vreg_28v;
 	}
 
+	htckovsky_oj_power(false);
+	htckovsky_oj_power(true);
+
 	ret = request_irq(gpio_to_irq(KOVS100_JOYSTICK_IRQ),
 		htckovsky_oj_interrupt, IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
 		"Joystick IRQ", NULL);
