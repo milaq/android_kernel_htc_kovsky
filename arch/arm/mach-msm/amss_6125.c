@@ -71,7 +71,7 @@ static struct msm_snd_endpoint snd_endpoints_list[] = {
 	SND(3, "BT_EC_OFF"),
 
 	SND(0x11, "IDLE"),
-	SND(0x11, "CURRENT"),
+	SND(256, "CURRENT"),
 };
 #undef SND
 
