@@ -556,7 +556,7 @@ static void mmc_sdio_remove(struct mmc_host *host)
  */
 static void mmc_sdio_detect(struct mmc_host *host)
 {
-	int err;
+	int err = 0;
 
 	BUG_ON(!host);
 	BUG_ON(!host->card);
@@ -568,13 +568,19 @@ static void mmc_sdio_detect(struct mmc_host *host)
 			goto out;
 	}
 
+	printk("%s: claiming host\n", __func__);
 	mmc_claim_host(host);
 
 	/*
 	 * Just check if our card has been removed.
 	 */
-	err = mmc_select_card(host->card);
+	printk("%s: selecting card\n", __func__);
+	//FIXME: this sucks. Make it unsuck if we upgrade to a newer kernel
+	if (!(host->card->quirks & MMC_QUIRK_NONSTD_SDIO)) {
+		err = mmc_select_card(host->card);
+	}
 
+	printk("%s: selected card\n", __func__);
 	mmc_release_host(host);
 
 	/*
