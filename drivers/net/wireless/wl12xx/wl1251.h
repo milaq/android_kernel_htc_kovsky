@@ -50,7 +50,7 @@ enum {
 	DEBUG_ALL	= ~0,
 };
 
-#define DEBUG_LEVEL (~(DEBUG_BOOT|DEBUG_TX|DEBUG_RX|DEBUG_EVENT|DEBUG_MAILBOX))
+#define DEBUG_LEVEL DEBUG_NONE
 
 #define DEBUG_DUMP_LIMIT 1024
 
@@ -66,14 +66,14 @@ enum {
 #define wl1251_info(fmt, arg...) \
 	printk(KERN_DEBUG DRIVER_PREFIX fmt "\n", ##arg)
 
-#define wl1251_enter() wl1251_info("+%s", __func__)
-#define wl1251_leave() wl1251_info("-%s", __func__)
-
 #define wl1251_debug(level, fmt, arg...) \
 	do { \
 		if (level & DEBUG_LEVEL) \
 			printk(KERN_DEBUG DRIVER_PREFIX fmt "\n", ##arg); \
 	} while (0)
+
+#define wl1251_enter() wl1251_debug(DEBUG_CMD, "+%s", __func__)
+#define wl1251_leave() wl1251_debug(DEBUG_CMD, "-%s", __func__)
 
 #define wl1251_dump(level, prefix, buf, len)	\
 	do { \

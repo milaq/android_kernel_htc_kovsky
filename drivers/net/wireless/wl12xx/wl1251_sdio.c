@@ -196,27 +196,27 @@ static int wl1251_sdio_set_power(struct wl1251 *wl, bool enable)
 			goto out;
 		}
 
-		wl1251_info("sdio_claim_host");
+		wl1251_debug(DEBUG_PSM, "sdio_claim_host");
 		sdio_claim_host(func);
-		wl1251_info("sdio_enable_func");
+		wl1251_debug(DEBUG_PSM, "sdio_enable_func");
 		sdio_enable_func(func);
-		wl1251_info("sdio_release_host");
+		wl1251_debug(DEBUG_PSM, "sdio_release_host");
 		sdio_release_host(func);
-		wl1251_info("sdio_done");
+		wl1251_debug(DEBUG_PSM, "sdio_done");
 	} else {
-		wl1251_info("sdio_claim_host");
+		wl1251_debug(DEBUG_PSM, "sdio_claim_host");
 		sdio_claim_host(func);
-		wl1251_info("sdio_disable_func");
+		wl1251_debug(DEBUG_PSM, "sdio_disable_func");
 		sdio_disable_func(func);
-		wl1251_info("sdio_release_host");
+		wl1251_debug(DEBUG_PSM, "sdio_release_host");
 		sdio_release_host(func);
-		wl1251_info("power_save_host");
+		wl1251_debug(DEBUG_PSM, "power_save_host");
 		ret = mmc_power_save_host(func->card->host);
 		if (ret) {
 			wl1251_error("failed to disable host power");
 			goto out;
 		}
-		wl1251_info("power_save done");
+		wl1251_debug(DEBUG_PSM, "power_save done");
 
 		if (wl->set_power)
 			wl->set_power(false);
@@ -359,18 +359,18 @@ static void __devexit wl1251_sdio_remove(struct sdio_func *func)
 
 	wl1251_enter();
 	
-	pr_info("%s: disabling irq\n", __func__);
+	pr_debug("%s: disabling irq\n", __func__);
 	wl1251_sdio_ops.disable_irq(wl);
-	pr_info("%s: disabled irq\n", __func__);
+	pr_debug("%s: disabled irq\n", __func__);
 
 	if (wl->irq) {
 		free_irq(wl->irq, wl);
-		pr_info("%s: freed wl irq\n", __func__);
+		pr_debug("%s: freed wl irq\n", __func__);
 	}
 	kfree(wl_sdio);
-	pr_info("%s: kfreed sdio\n", __func__);
+	pr_debug("%s: kfreed sdio\n", __func__);
 	wl1251_free_hw(wl);
-	pr_info("%s: freed HW\n", __func__);
+	pr_debug("%s: freed HW\n", __func__);
 
 	wl1251_leave();
 }
