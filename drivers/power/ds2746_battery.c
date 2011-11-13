@@ -326,7 +326,7 @@ static void ds2746_battery_work(struct work_struct *work)
 	bi->charging_enabled = false;
 	if (power_supply_am_i_supplied(bi->bat)) {
 		next_update = msecs_to_jiffies(FAST_POLL);
-		if (bi->level < 100 && bi->batt_vol < bi->bat_pdata.high_voltage)
+		if (bi->level < 100 && bi->batt_vol < bi->bat_pdata.high_voltage + 60)
 			bi->charging_enabled = true;
 	}
 	else {
