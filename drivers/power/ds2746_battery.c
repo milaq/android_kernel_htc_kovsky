@@ -311,7 +311,17 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 static void ds2746_battery_work(struct work_struct *work)
 {
 	unsigned long next_update;
+
+	if (bi->bat_pdata.block_charge) {
+		bi->bat_pdata.block_charge(true);
+		msleep(15);
+	}
+
 	ds2746_battery_read_status(bi);
+
+	if (bi->bat_pdata.block_charge) {
+		bi->bat_pdata.block_charge(false);
+	}
 
 	bi->charging_enabled = false;
 	if (power_supply_am_i_supplied(bi->bat)) {
