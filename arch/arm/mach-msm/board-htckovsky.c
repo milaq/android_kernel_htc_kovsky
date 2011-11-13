@@ -690,12 +690,31 @@ int kovsky_camera_set_state(int on)
 	return 0;
 }
 
+static int htckovsky_camera_flash(int level) {
+	switch (level) {
+		case 0:
+			gpio_direction_output(KOVS100_TORCH_FLASH, 0);
+			gpio_direction_output(KOVS100_TORCH_PWR, 0);
+			break;
+		case 1:
+			gpio_direction_output(KOVS100_TORCH_PWR, 1);
+			gpio_direction_output(KOVS100_TORCH_FLASH, 0);
+			break;
+		case 2:
+			gpio_direction_output(KOVS100_TORCH_PWR, 1);
+			gpio_direction_output(KOVS100_TORCH_FLASH, 1);
+			break;
+	}
+}
+
 static struct msm_camera_sensor_info msm_camera_sensor_mt9t012vc_data = {
 	//fake sensor name for the stupid proprietary driver
 	.sensor_name = "mt9t013",
 	.sensor_reset   = -1,
 	.sensor_pwd     = -1,
 	.vcm_pwd        = -1,
+	.num_flash_levels = 2,
+	.camera_flash = htckovsky_camera_flash,
 	.pdata = &msm_camera_device_data,
 };
 
