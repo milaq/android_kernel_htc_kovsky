@@ -324,10 +324,10 @@ static void htckovsky_set_charge(int flags)
 
 static void htckovsky_block_charge(bool do_block) {
 	if (do_block) {
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
+		htckovsky_set_charge(0);
 	}
 	else {
-		gpio_direction_output(KOVS100_N_CHG_ENABLE, !htckovsky_is_usb_online());
+		htckovsky_set_charge(htckovsky_is_usb_online());
 	}
 }
 
