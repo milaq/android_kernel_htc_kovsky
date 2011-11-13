@@ -54,20 +54,29 @@ enum vfe_resp_msg {
 	VFE_EVENT,
 	VFE_MSG_GENERAL,
 	VFE_MSG_SNAPSHOT,
+#ifndef CONFIG_720P_CAMERA
 	VFE_MSG_OUTPUT1,
 	VFE_MSG_OUTPUT2,
-	VFE_MSG_STATS_AF,
-	VFE_MSG_STATS_WE, /* AEC + AWB */
+#else
 	VFE_MSG_OUTPUT_P,   /* preview (continuous mode ) */
 	VFE_MSG_OUTPUT_T,   /* thumbnail (snapshot mode )*/
 	VFE_MSG_OUTPUT_S,   /* main image (snapshot mode )*/
 	VFE_MSG_OUTPUT_V,   /* video   (continuous mode ) */
+#endif
+	VFE_MSG_STATS_AF,
+	VFE_MSG_STATS_WE, /* AEC + AWB */
 	VFE_MSG_STATS_AEC,
 	VFE_MSG_STATS_AWB,
 	VFE_MSG_STATS_RS,
 	VFE_MSG_STATS_CS,
 	VFE_MSG_STATS_IHIST,
 	VFE_MSG_STATS_SKIN,
+#ifndef CONFIG_720P_CAMERA
+	VFE_MSG_OUTPUT_P,   /* preview (continuous mode ) */
+	VFE_MSG_OUTPUT_T,   /* thumbnail (snapshot mode )*/
+	VFE_MSG_OUTPUT_S,   /* main image (snapshot mode )*/
+	VFE_MSG_OUTPUT_V,   /* video   (continuous mode ) */
+#endif
 };
 
 struct msm_vfe_phy_info {
