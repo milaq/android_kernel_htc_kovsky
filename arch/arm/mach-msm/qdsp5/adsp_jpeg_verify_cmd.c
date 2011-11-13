@@ -156,6 +156,21 @@ static int verify_jpeg_action_cmd(struct msm_adsp_module *module,
 			return -1;
 	}
 	break;
+	case JPEG_CMD_DEC_IP:
+	{
+		jpeg_cmd_dec_ip *cmd =
+			(jpeg_cmd_dec_ip *)cmd_data;
+
+		if (cmd_size != sizeof(jpeg_cmd_dec_ip)) {
+			printk(KERN_ERR "module %s: JPEG_CMD_DEC_IP invalid \
+				size %d\n", module->name, cmd_size);
+			return -1;
+		}
+		if (adsp_pmem_fixup(module, (void **)&cmd->ip_buf_addr,
+			cmd->ip_buf_size))
+			return -1;
+	}
+	break;
 	default:
 		if (cmd_id > 7) {
 			printk(KERN_ERR "adsp: module %s: invalid cmd_id %d\n",
