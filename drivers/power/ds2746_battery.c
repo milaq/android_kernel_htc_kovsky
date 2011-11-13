@@ -314,7 +314,7 @@ static void ds2746_battery_work(struct work_struct *work)
 
 	if (bi->bat_pdata.block_charge) {
 		bi->bat_pdata.block_charge(true);
-		msleep(15);
+		msleep(150);
 	}
 
 	ds2746_battery_read_status(bi);
