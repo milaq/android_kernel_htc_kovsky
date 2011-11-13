@@ -322,6 +322,15 @@ static void htckovsky_set_charge(int flags)
 	gpio_direction_output(KOVS100_CHG_HIGH, !!flags);
 }
 
+static void htckovsky_block_charge(bool do_block) {
+	if (do_block) {
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, 1);
+	}
+	else {
+		gpio_direction_output(KOVS100_N_CHG_ENABLE, !htckovsky_is_usb_online());
+	}
+}
+
 static int htckovsky_power_init(struct device *dev)
 {
 	int rc = 0;
@@ -385,6 +394,7 @@ static struct ds2746_platform_data kovsky_battery_data = {
 	.capacity = 1660,
 	.high_voltage = 4200,
 	.low_voltage = 3600,
+	.block_charge = htckovsky_block_charge,
 };
 
 /******************************************************************************
