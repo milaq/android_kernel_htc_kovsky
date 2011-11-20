@@ -635,17 +635,18 @@ int kovsky_af_vdd(int on)
 int kovsky_pull_vcm_d(int on)
 {
 	volatile char* focus;
-	kovsky_af_vdd(on);
 	focus = ioremap(0xa9d00000, 0x1000);
 
 	if (on) {
 		writel(2, focus + 0x4c);
 		writel(0x1e21, focus + 0x50);
 		writel(0x1de, focus + 0x54);
+		gpio_direction_output(0x1c, 1);
 		gpio_direction_output(0x6b, 1);
-		gpio_direction_output(0x1c, 0);
+		kovsky_af_vdd(1);
 	}
 	else {
+		kovsky_af_vdd(0);
 		gpio_direction_output(0x6b, 0);
 		gpio_direction_output(0x1c, 0);
 		writel(0, focus + 0x4c);

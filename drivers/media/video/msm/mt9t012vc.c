@@ -30,6 +30,7 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/uaccess.h>
+#include <asm/io.h>
 
 #include <media/msm_camera.h>
 #include <mach/gpio.h>
@@ -232,16 +233,31 @@ static int32_t mt9t012vc_set_lc(void)
 	return rc;
 }
 
+static const int max_focus = 0x1de;
+static const int min_focus = 0x9a;
+
+static int32_t mt9t012vc_set_focus(int value) {
+	volatile char* focus;
+	focus = ioremap(0xa9d00000, 0x1000);
+	writel(mt9t012vc_ctrl->curr_lens_pos & 0x1ff, focus + 0x54);
+	iounmap(focus);
+}
+
 static int32_t mt9t012vc_move_focus(int direction, int32_t num_steps)
 {
-	//static const int max_focus = 0x1de;
-	//static const int min_focus = 0x9a;
+	int focus = mt9t012vc_ctrl->curr_lens_pos + (direction ? num_steps : -num_steps);
+	clamp(focus, min_focus, max_focus);
+	mt9t012vc_ctrl->curr_lens_pos = focus;
+	mt9t012vc_set_focus(focus);
+	
 	pr_debug("[MT9T012VC]: %s(dir=%d, num_steps=%d)\n", __func__, direction, num_steps);
 	return 0;
 }
 
 static int32_t mt9t012vc_set_default_focus(uint8_t af_step)
 {
+	mt9t012vc_ctrl->curr_lens_pos = af_step;
+	mt9t012vc_set_focus(af_step);
 	pr_debug("[MT9T012VC]: %s(%d)\n", __func__, af_step);
 	return 0;
 }
@@ -970,7 +986,7 @@ int mt9t012vc_sensor_config(void __user * argp)
 		break;
 
 	case CFG_GET_AF_MAX_STEPS:
-		cdata.max_steps = MT9T012VC_TOTAL_STEPS_NEAR_TO_FAR;
+		cdata.max_steps = max_focus - min_focus;
 		if (copy_to_user((void *)argp,
 				&cdata, sizeof(struct sensor_cfg_data)))
 			rc = -EFAULT;
@@ -1242,17 +1258,8 @@ static int focus_set(void *data, u64 val)
 	volatile char* focus;
 	mt9t012vc_ctrl->curr_lens_pos = val;
 	focus = ioremap(0xa9d00000, 0x1000);
-
-	if (vdd)
-		kovsky_af_vdd(0);
-	gpio_direction_output(0x6b, 0);
-	gpio_direction_output(0x1c, 0);
-	if (vdd)
-		kovsky_af_vdd(1);
 	writel(mt9t012vc_ctrl->curr_lens_pos, focus + 0x54);
 	iounmap(focus);
-	gpio_direction_output(0x6b, 1);
-	gpio_direction_output(0x1c, 1);
 
 	return 0;
 }
