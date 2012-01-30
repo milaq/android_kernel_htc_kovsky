@@ -79,6 +79,7 @@
 #define DEFAULT_BATTERY_RATING		1500	// capacity of standard DEFAULT battery 1500mAh
 #define DEFAULT_HIGH_VOLTAGE		4200
 #define DEFAULT_LOW_VOLTAGE		3300
+#define DEFAULT_MAX_OVER_CAPACITY	 120 // over capacity percent allowed
 
 #define DS2746_CURRENT_ACCUM_RES	1024	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
@@ -232,10 +233,22 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	s >>= 2;
 	b->batt_current = (s * DS2746_CURRENT_ACCUM_RES) / (bi->bat_pdata.resistance);
 
+	/* if battery voltage is < 3.3V and depleting, we assume it's almost empty! */
+	if (b->batt_vol < bi->bat_pdata.low_voltage && b->batt_current < 0) {
+		aux0 = ((bi->bat_pdata.low_voltage - b->batt_vol) * current_accum_capacity * 5) / 3;
+		printk(KERN_INFO "ds2746: correcting ACR to %d\n", aux0);
+		/* use approximate formula: 3.3V=5%, 3.0V=0% */
+		/* correction-factor is (capacity * 0.05) / (3300 - 3000) */
+		/*  or (capacity*5/3) */
+		i2c_write(DS2746_CURRENT_ACCUM_MSB, 0);
+		i2c_write(DS2746_CURRENT_ACCUM_LSB, aux0);
+	}
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
 	s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
 
-	if (s > 0) {
+	if (s > 0 && s <
+			(DEFAULT_BATTERY_RATING * DEFAULT_RSNS * DEFAULT_MAX_OVER_CAPACITY) /
+			(100 * DS2746_CURRENT_ACCUM_RES)) {
 		if (s > current_accum_capacity) {
 			/* if the battery is "fuller" than expected,
 			 * update our expectations */
