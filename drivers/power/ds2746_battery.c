@@ -321,7 +321,7 @@ static void ds2746_battery_work(struct work_struct *work)
 
 	ds2746_battery_read_status(bi);
 
-	if (bi->bat_pdata.block_charge) {
+	if (bi->bat_pdata.block_charge && bi->charging_enabled) {
 		bi->bat_pdata.block_charge(false);
 	}
 
