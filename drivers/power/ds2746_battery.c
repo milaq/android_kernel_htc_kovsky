@@ -81,7 +81,7 @@
 #define DEFAULT_LOW_VOLTAGE		3300
 #define DEFAULT_MAX_OVER_CAPACITY	 105 // over capacity percent allowed
 
-#define DS2746_CURRENT_ACCUM_RES	2440	// resolution of ACCUM-register in uVh * 100 per bit
+#define DS2746_CURRENT_ACCUM_RES	625	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
 
 #define FAST_POLL (30 * 1000)
