@@ -79,7 +79,6 @@
 #define DEFAULT_BATTERY_RATING		1500	// capacity of standard DEFAULT battery 1500mAh
 #define DEFAULT_HIGH_VOLTAGE		4200
 #define DEFAULT_LOW_VOLTAGE		3300
-#define DEFAULT_MAX_OVER_CAPACITY	 105 // over capacity percent allowed
 
 #define DS2746_CURRENT_ACCUM_RES	625	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
@@ -246,9 +245,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
 	s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
 
-	if (s > 0 && s <
-			(DEFAULT_BATTERY_RATING * DEFAULT_RSNS * DEFAULT_MAX_OVER_CAPACITY) /
-			(100 * DS2746_CURRENT_ACCUM_RES)) {
+	if (s > 0) {
 		if (s > current_accum_capacity) {
 			/* if the battery is "fuller" than expected,
 			 * update our expectations */
