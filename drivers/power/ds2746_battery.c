@@ -245,6 +245,9 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
 	s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
 
+	printk(KERN_DEBUG "ds2746 debug : s=%u, current_accum_capacity=%u\n",
+				 s,current_accum_capacity);
+
 	if (s > 0) {
 		if (s > current_accum_capacity) {
 			/* if the battery is "fuller" than expected,
@@ -320,11 +323,16 @@ static void ds2746_battery_work(struct work_struct *work)
 
 	if (bi->bat_pdata.block_charge && bi->charging_enabled) {
 		bi->bat_pdata.block_charge(false);
+		printk(KERN_DEBUG "ds2746 debug : charge 1\n");
 	}
+	else
+		printk(KERN_DEBUG "ds2746 debug : charge 0\n");
 
 	bi->charging_enabled = false;
 	if (power_supply_am_i_supplied(bi->bat)) {
 		next_update = msecs_to_jiffies(FAST_POLL);
+		printk(KERN_DEBUG "ds2746 debug level %d voltage %u (max=%u)\n",
+					 bi->level, bi->batt_vol, bi->bat_pdata.high_voltage + 60);
 		if (bi->level < 100 && bi->batt_vol < bi->bat_pdata.high_voltage + 60)
 			bi->charging_enabled = true;
 	}
