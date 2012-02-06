@@ -333,7 +333,7 @@ static void ds2746_battery_work(struct work_struct *work)
 		next_update = msecs_to_jiffies(FAST_POLL);
 		printk(KERN_DEBUG "ds2746 debug level %d voltage %u (max=%u)\n",
 					 bi->level, bi->batt_vol, bi->bat_pdata.high_voltage + 60);
-		if (bi->level < 100 && bi->batt_vol < bi->bat_pdata.high_voltage + 60)
+		if (bi->batt_vol < bi->bat_pdata.high_voltage + 60)
 			bi->charging_enabled = true;
 	}
 	else {
