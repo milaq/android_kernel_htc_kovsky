@@ -439,6 +439,7 @@ static void msmfb_resume(struct early_suspend *h)
 						early_suspend);
 	struct msm_panel_data *panel = msmfb->panel;
 	unsigned long irq_flags;
+	struct fb_info *info = msmfb->fb;
 
 	if (panel->resume(panel)) {
 		printk(KERN_INFO "msmfb: panel resume failed, not resuming "
@@ -450,6 +451,11 @@ static void msmfb_resume(struct early_suspend *h)
 	msmfb->sleeping = WAKING;
 	DLOG(SUSPEND_RESUME, "ready, waiting for full update\n");
 	spin_unlock_irqrestore(&msmfb->update_lock, irq_flags);
+
+	/* Launch a manual pan_update (otherwise depends on
+	 * fbmem ioctl FBIOPUT_VSCREENINFO call). */
+	msmfb_pan_update(info, 0, 0, info->var.xres, info->var.yres,
+									info->var.yoffset, 1);
 }
 #endif
 
