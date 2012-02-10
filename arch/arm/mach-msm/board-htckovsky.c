@@ -392,8 +392,8 @@ static struct platform_device htckovsky_powerdev = {
 static struct ds2746_platform_data kovsky_battery_data = {
 	.resistance = 1500,
 	.capacity = 1660,
-	.high_voltage = 4200,
-	.low_voltage = 3350,
+	.high_voltage = 4196,
+	.low_voltage = 3400,
 	.block_charge = htckovsky_block_charge,
 };
 
