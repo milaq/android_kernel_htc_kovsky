@@ -85,6 +85,7 @@
 #define DS2746_MINI_CURRENT_FOR_CHARGE   50	// Minimum batt_current to consider battery is charging
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 150  // How much more than low_voltage is 5%
+#define DS2746_ACCUM_BIAS_DEFAULT	 -25 // unit = 1.56mV/Rsns
 
 #define FAST_POLL (30 * 1000)
 #define SLOW_POLL (2 * 60 * 1000)
@@ -463,6 +464,9 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		pdata.resistance, pdata.capacity,
 		pdata.high_voltage, pdata.low_voltage,
 		current_accum_capacity);
+
+	/* Init a default value for offset_bias */
+	i2c_write_signed(DS2746_ACCUM_BIAS, DS2746_ACCUM_BIAS_DEFAULT);
 
 	INIT_DELAYED_WORK(&bat_work, ds2746_battery_work);
 
