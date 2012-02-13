@@ -283,16 +283,13 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 
 		printk(KERN_INFO "ds2746: low voltage (%d) ACR is %d, should be %d\n", b->batt_vol, s, aux0);
 
-		if (aux0 != s && aux0 > 1 && s > 1) {
-			/* A write to the ACR also forces the ADC to measure its offset and update
-			 * the offset correction factor.
-			 * Current measurement and accumulation resume (using the new offset correction)
-			 * with the second conversion following the write to the ACR. */
-			aux0 += (s-aux0)/2; /* By prevision of the double apply of diff ... */
-
+		if (abs(aux0 - s) > 10 && aux0 > 1 && s > 1) {
 			/* Get our correctors value */
 			aux0r = i2c_read_signed(DS2746_ACCUM_BIAS);
 			aux1r = i2c_read_signed(DS2746_OFFSET_BIAS);
+
+			/* Set accum bias register to 0 */
+			i2c_write_signed(DS2746_ACCUM_BIAS, 0);
 
 			/* Write accum value */
 			i2c_write(DS2746_CURRENT_ACCUM_LSB, aux0 & 0xFF);
@@ -301,6 +298,12 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 			/* Reset our correctors value (we want to keep ours, maybe only accum value is too high */
 			i2c_write_signed(DS2746_ACCUM_BIAS, aux0r);
 			i2c_write_signed(DS2746_OFFSET_BIAS, aux1r);
+
+			/* Read and info to be sure */
+			s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
+			s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
+
+			printk(KERN_INFO "ds2746: new ACR register is %d\n", s);
 		}
 	}
 
@@ -380,8 +383,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	//aux0r = (10000L*aux0r)/(1000-aux0r);
 	//aux1r = (10000L*aux1r)/(1000-aux1r);
 
-	b->batt_temp = (aux1r - 32L);
-	b->batt_temp = ((b->batt_temp * 5) / 9) + 5;
+	b->batt_temp = 20;
 	DBG("ds2746: %dmV %dmA charge: %d/100 (%d units) aux0: %d (%d) aux1: %d (%d) / %d\n",
 	       b->batt_vol, b->batt_current, b->level, s, aux0, aux0r, aux1,
 	       aux1r, b->batt_temp);
