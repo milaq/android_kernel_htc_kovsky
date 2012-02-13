@@ -221,7 +221,7 @@ static void i2c_write(int r, int v)
 {
 	unsigned char i2c_msg[3];
 	i2c_msg[0] = r;
-	i2c_msg[2] = v & 0xFF;
+	i2c_msg[1] = v & 0xFF;
 	i2c_master_send(pclient, i2c_msg, 2);
 }
 
