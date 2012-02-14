@@ -85,7 +85,7 @@
 #define DS2746_MINI_CURRENT_FOR_CHARGE   50	// Minimum batt_current to consider battery is charging
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 150  // How much more than low_voltage is 5%
-#define DS2746_ACCUM_BIAS_DEFAULT	 -25 // unit = 1.56mV/Rsns
+#define DS2746_ACCUM_BIAS_DEFAULT	   0  // unit = 1.56mV/Rsns
 
 #define FAST_POLL (30 * 1000)
 #define SLOW_POLL (2 * 60 * 1000)
@@ -242,11 +242,37 @@ static int reading2capacity(int r)
 	return (DS2746_CURRENT_ACCUM_RES * r) / (bi->bat_pdata.resistance);
 }
 
+signed short set_accum_value(int aux0)
+{
+	signed short s;
+	int aux0r, aux1r;
+
+	/* Get our correctors value */
+	aux0r = i2c_read_signed(DS2746_ACCUM_BIAS);
+	aux1r = i2c_read_signed(DS2746_OFFSET_BIAS);
+
+	/* Set accum bias register to 0 */
+	i2c_write_signed(DS2746_ACCUM_BIAS, 0);
+
+	/* Write accum value */
+	i2c_write(DS2746_CURRENT_ACCUM_LSB, aux0 & 0xFF);
+	i2c_write(DS2746_CURRENT_ACCUM_MSB, aux0 >> 8);
+
+	/* Reset our correctors value (we want to keep ours, maybe only accum value is too high */
+	i2c_write_signed(DS2746_ACCUM_BIAS, aux0r);
+	i2c_write_signed(DS2746_OFFSET_BIAS, aux1r);
+
+	/* Read and info to be sure */
+	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
+	s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
+
+	printk(KERN_INFO "ds2746: new ACR register is %d\n", s);
+	return s;
+}
+
 static int ds2746_battery_read_status(struct ds2746_info *b)
 {
 	signed short s;
-	signed short bias_correction;
-	signed short new_bias_correction;
 	int aux0, aux1;
 	int aux0r, aux1r;
 	int aver_batt_current;
@@ -258,10 +284,12 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 		return -ENODEV;
 	}
 
+	/* Get voltage value */
 	s = i2c_read(DS2746_VOLTAGE_LSB);
 	s |= i2c_read(DS2746_VOLTAGE_MSB) << 8;
 	b->batt_vol = ((s >> 4) * DS2746_VOLTAGE_RES) / 1000;
 
+	/* Get and current value and actualize history */
 	s = i2c_read(DS2746_CURRENT_LSB);
 	s |= i2c_read(DS2746_CURRENT_MSB) << 8;
 	s >>= 2;
@@ -273,95 +301,70 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
 	s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
 
-	/* if battery voltage is < 3.5V and depleting, we assume it's almost empty! */
-	if (b->batt_vol < bi->bat_pdata.low_voltage+DS2746_5PERCENT_VOLTAGE && b->batt_current < 0) {
-		/* use approximate formula: 3.5V=5%, 3.35V=0% */
-		/* correction-factor is (capacity * 0.05) / (3500 - 3350) */
-		/*  or (capacity*5/(100 * 150) */
-		aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 5) /
-			(100 * DS2746_5PERCENT_VOLTAGE);
-
-		printk(KERN_INFO "ds2746: low voltage (%d) ACR is %d, should be %d\n", b->batt_vol, s, aux0);
-
-		if (abs(aux0 - s) > 10 && aux0 > 1 && s > 1) {
-			/* Get our correctors value */
-			aux0r = i2c_read_signed(DS2746_ACCUM_BIAS);
-			aux1r = i2c_read_signed(DS2746_OFFSET_BIAS);
-
-			/* Set accum bias register to 0 */
-			i2c_write_signed(DS2746_ACCUM_BIAS, 0);
-
-			/* Write accum value */
-			i2c_write(DS2746_CURRENT_ACCUM_LSB, aux0 & 0xFF);
-			i2c_write(DS2746_CURRENT_ACCUM_MSB, aux0 >> 8);
-
-			/* Reset our correctors value (we want to keep ours, maybe only accum value is too high */
-			i2c_write_signed(DS2746_ACCUM_BIAS, aux0r);
-			i2c_write_signed(DS2746_OFFSET_BIAS, aux1r);
-
-			/* Read and info to be sure */
-			s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
-			s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
-
-			printk(KERN_INFO "ds2746: new ACR register is %d\n", s);
-		}
-	}
-
+	/* Get BIAS values */
 	aux0r = i2c_read_signed(DS2746_ACCUM_BIAS);
 	aux1r = i2c_read_signed(DS2746_OFFSET_BIAS);
-	printk(KERN_DEBUG "ds2746 debug : Battery %d, accum value *%u*, current accum capacity=%u BIAS %d %d\n",
-				 b->batt_current, s, current_accum_capacity, aux0r, aux1r);
 
-	/* If not really charging, correct current_accum to last_value, shoult not have increase */
 	aver_batt_current = (b->batt_current + b->batt_current_1 +  b->batt_current_2) / 3;
 	max_difference = abs(max(b->batt_current, max(b->batt_current_1, b->batt_current_2)) -
 											 min(b->batt_current, min(b->batt_current_1, b->batt_current_2)));
 
-	printk(KERN_INFO "ds2746 debug : (%d/%d/%d) aver_batt_current %d max_difference %d b->batt_vol %d\n",
+	/* Log informations */
+	printk(KERN_INFO "ds2746 debug : level %d, accum value %u / accum capacity %u BIAS %d %d\n",
+				 bi->level, s, current_accum_capacity, aux0r, aux1r);
+	printk(KERN_INFO "ds2746 debug : current (%d/%d/%d)-> %d max_difference:%d b->batt_vol:%d\n",
 				 b->batt_current, b->batt_current_1, b->batt_current_2,
 				 aver_batt_current, max_difference, b->batt_vol);
 
+	/* LOW VOLTAGE */
+
+	/* if battery voltage is < 3.5V and depleting, we assume it's almost empty! */
+	if (b->batt_vol < bi->bat_pdata.low_voltage+DS2746_5PERCENT_VOLTAGE && aver_batt_current < 0) {
+		/* use approximate formula: 3.5V=5%, 3.35V=0% correction-factor is */
+		/* (capacity * 0.05) / (3500 - 3350)  or (capacity*5/(100 * 150) */
+		aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 5) /
+			(100 * DS2746_5PERCENT_VOLTAGE);
+
+		if (abs(aux0 - s) > 10 && aux0 > 1 && s > 1) {
+			printk(KERN_INFO "ds2746: LOW VOLTAGE (%d) ACR is %d, should be %d\n", b->batt_vol, s, aux0);
+			s = set_accum_value(aux0);
+		}
+	}
+
+	/* HIGH VOLTAGE */
+
 	if (b->batt_vol >= bi->bat_pdata.high_voltage && max_difference < DS2746_STABLE_RANGE &&
 			abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
-		printk(KERN_INFO "ds2746: current low (%d), voltage high (%d) average %d (%d/%d/%d), updating COB\n",
-					 b->batt_current, b->batt_vol, aver_batt_current,
-					 b->batt_current, b->batt_current_1, b->batt_current_2);
+		/* Charge ended */
+		printk(KERN_INFO "ds2746: CHARGE ENDED, voltage high (%d) current average low %d (%d/%d/%d)\n",
+					 b->batt_vol, aver_batt_current, b->batt_current, b->batt_current_1, b->batt_current_2);
 		charge_ended = 1;
-		bias_correction = i2c_read_signed(DS2746_ACCUM_BIAS);
-		new_bias_correction = (-aver_batt_current + bias_correction)/2;
-		printk(KERN_INFO "ds2746: Correcting Accumulation Bias register (diff %d) from %d to %d\n",
-					 -aver_batt_current, bias_correction, new_bias_correction);
-		if(new_bias_correction != bias_correction)
-			i2c_write_signed(DS2746_ACCUM_BIAS, new_bias_correction);
-	}
-	b->last_s_value=s;
 
-	/* Update current_accum_capacity */
-	if (s > 0) {
-		if (s > current_accum_capacity) {
-			/* if the battery is "fuller" than expected,
-			 * update our expectations */
-			printk(KERN_INFO "ds2746 : battery capacity updated from %u to %u\n", current_accum_capacity, s);
-			current_accum_capacity = s;
-			battery_capacity = reading2capacity(s);
-		}
-	} else {
-		/* check if we're >4.2V and <5mA */
-		if ((b->batt_vol >= bi->bat_pdata.high_voltage) && (aver_batt_current < DS2746_MINI_CURRENT_FOR_CHARGE)) {
-			/* that's almost full, so let's assume it is */
-			current_accum_capacity = s + 1;
-			battery_capacity = reading2capacity(s);
-			printk(KERN_INFO
-						 "ds2746: correcting current accum capacity to %d (current capacity=%u)\n",
-						 battery_capacity,
-						 current_accum_capacity);
+		/* Set accum to max if superior, dont allow grow forever */
+		if(s > current_accum_capacity) {
+			printk(KERN_INFO "ds2746 : battery acum too high, corrected from %u to capacity %u\n",
+						 s, current_accum_capacity);
+			s = current_accum_capacity;
+			s = set_accum_value(s);
 		}
 	}
+	else {
+		/* No high voltage + low current : charge not ended check if "fuller" */
+		if (s >= current_accum_capacity) {
+			/* if the battery is "fuller" than expected update our expectations */
+			printk(KERN_INFO "ds2746 : battery capacity updated from %u to %u (not yet charged)\n",
+						 current_accum_capacity, s+1);
+			current_accum_capacity = s + 1;
+		}
+	}
+
+	b->last_s_value=s;
+	battery_capacity = reading2capacity(s);
 
 	b->level = (s * 100) / current_accum_capacity;
 	/* if we read 0%, */
 	if (b->level < 1) {
-		/* only report 0% if we're really down, <3.1V */
+		/* only report 0% if we're really down, <3.3wV */
 		b->level = ((b->batt_vol <= bi->bat_pdata.low_voltage - 100) ? 0 : 1);
 	}
 
@@ -413,8 +416,6 @@ static void ds2746_battery_work(struct work_struct *work)
 	bi->charging_enabled = false;
 	if (power_supply_am_i_supplied(bi->bat)) {
 		next_update = msecs_to_jiffies(FAST_POLL);
-		printk(KERN_DEBUG "ds2746 debug : level %d voltage %u (max=%u)\n",
-					 bi->level, bi->batt_vol, bi->bat_pdata.high_voltage + 60);
 		if (!charge_ended)
 			bi->charging_enabled = true;
 	}
