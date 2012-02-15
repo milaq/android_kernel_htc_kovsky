@@ -280,6 +280,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	int aux0, aux1;
 	int aux0r, aux1r;
 	int aver_batt_current;
+	int max_current;
 	int charge_ended = 0;
 
 	if (!pclient) {
@@ -303,6 +304,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	b->batt_current_1 = b->batt_current;
 	b->batt_current = (s * DS2746_CURRENT_ACCUM_RES) / (bi->bat_pdata.resistance);
 	b->batt_history_nb++;
+	max_current = max(b->batt_current_5, max(b->batt_current_4, max(b->batt_current_3,
+								    max(b->batt_current_2, max(b->batt_current_1, b->batt_current)))));
 
 	/* Get accum value */
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
@@ -336,7 +339,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 
 			/* HIGH VOLTAGE */
 
-			if (b->batt_vol >= bi->bat_pdata.high_voltage && abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
+			if (b->batt_vol >= bi->bat_pdata.high_voltage && 	max_current < 1000 &&
+					abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
 				/* Charge ended */
 				charge_ended = 1;
 				/* Set accum to max if superior, dont allow grow forever */
@@ -348,7 +352,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 					current_accum_capacity = s;
 				}
 			}
-			else if (b->batt_vol >= bi->bat_pdata.high_voltage && abs(aver_batt_current) < DS2746_NEAR_END_CHARGE) {
+			else if (b->batt_vol >= bi->bat_pdata.high_voltage && max_current < 1000 &&
+							 abs(aver_batt_current) < DS2746_NEAR_END_CHARGE) {
 				/* Set accum to max-2 if superior because we are near end charge */
 				if(s > current_accum_capacity-1) {
 					s = current_accum_capacity-1;
