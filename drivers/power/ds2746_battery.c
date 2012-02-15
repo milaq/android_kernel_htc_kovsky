@@ -111,6 +111,7 @@ struct ds2746_info {
 	int batt_current_3;
 	int batt_current_4;
 	int batt_current_5;
+	int batt_history_nb;
 	u32 level;		/* formula */
 	u32 charging_source;	/* 0: no cable, 1:usb, 2:AC */
 	bool charging_enabled;	/* 0: Disable, 1: Enable */
@@ -302,6 +303,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	b->batt_current_2 = b->batt_current_1;
 	b->batt_current_1 = b->batt_current;
 	b->batt_current = (s * DS2746_CURRENT_ACCUM_RES) / (bi->bat_pdata.resistance);
+	b->batt_history_nb++;
 
 	/* Get accum value */
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
@@ -321,60 +323,65 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 				 b->batt_vol, aver_batt_current, b->batt_current, b->batt_current_1,
 				 b->batt_current_2, b->batt_current_3, b->batt_current_4, b->batt_current_5);
 
-	/* LOW VOLTAGE */
+	/* Wait for some history before using average */
+	if(b->batt_history_nb > 8)
+		{
+			/* LOW VOLTAGE */
 
-	/* if battery voltage is < 3.5V and depleting, we assume it's almost empty! */
-	if (b->batt_vol < bi->bat_pdata.low_voltage+DS2746_5PERCENT_VOLTAGE && aver_batt_current < 0) {
-		/* use approximate formula: 3.5V=5%, 3.35V=0% correction-factor is */
-		/* (capacity * 0.05) / (3500 - 3350)  or (capacity*5/(100 * 150) */
-		aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 5) /
-			(100 * DS2746_5PERCENT_VOLTAGE);
+			/* if battery voltage is < 3.5V and depleting, we assume it's almost empty! */
+			if (b->batt_vol < bi->bat_pdata.low_voltage+DS2746_5PERCENT_VOLTAGE &&
+					aver_batt_current < 0) {
+				/* use approximate formula: 3.5V=5%, 3.35V=0% correction-factor is */
+				/* (capacity * 0.05) / (3500 - 3350)  or (capacity*5/(100 * 150) */
+				aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 5) /
+					(100 * DS2746_5PERCENT_VOLTAGE);
 
-		if (abs(aux0 - s) > 10 && aux0 > 1 && s > 1) {
-			printk(KERN_INFO "ds2746: LOW VOLTAGE (%d) ACR is %d, should be %d\n", b->batt_vol, s, aux0);
-			s = set_accum_value(aux0);
-		}
-	}
+				if (abs(aux0 - s) > 10 && aux0 > 1 && s > 1) {
+					printk(KERN_INFO "ds2746: LOW VOLTAGE (%d) ACR is %d, should be %d\n", b->batt_vol, s, aux0);
+					s = set_accum_value(aux0);
+				}
+			}
 
-	/* HIGH VOLTAGE */
+			/* HIGH VOLTAGE */
 
-	if (b->batt_vol >= bi->bat_pdata.high_voltage && abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
-		/* Charge ended */
-		printk(KERN_INFO "ds2746: CHARGE ENDED, voltage high (%d) current average low %d (%d/%d/%d/%d/%d/%d)\n",
-					 b->batt_vol, aver_batt_current, b->batt_current, b->batt_current_1, b->batt_current_2,
-					 b->batt_current_3, b->batt_current_4, b->batt_current_5);
-		charge_ended = 1;
-		/* Set accum to max if superior, dont allow grow forever */
-		if(s > current_accum_capacity) {
-			printk(KERN_INFO "ds2746 : battery acum too high, corrected from %u to capacity %u\n",
-						 s, current_accum_capacity);
-			s = current_accum_capacity;
-			s = set_accum_value(s);
+			if (b->batt_vol >= bi->bat_pdata.high_voltage && abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
+				/* Charge ended */
+				printk(KERN_INFO "ds2746: CHARGE ENDED, voltage high (%d) current average low %d (%d/%d/%d/%d/%d/%d)\n",
+							 b->batt_vol, aver_batt_current, b->batt_current, b->batt_current_1, b->batt_current_2,
+							 b->batt_current_3, b->batt_current_4, b->batt_current_5);
+				charge_ended = 1;
+				/* Set accum to max if superior, dont allow grow forever */
+				if(s > current_accum_capacity) {
+					printk(KERN_INFO "ds2746 : battery acum too high, corrected from %u to capacity %u\n",
+								 s, current_accum_capacity);
+					s = current_accum_capacity;
+					s = set_accum_value(s);
+				}
+				else if(s < current_accum_capacity) {
+					printk(KERN_INFO "ds2746 : battery capacity too high, corrected from %u to %u\n",
+								 current_accum_capacity, s);
+					current_accum_capacity = s;
+				}
+			}
+			else if (b->batt_vol >= bi->bat_pdata.high_voltage && abs(aver_batt_current) < DS2746_NEAR_END_CHARGE) {
+				/* Set accum to max-2 if superior because we are near end charge */
+				if(s > current_accum_capacity-1) {
+					printk(KERN_INFO "ds2746 : battery acum too high, near end charge, corrected from %u to capacity %u\n",
+								 s, current_accum_capacity-1);
+					s = current_accum_capacity-1;
+					s = set_accum_value(s);
+				}
+			}
+			else {
+				/* No high voltage + low current : charge not ended check if "fuller" */
+				if (s >= current_accum_capacity) {
+					/* if the battery is "fuller" than expected update our expectations */
+					printk(KERN_INFO "ds2746 : battery capacity updated from %u to %u (not yet charged)\n",
+								 current_accum_capacity, s+1);
+					current_accum_capacity = s + 1;
+				}
+			}
 		}
-		else if(s < current_accum_capacity) {
-			printk(KERN_INFO "ds2746 : battery capacity too high, corrected from %u to %u\n",
-						 current_accum_capacity, s);
-			current_accum_capacity = s;
-		}
-	}
-	else if (b->batt_vol >= bi->bat_pdata.high_voltage && abs(aver_batt_current) < DS2746_NEAR_END_CHARGE) {
-		/* Set accum to max-2 if superior because we are near end charge */
-		if(s > current_accum_capacity-1) {
-			printk(KERN_INFO "ds2746 : battery acum too high, near end charge, corrected from %u to capacity %u\n",
-						 s, current_accum_capacity-1);
-			s = current_accum_capacity-1;
-			s = set_accum_value(s);
-		}
-	}
-	else {
-		/* No high voltage + low current : charge not ended check if "fuller" */
-		if (s >= current_accum_capacity) {
-			/* if the battery is "fuller" than expected update our expectations */
-			printk(KERN_INFO "ds2746 : battery capacity updated from %u to %u (not yet charged)\n",
-						 current_accum_capacity, s+1);
-			current_accum_capacity = s + 1;
-		}
-	}
 
 	b->last_s_value=s;
 	battery_capacity = reading2capacity(s);
@@ -389,25 +396,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	if (b->level > 100)
 		b->level = 100;
 
-	aux0 = i2c_read(DS2746_AUX0_LSB);
-	aux0 |= i2c_read(DS2746_AUX0_MSB) << 8;
-	aux0 >>= 4;
-
-	aux1 = i2c_read(DS2746_AUX1_LSB);
-	aux1 |= i2c_read(DS2746_AUX1_MSB) << 8;
-	aux1 >>= 4;
-
-	// ratio
-	aux0r = (1000L * aux0) / 2047;
-	aux1r = (1000L * aux1) / 2047;
-	// resistance in Ohm (R_AUX=10kOhm)
-	//aux0r = (10000L*aux0r)/(1000-aux0r);
-	//aux1r = (10000L*aux1r)/(1000-aux1r);
-
 	b->batt_temp = 20;
-	DBG("ds2746: %dmV %dmA charge: %d/100 (%d units) aux0: %d (%d) aux1: %d (%d) / %d\n",
-	       b->batt_vol, b->batt_current, b->level, s, aux0, aux0r, aux1,
-	       aux1r, b->batt_temp);
+
 
 	return charge_ended;
 }
@@ -480,6 +470,7 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	bi->last_s_value = 0;
 	bi->batt_current = bi->batt_current_1 = bi->batt_current_2 = bi->batt_current_3 = 0;
 	bi->batt_current_4 = bi->batt_current_5 = 0;
+	bi->batt_history_nb = 0;
 
 	DBG("ds2746: resistance = %d, capacity = %d, "
 		"high_voltage = %d, low_voltage = %d, softACR = %d\n",
