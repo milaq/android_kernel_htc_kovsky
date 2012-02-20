@@ -85,7 +85,7 @@
 #define DS2746_NEAR_END_CHARGE		 200
 #define DS2746_MINI_CURRENT_FOR_CHARGE  100	// Minimum batt_current to consider battery is charging
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
-#define DS2746_5PERCENT_VOLTAGE	 150  // How much more than low_voltage is 5%
+#define DS2746_5PERCENT_VOLTAGE	 120  // How much more than low_voltage is 15%
 #define DS2746_ACCUM_BIAS_DEFAULT	   0  // unit = 1.56mV/Rsns
 
 #define FAST_POLL (30 * 1000)
@@ -326,12 +326,15 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 			/* if battery voltage is < 3.5V and depleting, we assume it's almost empty! */
 			if (b->batt_vol < bi->bat_pdata.low_voltage+DS2746_5PERCENT_VOLTAGE &&
 					aver_batt_current < 0) {
-				/* use approximate formula: 3.5V=5%, 3.35V=0% correction-factor is */
+				/* use approximate formula: 3.5V=15%, 3.35V=0% correction-factor is */
 				/* (capacity * 0.05) / (3500 - 3350)  or (capacity*5/(100 * 150) */
-				aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 5) /
+				aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 15) /
 					(100 * DS2746_5PERCENT_VOLTAGE);
 
-				if (abs(aux0 - s) > 10 && aux0 > 1 && s > 1) {
+				/* Ponderate value with s actual value */
+				aux0 = (2*s + aux0) / 3;
+
+				if (abs(aux0 - s) > 1 && aux0 > 1 && s > 1) {
 					printk(KERN_INFO "ds2746: LOW VOLTAGE (%d) ACR is %d, should be %d\n", b->batt_vol, s, aux0);
 					s = set_accum_value(aux0);
 				}
