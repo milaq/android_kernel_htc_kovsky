@@ -340,25 +340,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 				}
 			}
 
-			/* MEDIUM VOLTAGE */
-			/* if battery voltage is > 3.5V and depleting, should not be less than 15% */
-			if (b->batt_vol > bi->bat_pdata.low_voltage+DS2746_5PERCENT_VOLTAGE &&
-					aver_batt_current < 0 && (s*100)/current_accum_capacity < 15) {
-
-				/* Voltage is not low enought for a credible <15% level */
-				aux0 = (current_accum_capacity*15)/100;
-
-				/* Ponderate value with s actual value */
-				aux0 = (2*s + aux0) / 3;
-
-				if (abs(aux0 - s) > 1 && aux0 > 1 && s > 1) {
-					printk(KERN_INFO "ds2746: MEDIUM VOLTAGE (%d / %d) ACR is too low, updated %d\n",
-								 s, current_accum_capacity, aux0);
-					s = set_accum_value(aux0);
-				}
-			}
-
 			/* HIGH VOLTAGE */
+
 			if (b->batt_vol >= bi->bat_pdata.high_voltage && 	max_current < 1000 &&
 					abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
 				/* Charge ended */
