@@ -84,6 +84,8 @@
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
 #define DS2746_NEAR_END_CHARGE		 200
 #define DS2746_MINI_CURRENT_FOR_CHARGE  100	// Minimum batt_current to consider battery is charging
+#define DS2746_MAX_ACCUM_VALUE_AT_PROBE 2000 // Max value at startup for ACR (correct invalid values)
+
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 120  // How much more than low_voltage is 15%
 #define DS2746_ACCUM_BIAS_DEFAULT	   0  // unit = 1.56mV/Rsns
@@ -428,6 +430,7 @@ static int
 ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	int ret;
+	unsigned short s;
 	struct ds2746_platform_data pdata = {
 		.resistance = DEFAULT_RSNS,
 		.capacity = DEFAULT_BATTERY_RATING,
@@ -447,6 +450,17 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	pr_info("ds2746: Initializing DS-2746 chip driver at addr: 0x%02x\n",
 	       client->addr);
 	pclient = client;
+
+	/* Get accum value */
+	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
+	s |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
+
+	/* Correct if necessary accum value */
+	if (s > DS2746_MAX_ACCUM_VALUE_AT_PROBE)
+		{
+			pr_info("ds2746: Correcting too high ACR value from %d to %d\n", s, DS2746_MAX_ACCUM_VALUE_AT_PROBE);
+			s = set_accum_value(DS2746_MAX_ACCUM_VALUE_AT_PROBE);
+		}
 
 	if (client->dev.platform_data)
 		pdata = *(struct ds2746_platform_data*)client->dev.platform_data;
