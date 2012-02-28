@@ -114,6 +114,7 @@ struct ds2746_info {
 	int batt_current_4;
 	int batt_current_5;
 	int batt_history_nb;
+	int last_am_i_supplied;
 	u32 level;		/* formula */
 	u32 charging_source;	/* 0: no cable, 1:usb, 2:AC */
 	bool charging_enabled;	/* 0: Disable, 1: Enable */
@@ -418,6 +419,7 @@ static void ds2746_battery_work(struct work_struct *work)
 {
 	unsigned long next_update;
 	int charge_ended;
+	int am_i_supplied;
 	if (bi->bat_pdata.block_charge) {
 		bi->bat_pdata.block_charge(true);
 		msleep(150);
@@ -430,7 +432,8 @@ static void ds2746_battery_work(struct work_struct *work)
 	}
 
 	bi->charging_enabled = false;
-	if (power_supply_am_i_supplied(bi->bat)) {
+	am_i_supplied = power_supply_am_i_supplied(bi->bat);
+	if (am_i_supplied) {
 		next_update = msecs_to_jiffies(FAST_POLL);
 		if (!charge_ended)
 			bi->charging_enabled = true;
@@ -438,6 +441,11 @@ static void ds2746_battery_work(struct work_struct *work)
 	else {
 		next_update = msecs_to_jiffies(SLOW_POLL);
 	}
+
+	/* Check if supply change, reset history (to prevent from considering battery is charged) */
+	if(am_i_supplied != bi->last_am_i_supplied)
+		bi->batt_history_nb = 0;
+	bi->last_am_i_supplied = am_i_supplied;
 
 	power_supply_changed(bi->bat);
 	queue_delayed_work(monitor_wqueue, &bat_work, next_update);
