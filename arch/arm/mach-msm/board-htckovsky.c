@@ -84,7 +84,7 @@ static struct led_classdev htckovsky_qwerty_led = {
 
 static void htckovsky_update_keyled(struct work_struct* work) {
 	uint8_t buffer[10] = {};
-	uint8_t brightness = htckovsky_qwerty_led.brightness;
+	uint8_t brightness = htckovsky_qwerty_led.brightness >> 2;
 
 	buffer[0] = MICROP_KPD_LED_BRIGHTNESS_KOVS;
 	buffer[1] = brightness;
