@@ -85,6 +85,7 @@
 #define DS2746_NEAR_END_CHARGE		 200
 #define DS2746_MINI_CURRENT_FOR_CHARGE  100	// Minimum batt_current to consider battery is charging
 #define DS2746_MAX_ACCUM_VALUE 2000 // Max value for ACR (correct invalid values)
+#define DS2746_TOO_HIGH_ACCUM_VALUE 2500 // Too high value for ACR
 
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 120  // How much more than low_voltage is 15%
@@ -330,6 +331,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	aver_batt_current = (b->batt_current + b->batt_current_1 +  b->batt_current_2 +
 											 + b->batt_current_3 + b->batt_current_4 + b->batt_current_5) / 6;
 
+	//printk(KERN_INFO "ds2746 debug : level %d, accum %u / %u \n", bi->level, acr, current_accum_capacity);
+
 	/* Wait for some history before using average */
 	if(b->batt_history_nb > 8)
 		{
@@ -464,6 +467,8 @@ static int
 ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	int ret;
+	unsigned short acr;
+
 	struct ds2746_platform_data pdata = {
 		.resistance = DEFAULT_RSNS,
 		.capacity = DEFAULT_BATTERY_RATING,
@@ -502,6 +507,18 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		pdata.resistance, pdata.capacity,
 		pdata.high_voltage, pdata.low_voltage,
 		current_accum_capacity);
+
+	/* Get accum value */
+	acr = i2c_read(DS2746_CURRENT_ACCUM_LSB);
+	acr |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
+
+	/* Check registers mistake of bootloader */
+	if(acr > DS2746_TOO_HIGH_ACCUM_VALUE)
+		{
+			printk(KERN_INFO "ds2746: acr is obviously too high (%d)\n", acr);
+			printk(KERN_INFO "ds2746: maybe low value correction bootloader mistake, may be empty, set acr to 1\n");
+			acr = set_accum_value(1);
+		}
 
 	/* Init a default value for offset_bias */
 	i2c_write_signed(DS2746_ACCUM_BIAS, DS2746_ACCUM_BIAS_DEFAULT);
