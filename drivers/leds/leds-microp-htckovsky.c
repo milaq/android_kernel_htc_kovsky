@@ -82,7 +82,7 @@ static void htckovsky_update_backlight(struct work_struct* work) {
 	if (brightness) {
 		buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
 		buffer[1] = LED_FULL;
-		buffer[2] = brightness >> 2;
+		buffer[2] = brightness >> 1;
 		microp_ng_write(client, buffer, 3);
 	}
 	else {
