@@ -288,6 +288,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	int aver_batt_current;
 	int max_current;
 	int charge_ended = 0;
+	int voltage_diff;
 
 	if (!pclient) {
 		pr_err("client is null\n");
@@ -297,7 +298,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	/* Get voltage value */
 	volt = i2c_read(DS2746_VOLTAGE_LSB);
 	volt |= i2c_read(DS2746_VOLTAGE_MSB) << 8;
-	b->batt_vol = ((volt >> 4) * DS2746_VOLTAGE_RES) / 1000;
+	b->batt_vol = ((volt >> 4) * DS2746_VOLTAGE_RES) / 1000;		
 
 	/* Get and current value and actualize history */
 	cur = i2c_read(DS2746_CURRENT_LSB);
@@ -343,8 +344,11 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 					aver_batt_current < 0) {
 				/* use approximate formula: 3.5V=15%, 3.35V=0% correction-factor is */
 				/* (capacity * 0.05) / (3500 - 3350)  or (capacity*5/(100 * 150) */
-				aux0 = ((b->batt_vol - bi->bat_pdata.low_voltage) * current_accum_capacity * 15) /
-					(100 * DS2746_5PERCENT_VOLTAGE);
+				if (b->batt_vol <= bi->bat_pdata.low_voltage)
+					voltage_diff = 0;
+				else
+					voltage_diff = b->batt_vol - bi->bat_pdata.low_voltage;
+				aux0 = (voltage_diff * current_accum_capacity * 15) /	(100 * DS2746_5PERCENT_VOLTAGE);
 
 				/* Ponderate value with acr actual value */
 				aux0 = (2*acr + aux0) / 3;
