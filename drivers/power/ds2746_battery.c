@@ -344,8 +344,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 					aver_batt_current < 0) {
 				/* use approximate formula: 3.5V=15%, 3.35V=0% correction-factor is */
 				/* (capacity * 0.05) / (3500 - 3350)  or (capacity*5/(100 * 150) */
-				if (b->batt_vol <= bi->bat_pdata.low_voltage)
-					voltage_diff = 0;
+				if (b->batt_vol <= bi->bat_pdata.low_voltage + 20)
+					voltage_diff = 20;
 				else
 					voltage_diff = b->batt_vol - bi->bat_pdata.low_voltage;
 				aux0 = (voltage_diff * current_accum_capacity * 15) /	(100 * DS2746_5PERCENT_VOLTAGE);
