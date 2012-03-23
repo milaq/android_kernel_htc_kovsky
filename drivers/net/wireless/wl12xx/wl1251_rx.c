@@ -72,13 +72,13 @@ static void wl1251_rx_status(struct wl1251 *wl,
 			status->mactime = mactime;
 	}
 
-	status->signal = ((u8)desc->rssi) & 0x7F;
+	status->signal = desc->rssi;
 
 	/*
 	 * FIXME: guessing that snr needs to be divided by two, otherwise
 	 * the values don't make any sense
 	 */
-       wl->noise = max(status->signal - desc->snr, 0);
+	wl->noise = desc->rssi - desc->snr / 2;
 
 	status->freq = ieee80211_channel_to_frequency(desc->channel);
 

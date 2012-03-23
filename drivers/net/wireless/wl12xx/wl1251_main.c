@@ -1345,14 +1345,11 @@ int wl1251_init_ieee80211(struct wl1251 *wl)
 	/* FIXME: find a proper value */
 	wl->hw->channel_change_time = 10000;
 
-       wl->hw->flags = IEEE80211_HW_SIGNAL_UNSPEC |
+	wl->hw->flags = IEEE80211_HW_SIGNAL_DBM |
 		IEEE80211_HW_SUPPORTS_PS |
 		IEEE80211_HW_BEACON_FILTER |
 		IEEE80211_HW_SUPPORTS_UAPSD |
-		IEEE80211_HW_RX_INCLUDES_FCS |
 		IEEE80211_HW_SUPPORTS_CQM_RSSI;
-
-	wl->hw->max_signal = 0x7F;
 
 	wl->hw->wiphy->interface_modes = BIT(NL80211_IFTYPE_STATION) |
 					 BIT(NL80211_IFTYPE_ADHOC);
