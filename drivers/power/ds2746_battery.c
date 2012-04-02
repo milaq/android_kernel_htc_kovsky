@@ -86,7 +86,7 @@
 #define DS2746_MINI_CURRENT_FOR_CHARGE  50	// Minimum batt_current to consider battery is charging
 #define DS2746_MAX_ACCUM_VALUE 2000 // Max value for ACR (correct invalid values)
 #define DS2746_TOO_HIGH_ACCUM_VALUE 2500 // Too high value for ACR
-#define DS2746_MIN_ACCUM_VALUE   50
+#define DS2746_MIN_ACCUM_VALUE   80 // Minimum value of acr register when not commpletly empty.
 
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 120  // How much more than low_voltage is 15%
