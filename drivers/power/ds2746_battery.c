@@ -257,22 +257,22 @@ static int reading2capacity(int r)
 signed short set_accum_value(int aux0)
 {
 	signed short s;
-	int aux0r, aux1r;
+	//int aux0r, aux1r;
 
 	/* Get our correctors value */
-	aux0r = i2c_read_signed(DS2746_ACCUM_BIAS);
-	aux1r = i2c_read_signed(DS2746_OFFSET_BIAS);
+	//aux0r = i2c_read_signed(DS2746_ACCUM_BIAS);
+	//aux1r = i2c_read_signed(DS2746_OFFSET_BIAS);
 
 	/* Set accum bias register to 0 */
-	i2c_write_signed(DS2746_ACCUM_BIAS, 0);
+	//i2c_write_signed(DS2746_ACCUM_BIAS, 0);
 
 	/* Write accum value */
 	i2c_write(DS2746_CURRENT_ACCUM_LSB, aux0 & 0xFF);
 	i2c_write(DS2746_CURRENT_ACCUM_MSB, aux0 >> 8);
 
 	/* Reset our correctors value (we want to keep ours, maybe only accum value is too high */
-	i2c_write_signed(DS2746_ACCUM_BIAS, aux0r);
-	i2c_write_signed(DS2746_OFFSET_BIAS, aux1r);
+	//i2c_write_signed(DS2746_ACCUM_BIAS, aux0r);
+	//i2c_write_signed(DS2746_OFFSET_BIAS, aux1r);
 
 	/* Read and info to be sure */
 	s = i2c_read(DS2746_CURRENT_ACCUM_LSB);
