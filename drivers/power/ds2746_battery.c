@@ -83,10 +83,10 @@
 #define DS2746_CURRENT_ACCUM_RES	2440	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
 #define DS2746_NEAR_END_CHARGE		 100
-#define DS2746_MINI_CURRENT_FOR_CHARGE  50	// Minimum batt_current to consider battery is charging
+#define DS2746_MINI_CURRENT_FOR_CHARGE  30	// Minimum batt_current to consider battery is charging
 #define DS2746_MAX_ACCUM_VALUE 2000 // Max value for ACR (correct invalid values)
 #define DS2746_TOO_HIGH_ACCUM_VALUE 2500 // Too high value for ACR
-#define DS2746_MIN_ACCUM_VALUE   80 // Minimum value of acr register when not commpletly empty.
+#define DS2746_MIN_ACCUM_VALUE   100 // Minimum value of acr register when not commpletly empty.
 
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 120  // How much more than low_voltage is 15%
@@ -387,7 +387,8 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 			}
 
 			/* HIGH VOLTAGE */
-			if (b->batt_vol >= bi->bat_pdata.high_voltage && 	max_current <  DS2746_MINI_CURRENT_FOR_CHARGE*2 &&
+			if (b->batt_vol >= bi->bat_pdata.high_voltage &&
+					max_current <  DS2746_MINI_CURRENT_FOR_CHARGE*2 &&
 					abs(aver_batt_current) < DS2746_MINI_CURRENT_FOR_CHARGE) {
 
 				/* Charge ended */
