@@ -545,6 +545,13 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	acr = i2c_read(DS2746_CURRENT_ACCUM_LSB);
 	acr |= i2c_read(DS2746_CURRENT_ACCUM_MSB) << 8;
 
+	/* To allow boot, ignore too low values */
+	if(acr < 2 * DS2746_MIN_ACCUM_VALUE)
+		{
+			printk(KERN_INFO "ds2746: acr is too low to boot (%d)\n", acr);
+			acr = set_accum_value(2 * DS2746_MIN_ACCUM_VALUE);
+		}
+
 	/* Check registers mistake of bootloader */
 	if(acr > DS2746_TOO_HIGH_ACCUM_VALUE)
 		{
