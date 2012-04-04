@@ -48,16 +48,23 @@ static struct microp_keypad_t {
 	struct work_struct clamshell_work;
 	struct platform_device *pdev;
 	bool last_clamshell_state;
+	bool suspend;
 } microp_keypad;
 
 static irqreturn_t microp_keypad_interrupt(int irq, void *handle)
 {
+	printk(KERN_ERR "microp_keypad : microp_keypad_interrupt\n");
+	if(microp_keypad.suspend)
+		return IRQ_HANDLED;
 	schedule_work(&microp_keypad.keypad_work);
 	return IRQ_HANDLED;
 }
 
 static irqreturn_t microp_clamshell_interrupt(int irq, void *handle)
 {
+	printk(KERN_ERR "microp_keypad : microp_clamshell_interrupt\n");
+	if(microp_keypad.suspend)
+		return IRQ_HANDLED;
 	schedule_work(&microp_keypad.clamshell_work);
 	return IRQ_HANDLED;
 }
@@ -68,6 +75,12 @@ static void microp_keypad_work(struct work_struct *work)
 	uint8_t key = 0;
 	bool slider_open = false;
 	bool isdown;
+
+	/* If suspend_state != 0 do not process. */
+	printk(KERN_ERR "microp_keypad : Send input event %d suspend %d\n", key, microp_keypad.suspend);
+	if(microp_keypad.suspend)
+		return;
+
 	mutex_lock(&microp_keypad.lock);
 
 	do {
@@ -111,6 +124,7 @@ static void microp_clamshell_work(struct work_struct *work)
 {
 	int open = 1;
 
+	printk(KERN_ERR "microp_keypad : microp_clamshell_work\n");
 	mutex_lock(&microp_keypad.lock);
 		open = !gpio_get_value(microp_keypad.pdata->gpio_clamshell);
 		input_report_switch(microp_keypad.input, SW_LID, open);
@@ -223,6 +237,8 @@ static int microp_keypad_probe(struct platform_device *pdev)
 		}
 	}
 
+	microp_keypad.suspend = 0;
+
 	led_trigger_register_simple("microp-keypad", &microp_keypad.bl_trigger);
 	if (!microp_keypad.bl_trigger)
 		goto fail_ledtrig;
@@ -269,6 +285,8 @@ static int microp_keypad_suspend(struct platform_device *pdev, pm_message_t mesg
 		cancel_work_sync(&microp_keypad.clamshell_work);
 	cancel_work_sync(&microp_keypad.keypad_work);
 	led_trigger_event(microp_keypad.bl_trigger, LED_OFF);
+	microp_keypad.suspend = 1;
+	printk(KERN_ERR "microp_keypad : microp_keypad_suspend\n");
 	return 0;
 }
 
@@ -277,8 +295,11 @@ static int microp_keypad_resume(struct platform_device *pdev)
 	schedule_work(&microp_keypad.keypad_work);
 	if (microp_keypad.pdata->gpio_clamshell > 0)
 		schedule_work(&microp_keypad.clamshell_work);
+	microp_keypad.suspend = 0;
+	printk(KERN_ERR "microp_keypad : microp_keypad_resume\n");
 	return 0;
 }
+
 #else
 #define microp_keypad_suspend NULL
 #define microp_keypad_resume NULL
