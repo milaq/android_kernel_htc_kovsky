@@ -643,7 +643,7 @@ int kovsky_pull_vcm_d(int on)
 		writel(0x1de, focus + 0x54);
 		gpio_direction_output(0x1c, 1);
 		gpio_direction_output(0x6b, 1);
-		kovsky_af_vdd(1);
+		//kovsky_af_vdd(1);
 	}
 	else {
 		kovsky_af_vdd(0);
