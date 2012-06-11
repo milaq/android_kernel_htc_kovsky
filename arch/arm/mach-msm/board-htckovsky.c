@@ -153,7 +153,7 @@ static int htckovsky_microp_keymap[] = {
 	KEY_D,
 	KEY_RESERVED,
 	KEY_RESERVED,
-	KEY_POWER, // NAVI_SILVER_RIGHT; Power-Key for Android
+	KEY_SEARCH, // NAVI_SILVER_RIGHT; Power-Key for Android
 	KEY_DOWN,
 	KEY_RIGHT,
 	KEY_HOME, // NAVI_XPANEL; Home-Key for Android
