@@ -77,16 +77,16 @@
 
 #define DEFAULT_RSNS			1500	// in mOHM. From the maths, this should be correct
 #define DEFAULT_BATTERY_RATING		1500	// capacity of standard DEFAULT battery 1500mAh
-#define DEFAULT_HIGH_VOLTAGE		4200
-#define DEFAULT_LOW_VOLTAGE		3300
+#define DEFAULT_HIGH_VOLTAGE		4196
+#define DEFAULT_LOW_VOLTAGE		3400
 
-#define DS2746_CURRENT_ACCUM_RES	2440	// resolution of ACCUM-register in uVh * 100 per bit
+#define DS2746_CURRENT_ACCUM_RES	690	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
 #define DS2746_NEAR_END_CHARGE		 100
 #define DS2746_MINI_CURRENT_FOR_CHARGE  30	// Minimum batt_current to consider battery is charging
-#define DS2746_MAX_ACCUM_VALUE 2000 // Max value for ACR (correct invalid values)
-#define DS2746_TOO_HIGH_ACCUM_VALUE 2500 // Too high value for ACR
-#define DS2746_MIN_ACCUM_VALUE   100 // Minimum value of acr register when not commpletly empty.
+#define DS2746_MAX_ACCUM_VALUE 4000 // Max value for ACR (correct invalid values)
+#define DS2746_TOO_HIGH_ACCUM_VALUE 5000 // Too high value for ACR
+#define DS2746_MIN_ACCUM_VALUE   10 // Minimum value of acr register when not commpletly empty.
 
 #define DS2746_STABLE_RANGE		 300  // Range for 3 last bat_curent to consider it's stable
 #define DS2746_5PERCENT_VOLTAGE	 120  // How much more than low_voltage is 15%
@@ -325,7 +325,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	/* Correct if necessary accum value */
 	if (acr > DS2746_MAX_ACCUM_VALUE)
 		{
-			pr_info("ds2746: Correcting too high ACR value from %d to %d\n", acr, DS2746_MAX_ACCUM_VALUE);
+			pr_info("ds2746: Correcting too high ACR value from %d to %d.\n", acr, DS2746_MAX_ACCUM_VALUE);
 			acr = set_accum_value(DS2746_MAX_ACCUM_VALUE);
 		}
 
@@ -338,7 +338,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	all_positive = (b->batt_current >= 0) && (b->batt_current_1 >= 0) && (b->batt_current_2 >= 0) &&
 		(b->batt_current_3 >= 0) && (b->batt_current_4 >= 0) && (b->batt_current_5 >= 0);
 
-	/* printk(KERN_INFO "ds2746 debug : %d mV level %d, accum %u / %u current %d (%d/%d/%d/%d/%d/%d)\n",
+	/*pr_info("ds2746 debug : %d mV level %d, accum %u / %u current %d (%d/%d/%d/%d/%d/%d)\n",
 				 b->batt_vol, bi->level, acr, current_accum_capacity, aver_batt_current,
 				 b->batt_current, b->batt_current_1,  b->batt_current_2,
 				 b->batt_current_3, b->batt_current_4, b->batt_current_5);*/
@@ -363,7 +363,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 				aux0 = (2*acr + aux0) / 3;
 
 				if (abs(aux0 - acr) > 1 && aux0 > 1 && acr > 1) {
-					printk(KERN_INFO "ds2746: LOW VOLTAGE (%d) ACR is %d, should be %d\n", b->batt_vol, acr, aux0);
+					pr_info("ds2746: LOW VOLTAGE (%d) ACR is %d, should be %d\n", b->batt_vol, acr, aux0);
 					acr = set_accum_value(aux0);
 				}
 			}
@@ -380,7 +380,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 				aux0 = (2*acr + aux0) / 3;
 
 				if (abs(aux0 - acr) > 1 && aux0 > 1 && acr > 1) {
-					printk(KERN_INFO "ds2746: MEDIUM VOLTAGE (%d / %d) ACR is too low, updated %d\n",
+					pr_info("ds2746: MEDIUM VOLTAGE (%d / %d) ACR is too low, updated %d\n",
 								 b->batt_vol, current_accum_capacity, aux0);
 					acr = set_accum_value(aux0);
 				}
@@ -440,7 +440,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 
 		/* If we aren't really down, never go lower than 10 for this register (cannot reboot) */
 		if (acr < DS2746_MIN_ACCUM_VALUE) {
-				printk(KERN_INFO "ds2746: not low correction %d mV acr changed from %d to %d\n",
+				pr_info("ds2746: not low correction %d mV acr changed from %d to %d\n",
 							 b->batt_vol, acr, DS2746_MIN_ACCUM_VALUE);
 				acr = set_accum_value(DS2746_MIN_ACCUM_VALUE);
 		}
@@ -548,15 +548,15 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	/* To allow boot, ignore too low values */
 	if(acr < 2 * DS2746_MIN_ACCUM_VALUE)
 		{
-			printk(KERN_INFO "ds2746: acr is too low to boot (%d)\n", acr);
+			pr_info("ds2746: acr is too low to boot (%d)\n", acr);
 			acr = set_accum_value(2 * DS2746_MIN_ACCUM_VALUE);
 		}
 
 	/* Check registers mistake of bootloader */
 	if(acr > DS2746_TOO_HIGH_ACCUM_VALUE)
 		{
-			printk(KERN_INFO "ds2746: acr is obviously too high (%d)\n", acr);
-			printk(KERN_INFO "ds2746: maybe low value correction bootloader mistake, may be empty, set acr to 1\n");
+			pr_info("ds2746: acr is obviously too high (%d)\n", acr);
+			pr_info("ds2746: maybe low value correction bootloader mistake, may be empty, set acr to 1\n");
 			acr = set_accum_value(1);
 		}
 
