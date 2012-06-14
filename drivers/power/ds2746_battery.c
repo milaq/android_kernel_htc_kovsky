@@ -78,7 +78,7 @@
 #define DEFAULT_RSNS			1500	// in mOHM. From the maths, this should be correct
 #define DEFAULT_BATTERY_RATING		1500	// capacity of standard DEFAULT battery 1500mAh
 #define DEFAULT_HIGH_VOLTAGE		4196
-#define DEFAULT_LOW_VOLTAGE		3400
+#define DEFAULT_LOW_VOLTAGE		3500
 
 #define DS2746_CURRENT_ACCUM_RES	690	// resolution of ACCUM-register in uVh * 100 per bit
 #define DS2746_VOLTAGE_RES		2440	// resolution of voltage register multiplied by 1000
