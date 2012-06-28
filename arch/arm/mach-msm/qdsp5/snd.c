@@ -39,6 +39,38 @@ struct snd_ctxt {
 
 static struct snd_ctxt the_snd;
 
+
+static int currentDevice = 0;
+static int IdleDeviceID = 0;
+
+static inline int get_idle_deviceid(void)
+
+{
+
+	int i;
+
+	struct snd_ctxt *snd = &the_snd;
+
+	for (i = 0; i < snd->snd_pdata->num_endpoints; i++) {
+
+		if (!strcmp("IDLE", snd->snd_pdata->endpoints[i].name)) {
+
+			printk("Found SND_DEVICE_IDLE id %d\n", snd->snd_pdata->endpoints[i].id);
+
+			return snd->snd_pdata->endpoints[i].id;
+
+		}
+
+	}
+
+	printk("SND_DEVICE_IDLE not found\n");
+
+	/* default to earcuple */
+
+	return 0;
+
+}
+
 struct rpc_snd_set_device_args {
 	uint32_t device;
 	uint32_t ear_mute;
@@ -104,6 +136,26 @@ static int get_endpoint(struct snd_ctxt *snd, unsigned long arg)
 	return rc;
 }
 
+static inline void check_device(int *device)
+{
+
+	/* Is device ID out of range ? */
+
+	if (*device > IdleDeviceID || *device < 0) {
+
+		pr_err("%s: snd device %d out of range: use last device %d\n", __func__,
+
+			*device, currentDevice);
+
+		*device = currentDevice;
+
+	} else {
+
+		currentDevice = *device;
+
+	}
+
+}
 static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct snd_set_device_msg dmsg;
@@ -121,7 +173,11 @@ static long snd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
+	
+	/* Prevent wrong device to make the snd processor crashing */
 
+        check_device(&dev.device);
+	
 		dmsg.args.device = cpu_to_be32(dev.device);
 		dmsg.args.ear_mute = cpu_to_be32(dev.ear_mute);
 		dmsg.args.mic_mute = cpu_to_be32(dev.mic_mute);
@@ -255,7 +311,14 @@ static int snd_probe(struct platform_device *pdev)
 	}
 	mutex_init(&snd->lock);
 	snd->snd_pdata = (struct msm_snd_platform_data *)pdev->dev.platform_data;
-	rc = misc_register(&snd_misc);
+	/* Find the idle sound device */
+	
+      IdleDeviceID = get_idle_deviceid();
+
+      rc = misc_register(&snd_misc);
+	
+
+
 ret:
 	pr_debug("Loaded MSM sound driver rc=%d\n", rc);
 	return rc;
