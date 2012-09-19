@@ -17,6 +17,9 @@
  */
 
 #include <linux/delay.h>
+
+#define DEBUG
+
 #include <linux/device.h>
 #include <linux/init.h>
 #include <linux/input.h>
@@ -105,13 +108,45 @@ static struct ts_virt_key *find_virt_key(struct msm_ts *ts,
 	return NULL;
 }
 
+static int __devinit msm_ts_hw_init(struct msm_ts *ts)
+{
+	uint32_t tmp;
+
+	/* Enable the register clock to tssc so we can configure it. */
+	tssc_writel(ts, TSSC_CTL_ENABLE, TSSC_CTL);
+	/* Enable software reset*/
+	tssc_writel(ts, TSSC_CTL_SW_RESET, TSSC_CTL);
+
+	/* op1 - measure X, 1 sample, 12bit resolution */
+	tmp = (TSSC_OPN_4WIRE_X << 16) | (2 << 8) | (2 << 0);
+	/* op2 - measure Y, 1 sample, 12bit resolution */
+	tmp |= (TSSC_OPN_4WIRE_Y << 20) | (2 << 10) | (2 << 2);
+	/* op3 - measure Z1, 1 sample, 8bit resolution */
+	tmp |= (TSSC_OPN_4WIRE_Z1 << 24) | (2 << 12) | (0 << 4);
+
+	/* XXX: we don't actually need to measure Z2 (thus 0 samples) when
+	* doing voltage-driven measurement */
+	/* op4 - measure Z2, 0 samples, 8bit resolution */
+	tmp |= (TSSC_OPN_4WIRE_Z2 << 28) | (0 << 14) | (0 << 6);
+	tssc_writel(ts, tmp, TSSC_OPN);
+
+	/* 16ms sampling interval */
+	tssc_writel(ts, 16, TSSC_SAMPLING_INT);
+	/* Enable gating logic to fix the timing delays caused because of
+	* enabling debounce logic */
+	tssc_writel(ts, TSSC_TEST_1_EN_GATE_DEBOUNCE, TSSC_TEST_1);
+
+	setup_next_sample(ts);
+
+	return 0;
+}
 
 static irqreturn_t msm_ts_irq(int irq, void *dev_id)
 {
 	struct msm_ts *ts = dev_id;
 	struct msm_ts_platform_data *pdata = ts->pdata;
 
-	uint32_t tssc_avg12, tssc_avg34, tssc_status, tssc_ctl;
+	uint32_t tssc_avg12, tssc_avg34, tssc_status, tssc_ctl, tssc_opn;
 	int x, y, z1, z2;
 	int was_down;
 	int down;
@@ -120,13 +155,21 @@ static irqreturn_t msm_ts_irq(int irq, void *dev_id)
 	tssc_status = tssc_readl(ts, TSSC_STATUS);
 	tssc_avg12 = tssc_readl(ts, TSSC_AVG_12);
 	tssc_avg34 = tssc_readl(ts, TSSC_AVG_34);
-
+	tssc_opn = tssc_readl(ts, TSSC_OPN);
+	
+	
+	if (tssc_ctl & TSSC_CTL_SW_RESET){
+	   printk("%s: Software reset of touchscreen detected, reconfiguring\n", __func__);
+	   msm_ts_hw_init(ts);
+	   return IRQ_HANDLED;
+	}
+	
 	setup_next_sample(ts);
 
 	x = tssc_avg12 & 0xffff;
-	y = tssc_avg12 >> 16;
+	y = (tssc_avg12 >> 16) & 0xffff;
 	z1 = tssc_avg34 & 0xffff;
-	z2 = tssc_avg34 >> 16;
+	z2 = (tssc_avg34 >> 16) & 0xffff;
 
 	/* invert the inputs if necessary */
 	if (pdata->inv_x) x = pdata->inv_x - x;
@@ -138,13 +181,16 @@ static irqreturn_t msm_ts_irq(int irq, void *dev_id)
 	was_down = ts->ts_down;
 	ts->ts_down = down;
 
+	
+	
+	
 	/* no valid data */
 	if (down && !(tssc_ctl & TSSC_CTL_DATA_FLAG))
 		return IRQ_HANDLED;
-
+	
 	if (msm_tsdebug & MSM_TS_DEBUG_COORD)
-		dev_dbg(ts->dev, "%s: down=%d, x=%d, y=%d, z1=%d, z2=%d, status %x\n",
-		__func__, down, x, y, z1, z2, tssc_status);
+		dev_dbg(ts->dev, "%s: down=%d, x=%d, y=%d, z1=%d, z2=%d, status %x, ctl %x, opn %x\n",
+		__func__, down, x, y, z1, z2, tssc_status, tssc_ctl, tssc_opn);
 
 	if (!was_down && down) {
 		struct ts_virt_key *vkey = NULL;
@@ -204,38 +250,6 @@ static void dump_tssc_regs(struct msm_ts *ts)
 #undef __dump_tssc_reg
 }
 
-static int __devinit msm_ts_hw_init(struct msm_ts *ts)
-{
-	uint32_t tmp;
-
-	/* Enable the register clock to tssc so we can configure it. */
-	tssc_writel(ts, TSSC_CTL_ENABLE, TSSC_CTL);
-	/* Enable software reset*/
-	tssc_writel(ts, TSSC_CTL_SW_RESET, TSSC_CTL);
-
-	/* op1 - measure X, 1 sample, 12bit resolution */
-	tmp = (TSSC_OPN_4WIRE_X << 16) | (2 << 8) | (2 << 0);
-	/* op2 - measure Y, 1 sample, 12bit resolution */
-	tmp |= (TSSC_OPN_4WIRE_Y << 20) | (2 << 10) | (2 << 2);
-	/* op3 - measure Z1, 1 sample, 8bit resolution */
-	tmp |= (TSSC_OPN_4WIRE_Z1 << 24) | (2 << 12) | (0 << 4);
-
-	/* XXX: we don't actually need to measure Z2 (thus 0 samples) when
-	* doing voltage-driven measurement */
-	/* op4 - measure Z2, 0 samples, 8bit resolution */
-	tmp |= (TSSC_OPN_4WIRE_Z2 << 28) | (0 << 14) | (0 << 6);
-	tssc_writel(ts, tmp, TSSC_OPN);
-
-	/* 16ms sampling interval */
-	tssc_writel(ts, 16, TSSC_SAMPLING_INT);
-	/* Enable gating logic to fix the timing delays caused because of
-	* enabling debounce logic */
-	tssc_writel(ts, TSSC_TEST_1_EN_GATE_DEBOUNCE, TSSC_TEST_1);
-
-	setup_next_sample(ts);
-
-	return 0;
-}
 
 static void msm_ts_enable(struct msm_ts *ts, bool enable)
 {
