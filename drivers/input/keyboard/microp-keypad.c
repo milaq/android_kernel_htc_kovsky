@@ -53,18 +53,18 @@ static struct microp_keypad_t {
 
 static irqreturn_t microp_keypad_interrupt(int irq, void *handle)
 {
-	printk(KERN_ERR "microp_keypad : microp_keypad_interrupt\n");
-	if(microp_keypad.suspend)
-		return IRQ_HANDLED;
+//	printk(KERN_ERR "microp_keypad : microp_keypad_interrupt\n");
+//	if(microp_keypad.suspend)
+//		return IRQ_HANDLED;
 	schedule_work(&microp_keypad.keypad_work);
 	return IRQ_HANDLED;
 }
 
 static irqreturn_t microp_clamshell_interrupt(int irq, void *handle)
 {
-	printk(KERN_ERR "microp_keypad : microp_clamshell_interrupt\n");
-	if(microp_keypad.suspend)
-		return IRQ_HANDLED;
+//	printk(KERN_ERR "microp_keypad : microp_clamshell_interrupt\n");
+//	if(microp_keypad.suspend)
+//		return IRQ_HANDLED;
 	schedule_work(&microp_keypad.clamshell_work);
 	return IRQ_HANDLED;
 }
@@ -100,7 +100,7 @@ static void microp_keypad_work(struct work_struct *work)
 		DLOG(KERN_DEBUG "%s: scancode=%u\n", __func__, key);
 
 		if (key != 0) {
-			input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
+			if(!microp_keypad.suspend) input_event(microp_keypad.input, EV_MSC, MSC_SCAN, key);
 			if (key < microp_keypad.pdata->keypad_scancodes_size) {
 				input_report_key(microp_keypad.input,
 						microp_keypad.pdata->keypad_scancodes[key],
