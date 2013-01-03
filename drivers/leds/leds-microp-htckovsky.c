@@ -98,7 +98,7 @@ static void htckovsky_update_backlight(struct work_struct* work) {
        // printk("Auto screen brightness enabled %x\n", kovsky_leds[LCD].brightness);
         microp_ng_read(client, 0x30, buffer, 2);
        // printk("Lightsensor returned %.2x %.2x\n", buffer[0], buffer[1]);
-	brightness = (low_level + (buffer[1]) ) ;
+	brightness = (low_level + (buffer[1] + (buffer[0] << 8))*3/2 ) ;
 	
 	if(brightness> 0xff) brightness = 0xff;
 		      
@@ -112,8 +112,7 @@ static void htckovsky_update_backlight(struct work_struct* work) {
 
         read_light=0;
 
-    }
-    else {
+    } else if (!brightness) {
         buffer[1] = buffer[2] = 0;
 
         buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
@@ -320,7 +319,7 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
       init_timer(&sensor_timer);
       sensor_timer.function = sensor_timer_routine;
       sensor_timer.data = (unsigned long)client;
-      sensor_timer.expires = jiffies + HZ*1; /* Start 50 seconds from now */
+      sensor_timer.expires = jiffies + HZ;
       add_timer(&sensor_timer); /* Starting the timer */
 
 #endif
@@ -361,7 +360,7 @@ static int htckovsky_leds_suspend(struct platform_device *pdev, pm_message_t mes
 static int htckovsky_leds_resume(struct platform_device *pdev)
 {
 	pr_debug("%s\n", __func__);
-	mod_timer(&sensor_timer, jiffies + (HZ/2));
+	mod_timer(&sensor_timer, jiffies + (HZ/3));
 	return 0;
 }
 #else
