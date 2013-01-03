@@ -27,9 +27,11 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 #include <linux/leds.h>
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
-
+#include <linux/delay.h>
 #include <linux/mfd/microp-ng.h>
 #include <linux/microp-htckovsky.h>
+
+static int leds_init_done = 0;
 
 static void htckovsky_update_color_leds(struct work_struct* work);
 static void htckovsky_update_backlight(struct work_struct* work);
@@ -39,10 +41,22 @@ static void htckovsky_set_backlight(struct led_classdev*, enum led_brightness);
 static void htckovsky_set_button_light(struct led_classdev*, enum led_brightness);
 static void htckovsky_set_brightness_color(struct led_classdev*, enum led_brightness);
 
+struct timer_list sensor_timer;
+
+static long read_sensor = 0;
+module_param(read_sensor, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(read_sensor, "Start reading the sensor");
+
+static long low_level = 60;
+module_param(low_level, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(low_level, "Lowest_level");
+
 static DECLARE_WORK(colorled_wq, htckovsky_update_color_leds);
+//static DECLARE_WORK(leds_init_wq, leds_init);
 static DECLARE_WORK(backlight_wq, htckovsky_update_backlight);
 static DECLARE_WORK(buttonlight_wq, htckovsky_update_button_light);
 static struct i2c_client *client = NULL;
+static int read_light=0;
 
 enum kovsky_led {RED, GREEN, BLUE, LCD, BUTTONS};
 
@@ -77,26 +91,50 @@ static void htckovsky_update_color_leds(struct work_struct* work) {
 }
 
 static void htckovsky_update_backlight(struct work_struct* work) {
-	char buffer[3] = {};
-	enum led_brightness brightness = kovsky_leds[LCD].brightness;
-	if (brightness) {
-		buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
-		buffer[1] = LED_FULL;
-		buffer[2] = brightness >> 1;
-		microp_ng_write(client, buffer, 3);
-	}
-	else {
-		buffer[1] = buffer[2] = 0;
+    char buffer[3] = {};
+    int brightness = (kovsky_leds[LCD].brightness)&0xff;
+    int enable_auto = (kovsky_leds[LCD].brightness)&0x100 >> 8;
+    if(brightness && read_light) {
+       // printk("Auto screen brightness enabled %x\n", kovsky_leds[LCD].brightness);
+        microp_ng_read(client, 0x30, buffer, 2);
+       // printk("Lightsensor returned %.2x %.2x\n", buffer[0], buffer[1]);
+	brightness = (low_level + (buffer[1]) ) ;
+	
+	if(brightness> 0xff) brightness = 0xff;
+		      
+	//printk("%s: read %x used %d\n", __func__, buffer[1], brightness);
+	
+	
+	buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
+        buffer[1] = LED_FULL;
+        buffer[2] = (brightness & 0xff) >> 1;
+        microp_ng_write(client, buffer, 3);
 
-		buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
-		microp_ng_write(client, buffer, 3);
+        read_light=0;
 
-		buffer[0] = 0x11;
-		microp_ng_write(client, buffer, 3);
+    }
+    else {
+        buffer[1] = buffer[2] = 0;
 
-		buffer[0] = 0x13;
-		microp_ng_write(client, buffer, 3);
-	}
+        buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
+        microp_ng_write(client, buffer, 3);
+
+        buffer[0] = 0x11;
+        microp_ng_write(client, buffer, 3);
+
+        buffer[0] = 0x13;
+        microp_ng_write(client, buffer, 3);
+    }
+}
+
+
+void sensor_timer_routine(unsigned long data)
+{
+  read_light=1;
+  schedule_work(&backlight_wq);
+   mod_timer(&sensor_timer, jiffies + HZ);
+    return;
+
 }
 
 static void htckovsky_update_button_light(struct work_struct* work) {
@@ -118,7 +156,7 @@ static void htckovsky_set_brightness_color(struct led_classdev *led_cdev,
 static void htckovsky_set_button_light(struct led_classdev *led_cdev,
 					       enum led_brightness brightness)
 {
-	schedule_work(&buttonlight_wq);
+  schedule_work(&buttonlight_wq);
 }
 
 static void htckovsky_set_backlight(struct led_classdev *led_cdev,
@@ -127,21 +165,167 @@ static void htckovsky_set_backlight(struct led_classdev *led_cdev,
 	schedule_work(&backlight_wq);
 }
 
+
 static int htckovsky_leds_probe(struct platform_device *pdev)
 {
-	int ret = 0;
+ int ret = 0;
 	int i;
+	
+	 	char buffer[10];
+	char buffer41[72] = {0x41, 0x00, 0x00, 0x03, 
+			   0x00, 0x0A, 0xDA, 0x11,
+			   0xA1, 0x18, 0xB6, 0x1F,
+			   0xE6, 0x26, 0x6C, 0x2D,
+			   0x00, 0x2E, 0x00, 0x41,
+			   0x00, 0x00, 0x00, 0x03,
+			   0xF0, 0x0A, 0x35, 0x11,
+			   0xA1, 0x18, 0x1F, 0x1F,
+			   0x00, 0x26, 0x00, 0x2D,
+			   0x00, 0x2E, 0x00, 0x41,
+			   0x00, 0x00, 0x00, 0x03,
+			   0x00, 0x0A, 0x00, 0x11,
+			   0x00, 0x18, 0x13, 0x1F,
+			   0xC0, 0x26, 0xF0, 0x2D,
+			   0x00, 0x2E, 0x00, 0x41,
+			   0x00, 0x0A, 0x0F, 0x0F,
+			   0x0F, 0x0F, 0x0F, 0x0F,
+			   0x0F, 0x0F, 0x0F, 0x00};
+	
+	char buffer51[22] = { 51, 00 , 00 , 0x19 ,
+                                00 , 0x64 , 00, 0x65 ,
+                                00 , 0x66 , 00 , 0x67 ,
+                                00 , 0x68 , 00 , 0x69 ,
+                                00 , 0x6A , 00 , 0x7D ,
+                                00, 00};
 
+				
+	char buffer42[71] = {     0x42, 00, 0x00, 0x19,
+                                00, 0x32, 0xF0, 0x4B,
+                                00, 0x50, 0x00, 0x51,
+                                00, 0x52, 0x00, 0x53,
+                                00, 0x54, 0x00, 0x64,
+                                00, 0x00, 0x00, 0x19,
+                                00, 0x32, 0xF0, 0x4B,
+                                00, 0x50, 0x00, 0x51,
+                                00, 0x52, 0x00, 0x53,
+                                00, 0x54, 0x00, 0x64,
+                                00, 0x00, 0x00, 0x19,
+                                00, 0x32, 0xF0, 0x4B,
+                                00, 0x50, 0x00, 0x51, 
+                                00, 0x52, 0x00, 0x53,
+                                00, 0x54, 0x00, 0x64,
+                                00, 0x0A, 0x05, 0x05,
+                                0x05, 0x05, 0x05, 0x05,
+                                0x05, 0x05, 0x05};
+	char buffer44[71] = { 44, 0x00, 0x00, 0x0C,
+				0xF0, 0x19, 0x00, 0x20,
+				0x00, 0x21, 0x00, 0x22,
+				0x00, 0x23, 0x00, 0x24,
+				0x00, 0x25, 0x00, 0x32,
+				0x00, 0x00, 0x00, 0x0C,
+				0xF0, 0x19, 0x00, 0x20,
+				0x00, 0x21, 0x00, 0x22,
+				0x00, 0x23, 0x00, 0x24,
+				0x00, 0x25, 0x00, 0x32,
+				0x00, 0x00, 0x00, 0x0C,
+				0xF0, 0x19, 0x00, 0x20,
+				0x00, 0x21, 0x00, 0x22,
+				0x00, 0x23, 0x00, 0x24,
+				0x00, 0x25, 0x00, 0x32,
+				0x00, 0x0A, 0x0F, 0x0F,
+				0x0F, 0x0F, 0x0F, 0x0F,
+				0x0F, 0x0F, 0x0F};
+	char buffer53[]= {0x53, 0x00, 0x00, 0x19,
+			  0xF0, 0x32, 0x00, 0x33,
+			  0x00, 0x34, 0x00, 0x35,
+			  0x00, 0x36, 0x00, 0x37,
+			  0x00, 0x38, 0x00, 0x39,
+			  0x00};
+	int len=2;
+	char addr=0x07;
 	client = dev_get_drvdata(&pdev->dev);
+	
+	microp_ng_read(client, addr, buffer, len);
+	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	buffer[0] = 0x02; buffer[1]= 0x01;
+	microp_ng_write(client, buffer, 2);
+	microp_ng_write(client, buffer, 2);
+	microp_ng_read(client, addr, buffer, len);
+	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	
+	printk("micropLEDS: Sending 41\n");
+	microp_ng_write(client, buffer41, 72);
+	printk("micropLEDS: Sending 51\n");
+	microp_ng_write(client, buffer51, 22);
+	buffer[0] = 0x11; buffer[1]= 0x00;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0x11; buffer[1]= 0x01;
+	microp_ng_write(client, buffer, 2);
 
+
+	printk("micropLEDS: Sending 42\n");
+	microp_ng_write(client, buffer42, 71);
+	printk("micropLEDS: Sending 44\n");
+	microp_ng_write(client, buffer44, 71);
+	printk("micropLEDS: Sending 51\n");
+	microp_ng_write(client, buffer51, 21);
+	printk("micropLEDS: Sending 53\n");
+	microp_ng_write(client, buffer53, 21);
+	buffer[0] = 0x03; buffer[1]= 0x00;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0xBA; buffer[1]= 0x5A;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0xF0; buffer[1]= 0x02;
+	microp_ng_write(client, buffer, 2);
+	addr=0xF1; len=2;
+	microp_ng_read(client, addr, buffer, len);
+	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	buffer[0] = 0xF0; buffer[1]= 0x03;
+	microp_ng_write(client, buffer, 2);
+	addr=0xF1; len=2;
+	microp_ng_read(client, addr, buffer, len);
+	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	buffer[0] = 0xF0; buffer[1]= 0x04;
+	microp_ng_write(client, buffer, 2);
+	addr=0xF1; len=2;
+	microp_ng_read(client, addr, buffer, len);
+	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	buffer[0] = 0xF7; buffer[1]= 0x01;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0x80; buffer[1]= 0x00;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0x80; buffer[1]= 0x01;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0xF7; buffer[1]= 0x01;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0x80; buffer[1]= 0x00;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0x80; buffer[1]= 0x01;
+	microp_ng_write(client, buffer, 2);
+	buffer[0] = 0x80; buffer[1]= 0x00;
+	microp_ng_write(client, buffer, 2);
+	addr=0x30; len=2;
+	microp_ng_read(client, addr, buffer, len);
+	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	
+	 leds_init_done=1;
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
 		ret = led_classdev_register(&pdev->dev, &kovsky_leds[i]);
 		if (ret < 0) {
 			goto led_fail;
 		}
 	}
+      kovsky_leds[LCD].brightness=0xff;
+#if 1
+      init_timer(&sensor_timer);
+      sensor_timer.function = sensor_timer_routine;
+      sensor_timer.data = (unsigned long)client;
+      sensor_timer.expires = jiffies + HZ*1; /* Start 50 seconds from now */
+      add_timer(&sensor_timer); /* Starting the timer */
 
-	return 0;
+#endif
+
+return 0;
 
 led_fail:
 	for (i--; i >= 0; i--) {
@@ -156,7 +340,9 @@ static int htckovsky_leds_remove(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
 		led_classdev_unregister(&kovsky_leds[i]);
 	}
+	del_timer_sync(&sensor_timer);
 	client = NULL;
+	
 	return 0;
 }
 
@@ -164,6 +350,7 @@ static int htckovsky_leds_remove(struct platform_device *pdev)
 static int htckovsky_leds_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
 	pr_debug("+%s\n", __func__);
+	del_timer_sync(&sensor_timer);
 	cancel_work_sync(&colorled_wq);
 	cancel_work_sync(&backlight_wq);
 	cancel_work_sync(&buttonlight_wq);
@@ -174,6 +361,7 @@ static int htckovsky_leds_suspend(struct platform_device *pdev, pm_message_t mes
 static int htckovsky_leds_resume(struct platform_device *pdev)
 {
 	pr_debug("%s\n", __func__);
+	mod_timer(&sensor_timer, jiffies + (HZ/2));
 	return 0;
 }
 #else
@@ -202,5 +390,9 @@ static void __exit htckovsky_leds_exit(void)
 	platform_driver_unregister(&htckovsky_leds_driver);
 }
 
+MODULE_AUTHOR("Alexander Tarasikov <alexander.tarasikov@gmail.com>");
+MODULE_DESCRIPTION("MicroP manager driver");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("0.3");
 module_init(htckovsky_leds_init);
 module_exit(htckovsky_leds_exit)
