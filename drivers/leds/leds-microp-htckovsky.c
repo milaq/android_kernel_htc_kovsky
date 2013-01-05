@@ -4,6 +4,7 @@ on HTC Kovsky (Sony Ericsson Xperia X1). The hardware includes
 programmable color leds, two PWMs for LCD and keypad backlight,
 light sensor and optical joystick
 
+Copyright (2012) Tor Berg <tob@samfundet.no>
 Copyright (2010) Alexander Tarasikov <alexander.tarasikov@gmail.com>
 Some code was written by ultrashot at xda-developers
 
@@ -43,13 +44,41 @@ static void htckovsky_set_brightness_color(struct led_classdev*, enum led_bright
 
 struct timer_list sensor_timer;
 
-static long read_sensor = 0;
-module_param(read_sensor, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-MODULE_PARM_DESC(read_sensor, "Start reading the sensor");
+static long debuglevel = 0;
+module_param(debuglevel, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(debuglevel, "Debuglevel");
 
-static long low_level = 60;
+static long auto_brightness = 0;
+module_param(auto_brightness, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(auto_brightness, "Enable auto brightness");
+
+
+static long low_level = 50;
 module_param(low_level, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(low_level, "Lowest_level");
+
+static long high_level = 300;
+module_param(high_level, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(high_level, "Lowest_level");
+
+static long div = 3;
+module_param(div, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(div, "divisor");
+
+
+static long mult = 2;
+module_param(mult, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mult, "Multiplier");
+
+static long div2 = 1;
+module_param(div2, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(div2, "2nd order divisor");
+
+
+static long mult2 = 0;
+module_param(mult2, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+MODULE_PARM_DESC(mult2, "2nd order Multiplier");
+
 
 static DECLARE_WORK(colorled_wq, htckovsky_update_color_leds);
 //static DECLARE_WORK(leds_init_wq, leds_init);
@@ -93,21 +122,27 @@ static void htckovsky_update_color_leds(struct work_struct* work) {
 static void htckovsky_update_backlight(struct work_struct* work) {
     char buffer[3] = {};
     int brightness = (kovsky_leds[LCD].brightness)&0xff;
-    int enable_auto = (kovsky_leds[LCD].brightness)&0x100 >> 8;
-    if(brightness && read_light) {
+    int calc_brightness;
+    int light=0;
+    if(debuglevel) printk("%s: 0x%.8X\n", __func__, kovsky_leds[LCD].brightness);
+	
+    if(brightness && read_light && auto_brightness) {
        // printk("Auto screen brightness enabled %x\n", kovsky_leds[LCD].brightness);
         microp_ng_read(client, 0x30, buffer, 2);
+	light=(buffer[1] + (buffer[0] << 8));
        // printk("Lightsensor returned %.2x %.2x\n", buffer[0], buffer[1]);
-	brightness = (low_level + (buffer[1] + (buffer[0] << 8))*3/2 ) ;
-	
-	if(brightness> 0xff) brightness = 0xff;
+	if(div != 0 && div2 != 0)
+	  calc_brightness = (low_level + light*mult/div + light*light*mult2/div2) ;
+	else
+	  calc_brightness = low_level;
 		      
-	//printk("%s: read %x used %d\n", __func__, buffer[1], brightness);
+	if(debuglevel) printk("%s: read %x got %d used %d\n", __func__, light , brightness, calc_brightness);
 	
+	if(calc_brightness> high_level) calc_brightness = high_level;
 	
 	buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
         buffer[1] = LED_FULL;
-        buffer[2] = (brightness & 0xff) >> 1;
+        buffer[2] = ((calc_brightness) >> 1)&0xff;
         microp_ng_write(client, buffer, 3);
 
         read_light=0;
@@ -122,8 +157,16 @@ static void htckovsky_update_backlight(struct work_struct* work) {
         microp_ng_write(client, buffer, 3);
 
         buffer[0] = 0x13;
-        microp_ng_write(client, buffer, 3);
+        if(debuglevel) printk("%s: Turning off\n", __func__);
+	microp_ng_write(client, buffer, 3);
+    }   else if(!auto_brightness) {
+	buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
+        buffer[1] = LED_FULL;
+        buffer[2] = (brightness & 0xff) >> 1;
+	if(debuglevel) printk("%s: used %d\n", __func__, brightness);
+	microp_ng_write(client, buffer, 3);
     }
+      
 }
 
 
