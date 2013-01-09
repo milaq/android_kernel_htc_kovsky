@@ -86,6 +86,7 @@ static DECLARE_WORK(backlight_wq, htckovsky_update_backlight);
 static DECLARE_WORK(buttonlight_wq, htckovsky_update_button_light);
 static struct i2c_client *client = NULL;
 static int read_light=0;
+static int enable_backlight=1;
 
 enum kovsky_led {RED, GREEN, BLUE, LCD, BUTTONS};
 
@@ -125,8 +126,16 @@ static void htckovsky_update_backlight(struct work_struct* work) {
     int calc_brightness;
     int light=0;
     if(debuglevel) printk("%s: 0x%.8X\n", __func__, kovsky_leds[LCD].brightness);
-	
-    if(brightness && read_light && auto_brightness) {
+    
+    if(brightness== 0xff){
+      auto_brightness = 1;
+      if(debuglevel) printk("%s: Turning ON auto brightness\n", __func__);
+    } else {
+      auto_brightness = 0;
+      if(debuglevel) printk("%s: Turning OFF auto brightness\n", __func__);
+    }
+    
+    if(brightness && read_light && auto_brightness && enable_backlight) {
        // printk("Auto screen brightness enabled %x\n", kovsky_leds[LCD].brightness);
         microp_ng_read(client, 0x30, buffer, 2);
 	light=(buffer[1] + (buffer[0] << 8));
@@ -147,7 +156,7 @@ static void htckovsky_update_backlight(struct work_struct* work) {
 
         read_light=0;
 
-    } else if (!brightness) {
+    } else if (!brightness || !enable_backlight) {
         buffer[1] = buffer[2] = 0;
 
         buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
@@ -386,6 +395,13 @@ static int htckovsky_leds_remove(struct platform_device *pdev)
 	client = NULL;
 	
 	return 0;
+}
+
+void htckovsky_leds_enable_backlight(int enabled)
+{
+  enable_backlight=enabled;
+  schedule_work(&backlight_wq);
+  return;
 }
 
 #if CONFIG_PM

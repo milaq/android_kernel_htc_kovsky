@@ -119,8 +119,23 @@ static int htckovsky_keyled_remove(struct platform_device *pdev)
 }
 
 #if CONFIG_PM
+int suspend_count=0;
 static int htckovsky_keyled_suspend(struct platform_device *pdev, pm_message_t mesg)
 {
+#if 0
+      static struct vreg *vreg_local;
+      int i;
+	suspend_count++;
+	if(suspend_count<3){
+	  printk("%s: count: %d\n",__func__,suspend_count);
+	else {
+	  printk("%s: count: %d disabling %d\n",__func__,suspend_count, suspend_count-3);
+	  for(i=0;i<32;i++){
+	    vreg_local = vreg_get_by_id(0, i);
+	    vreg_disable(vreg_local);
+	  }
+	}
+#endif
 	cancel_work_sync(&htckovsky_keyled_wq);
 	return 0;
 }
@@ -452,6 +467,9 @@ static struct i2c_board_info i2c_devices[] = {
 		.addr = 0x67,
 		.platform_data = &htckovsky_microp_keypad_pdata,
 	},
+//	{
+//		I2C_BOARD_INFO("ov6680", 0x60),
+//	},
 	{
 		I2C_BOARD_INFO("mt9t012vc", 0x20),
 	},
@@ -606,7 +624,7 @@ static void config_camera_on_gpios(void)
 
 static void config_camera_off_gpios(void)
 {
-	printk(KERN_DEBUG "-%s\n", __func__);
+	printk(KERN_DEBUG "+%s\n", __func__);
 	msm_gpios_disable_free(htckovsky_camera_gpios_off,
 							ARRAY_SIZE(htckovsky_camera_gpios_off));
 	printk(KERN_DEBUG "-%s\n", __func__);

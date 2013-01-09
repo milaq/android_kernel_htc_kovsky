@@ -119,12 +119,14 @@ int vreg_enable(struct vreg *vreg)
 
 #if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
 	struct msm_dex_command dex;
+	printk("%s: Turning ON %d\n", __func__, id);
 	id = 1U << id;
 	dex.cmd = DEX_PMIC_REG_ON;
 	dex.has_data = 1;
 	dex.data = id;
 	if (vreg->refcnt == 0)
 	vreg->status = msm_dex_comm(&dex, 0);
+
 #else
 	unsigned enable = 1;
 	if (vreg->refcnt == 0)
@@ -141,11 +143,13 @@ int vreg_disable(struct vreg *vreg)
 {
 	unsigned id = vreg->id;
 
+
 	if (!vreg->refcnt)
 		return 0;
 
 #if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
 	struct msm_dex_command dex;
+	printk("%s: Turning OFF %d\n", __func__, id);
 	id = 1U << id;
 	dex.cmd = DEX_PMIC_REG_OFF;
 	dex.has_data = 1;
