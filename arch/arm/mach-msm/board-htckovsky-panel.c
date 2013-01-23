@@ -395,10 +395,10 @@ static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data
 				      struct msm_mddi_client_data *client_data)
 {
 	printk("%s: +unblank panel\n", __func__);
-	client_data->auto_hibernate(client_data, 0);
+	htckovsky_leds_enable_backlight(1);
+ 	client_data->auto_hibernate(client_data, 0);
 	client_data->remote_write(client_data, (1 << 14), 0x600);
 	client_data->auto_hibernate(client_data, 1);
-	htckovsky_leds_enable_backlight(1);
 	printk("%s: -unblank panel\n", __func__);
 	return 0;
 }
@@ -408,10 +408,10 @@ static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data
 				      struct msm_mddi_client_data *client_data)
 {
 	printk("%s: +blank panel\n", __func__);
+	htckovsky_leds_enable_backlight(0);
 	client_data->auto_hibernate(client_data, 0);
 	client_data->remote_write(client_data, (1 << 14) | (1 << 7), 0x600);
 	client_data->auto_hibernate(client_data, 1);
-	htckovsky_leds_enable_backlight(0);
 	printk("%s: -blank panel\n", __func__);
 	return 0;
 }

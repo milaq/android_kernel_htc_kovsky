@@ -53,7 +53,7 @@ module_param(auto_brightness, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(auto_brightness, "Enable auto brightness");
 
 
-static long low_level = 50;
+static long low_level = 40;
 module_param(low_level, long, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 MODULE_PARM_DESC(low_level, "Lowest_level");
 
@@ -87,6 +87,7 @@ static DECLARE_WORK(buttonlight_wq, htckovsky_update_button_light);
 static struct i2c_client *client = NULL;
 static int read_light=0;
 static int enable_backlight=1;
+static int unblank = 0;
 
 enum kovsky_led {RED, GREEN, BLUE, LCD, BUTTONS};
 
@@ -134,6 +135,17 @@ static void htckovsky_update_backlight(struct work_struct* work) {
       auto_brightness = 0;
       if(debuglevel) printk("%s: Turning OFF auto brightness\n", __func__);
     }
+    
+    if(unblank){
+ 	buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
+        buffer[1] = LED_FULL;
+        buffer[2] = 0x7f;
+        microp_ng_write(client, buffer, 3);
+	microp_ng_write(client, buffer, 3);
+	msleep(100);
+        unblank=0;
+    }
+    
     
     if(brightness && read_light && auto_brightness && enable_backlight) {
        // printk("Auto screen brightness enabled %x\n", kovsky_leds[LCD].brightness);
@@ -399,7 +411,9 @@ static int htckovsky_leds_remove(struct platform_device *pdev)
 
 void htckovsky_leds_enable_backlight(int enabled)
 {
+  read_light=1;
   enable_backlight=enabled;
+  unblank = enabled;
   schedule_work(&backlight_wq);
   return;
 }
