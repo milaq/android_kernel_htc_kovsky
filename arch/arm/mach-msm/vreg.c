@@ -103,7 +103,6 @@ struct vreg *vreg_get(struct device *dev, const char *id)
 
 struct vreg *vreg_get_by_id(struct device *dev, int id)
 {
-	int n;
 	if (id < ARRAY_SIZE(vregs))
 		return vregs + id;
 	return ERR_PTR(-ENOENT);
@@ -143,12 +142,13 @@ int vreg_disable(struct vreg *vreg)
 {
 	unsigned id = vreg->id;
 
-
+#if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
+	struct msm_dex_command dex;
+#endif
 	if (!vreg->refcnt)
 		return 0;
 
 #if defined(CONFIG_MSM_AMSS_VERSION_WINCE)
-	struct msm_dex_command dex;
 	printk("%s: Turning OFF %d\n", __func__, id);
 	id = 1U << id;
 	dex.cmd = DEX_PMIC_REG_OFF;
