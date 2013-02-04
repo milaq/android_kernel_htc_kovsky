@@ -528,7 +528,7 @@ struct platform_device msm_device_sdc4 = {
 	},
 };
 
-static struct platform_device *msm_sdcc_devices[] __initdata = {
+static struct platform_device *msm_sdcc_devices[] = {
 	&msm_device_sdc1,
 	&msm_device_sdc2,
 	&msm_device_sdc3,
