@@ -309,16 +309,16 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
 	client = dev_get_drvdata(&pdev->dev);
 	
 	microp_ng_read(client, addr, buffer, len);
-	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	if(debuglevel) printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
 	buffer[0] = 0x02; buffer[1]= 0x01;
 	microp_ng_write(client, buffer, 2);
 	microp_ng_write(client, buffer, 2);
 	microp_ng_read(client, addr, buffer, len);
-	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	if(debuglevel) printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
 	
-	printk("micropLEDS: Sending 41\n");
+	if(debuglevel) printk("micropLEDS: Sending 41\n");
 	microp_ng_write(client, buffer41, 72);
-	printk("micropLEDS: Sending 51\n");
+	if(debuglevel) printk("micropLEDS: Sending 51\n");
 	microp_ng_write(client, buffer51, 22);
 	buffer[0] = 0x11; buffer[1]= 0x00;
 	microp_ng_write(client, buffer, 2);
@@ -326,13 +326,13 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
 	microp_ng_write(client, buffer, 2);
 
 
-	printk("micropLEDS: Sending 42\n");
+	if(debuglevel) printk("micropLEDS: Sending 42\n");
 	microp_ng_write(client, buffer42, 71);
-	printk("micropLEDS: Sending 44\n");
+	if(debuglevel) printk("micropLEDS: Sending 44\n");
 	microp_ng_write(client, buffer44, 71);
-	printk("micropLEDS: Sending 51\n");
+	if(debuglevel) printk("micropLEDS: Sending 51\n");
 	microp_ng_write(client, buffer51, 21);
-	printk("micropLEDS: Sending 53\n");
+	if(debuglevel) printk("micropLEDS: Sending 53\n");
 	microp_ng_write(client, buffer53, 21);
 	buffer[0] = 0x03; buffer[1]= 0x00;
 	microp_ng_write(client, buffer, 2);
@@ -342,17 +342,17 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
 	microp_ng_write(client, buffer, 2);
 	addr=0xF1; len=2;
 	microp_ng_read(client, addr, buffer, len);
-	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	if(debuglevel) printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
 	buffer[0] = 0xF0; buffer[1]= 0x03;
 	microp_ng_write(client, buffer, 2);
 	addr=0xF1; len=2;
 	microp_ng_read(client, addr, buffer, len);
-	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	if(debuglevel) printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
 	buffer[0] = 0xF0; buffer[1]= 0x04;
 	microp_ng_write(client, buffer, 2);
 	addr=0xF1; len=2;
 	microp_ng_read(client, addr, buffer, len);
-	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	if(debuglevel) printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
 	buffer[0] = 0xF7; buffer[1]= 0x01;
 	microp_ng_write(client, buffer, 2);
 	buffer[0] = 0x80; buffer[1]= 0x00;
@@ -369,7 +369,7 @@ static int htckovsky_leds_probe(struct platform_device *pdev)
 	microp_ng_write(client, buffer, 2);
 	addr=0x30; len=2;
 	microp_ng_read(client, addr, buffer, len);
-	printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
+	if(debuglevel) printk("micropLEDS: R %d %.2x: %.2x %.2x %.2x\n", len, addr, buffer[0], buffer[1], buffer[2]);
 	
 	 leds_init_done=1;
 	for (i = 0; i < ARRAY_SIZE(kovsky_leds); i++) {
