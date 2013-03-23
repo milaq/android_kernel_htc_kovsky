@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.7
-# Fri Mar 22 13:35:37 2013
+# Sat Mar 23 00:37:08 2013
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -1584,7 +1584,8 @@ CONFIG_ANDROID_LOW_MEMORY_KILLER=y
 # RAR Register Driver
 #
 # CONFIG_IIO is not set
-# CONFIG_RAMZSWAP is not set
+CONFIG_ZRAM=y
+# CONFIG_ZRAM_DEBUG is not set
 # CONFIG_BATMAN_ADV is not set
 # CONFIG_FB_SM7XX is not set
 
