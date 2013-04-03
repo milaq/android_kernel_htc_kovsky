@@ -88,6 +88,7 @@ static struct i2c_client *client = NULL;
 static int read_light=0;
 static int enable_backlight=1;
 static int unblank = 0;
+static int holdoff_counter = 0;
 
 enum kovsky_led {RED, GREEN, BLUE, LCD, BUTTONS};
 
@@ -124,7 +125,7 @@ static void htckovsky_update_color_leds(struct work_struct* work) {
 static void htckovsky_update_backlight(struct work_struct* work) {
     char buffer[3] = {};
     int brightness = (kovsky_leds[LCD].brightness)&0xff;
-    int calc_brightness;
+    static int calc_brightness;
     int light=0;
     if(debuglevel) printk("%s: 0x%.8X\n", __func__, kovsky_leds[LCD].brightness);
     
@@ -152,15 +153,19 @@ static void htckovsky_update_backlight(struct work_struct* work) {
         microp_ng_read(client, 0x30, buffer, 2);
 	light=(buffer[1] + (buffer[0] << 8));
        // printk("Lightsensor returned %.2x %.2x\n", buffer[0], buffer[1]);
-	if(div != 0 && div2 != 0)
-	  calc_brightness = (low_level + light*mult/div + light*light*mult2/div2) ;
-	else
-	  calc_brightness = low_level;
-		      
-	if(debuglevel) printk("%s: read %x got %d used %d\n", __func__, light , brightness, calc_brightness);
 	
-	if(calc_brightness> high_level) calc_brightness = high_level;
-	
+	if(!holdoff_counter){
+	  if(div != 0 && div2 != 0)
+	    calc_brightness = (low_level + light*mult/div + light*light*mult2/div2) ;
+	  else
+	    calc_brightness = low_level;
+			
+	  if(debuglevel) printk("%s: read %x got %d used %d\n", __func__, light , brightness, calc_brightness);
+	  
+	  if(calc_brightness> high_level) calc_brightness = high_level;
+	} else {
+	  holdoff_counter--;
+	}
 	buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
         buffer[1] = LED_FULL;
         buffer[2] = ((calc_brightness) >> 1)&0xff;
@@ -433,6 +438,7 @@ static int htckovsky_leds_suspend(struct platform_device *pdev, pm_message_t mes
 static int htckovsky_leds_resume(struct platform_device *pdev)
 {
 	pr_debug("%s\n", __func__);
+	holdoff_counter = 5;
 	mod_timer(&sensor_timer, jiffies + (HZ/3));
 	return 0;
 }
