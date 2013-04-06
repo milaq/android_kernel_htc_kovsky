@@ -58,6 +58,24 @@
 #include <linux/android_alarm.h>
 #include <linux/wakelock.h>
 
+int TEMP_MAP_1000K_100_4360[] =
+{
+	0, 30, 31, 32, 34, 35, 36, 38, 39, 40,
+	42, 44, 45, 47, 49, 51, 53, 55, 57, 60,
+	62, 64, 67, 70, 73, 76, 79, 82, 86, 89,
+	93, 97, 101, 106, 111, 115, 120, 126, 131, 137,
+	143, 150, 156, 163, 171, 178, 187, 195, 204, 213,
+	223, 233, 244, 255, 267, 279, 292, 306, 320, 334,
+	350, 365, 382, 399, 418, 436, 456, 476, 497, 519,
+	542, 566, 590, 615, 641, 668, 695, 723, 752, 782,
+	812, 843, 2047,
+};
+
+int *TEMP_MAP = TEMP_MAP_1000K_100_4360;
+#define TEMP_MAX 70
+#define TEMP_MIN -11
+#define TEMP_NUM 83
+
 /* definitions for registers we care about. */
 #define DS2746_DATA_SIZE		0x12
 
@@ -119,11 +137,17 @@ struct ds2746_info {
 	int batt_current_5;
 	int batt_history_nb;
 	int last_am_i_supplied;
+	
 	u32 level;		/* formula */
 	u32 charging_source;	/* 0: no cable, 1:usb, 2:AC */
 	bool charging_enabled;	/* 0: Disable, 1: Enable */
 	u32 full_bat;		/* Full capacity of battery (mAh) */
 	u32 last_s_value;	/* last CURRENT_ACCUM register value */
+	
+	int temp_adc;
+	int last_temp_adc;
+	int last_temp_index;
+	
 	struct ds2746_platform_data bat_pdata;
 	struct power_supply *bat;	/* Hold the supply struct so it can be passed along */
 };
@@ -171,7 +195,7 @@ ds2746_bat_get_property(struct power_supply *bat_ps,
 		val->intval = bi->level;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-		val->intval = (bi->batt_temp * 10);
+		val->intval = bi->batt_temp;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
 		val->intval = (bi->batt_vol * 1000);
@@ -254,6 +278,33 @@ static int reading2capacity(int r)
 	return (DS2746_CURRENT_ACCUM_RES * r) / (bi->bat_pdata.resistance);
 }
 
+static int ds2746_battery_read_temp(struct ds2746_info *b)
+{
+	int cur_idx = b->last_temp_index;
+	int search_dir;
+
+	if (b->last_temp_adc > b->temp_adc) {
+		search_dir = -1;
+	} else {
+		search_dir = 1;
+	}
+
+	while (cur_idx >= 0 && cur_idx < TEMP_NUM-1) {
+		int temp_min = TEMP_MAP[cur_idx];
+		int temp_max = TEMP_MAP[cur_idx + 1];
+
+		if (temp_max > b->temp_adc && temp_min <= b->temp_adc) {
+			b->last_temp_index = cur_idx;
+			b->last_temp_adc = b->temp_adc;
+			return (TEMP_MAX - cur_idx) * 10;
+		}
+
+		cur_idx += search_dir;
+	}
+
+	return (TEMP_MIN-1) * 10;
+}
+
 signed short set_accum_value(int aux0)
 {
 	signed short s;
@@ -293,6 +344,7 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 	int all_positive;
 	int charge_ended = 0;
 	int voltage_diff;
+	int r_ain0;
 
 	if (!pclient) {
 		pr_err("client is null\n");
@@ -448,9 +500,13 @@ static int ds2746_battery_read_status(struct ds2746_info *b)
 
 	if (b->level > 100)
 		b->level = 100;
-
-	b->batt_temp = 20;
-
+	
+	/* Temperature */
+	r_ain0 = (i2c_read(DS2746_AUX0_MSB) << 4) |
+			 (i2c_read(DS2746_AUX0_LSB) >> 4);
+			 
+	b->temp_adc = r_ain0;
+	b->batt_temp = ds2746_battery_read_temp(b);
 
 	return charge_ended;
 }
@@ -534,6 +590,9 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	bi->batt_current_4 = bi->batt_current_5 = 0;
 	bi->aver_batt_current = 0;
 	bi->batt_history_nb = 0;
+	bi->batt_temp = 250;
+	bi->last_temp_adc = 0;
+	bi->last_temp_index = 0;
 
 	DBG("ds2746: resistance = %d, capacity = %d, "
 		"high_voltage = %d, low_voltage = %d, softACR = %d\n",
