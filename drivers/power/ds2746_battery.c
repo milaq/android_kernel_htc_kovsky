@@ -230,47 +230,149 @@ static struct power_supply bat_ps = {
 /* -----------------------------------------------------------
  * i2c utilitiy functions
  */
+#if 1
+#define I2C_READ_RETRY_TIMES 10
+#define I2C_WRITE_RETRY_TIMES 10
 
 static int i2c_read(int r)
 {
+	int retry;
+	int rc;
+	unsigned char i2c_msg[1];
+	unsigned char i2c_data[2];
+	
+	
+	struct i2c_msg msgs[] = {
+		{
+		 .addr = 0,
+		 .flags = 0,
+		 .len = 1,
+		 .buf = i2c_msg,
+		 },
+		{
+		 .addr = 0,
+		 .flags = I2C_M_RD,
+		 .len = 2,
+		 .buf = i2c_data,
+		 }
+	};
+
+	i2c_msg[0]= r & 0xff;
+	
+	if (!pclient) {
+		pr_err("%s: pclient is null\n", __func__);
+		return -EIO;
+	}
+
+	msgs[0].addr = msgs[1].addr = pclient->addr;
+
+	for (retry = 0; retry <= I2C_READ_RETRY_TIMES; retry++) {
+		rc = i2c_transfer(pclient->adapter, msgs, 2);
+		if (rc == 2) {
+			rc = 0;
+			goto exit;
+		}
+		msleep(10);
+		pr_err("microp_ng, i2c read retry\n");
+	}
+
+	if (retry >= I2C_WRITE_RETRY_TIMES) {
+		dev_err(&pclient->dev, "i2c_read_block retry over %d\n",
+			I2C_READ_RETRY_TIMES);
+		rc = -EIO;
+	}
+
+exit:
+	return ((int)i2c_data[0])&0xff;
+}
+
+static int i2c_read_signed(int r)
+{
+	int data = i2c_read(r);
+	
+	if((data & 0x80) == 0)
+		return data;
+	else
+		return -(data & 0x7F);
+}
+
+#else 
+static int i2c_read(int r)
+{
+	int ret;
 	unsigned char i2c_msg[1];
 	unsigned char i2c_data[2];
 	i2c_msg[0] = r;
-	i2c_master_send(pclient, i2c_msg, 1);
-	i2c_master_recv(pclient, i2c_data, 2);
+	ret = i2c_master_send(pclient, i2c_msg, 1);
+	if(ret==-EAGAIN){
+	  msleep(10);
+	  printk("ds2746: i2c bus busy; Retrying write\n");
+	  ret = i2c_master_send(pclient, i2c_msg, 1);
+	}
+	ret = i2c_master_recv(pclient, i2c_data, 2);
+	if(ret==-EAGAIN){
+	  msleep(10);
+	  printk("ds2746: i2c bus busy; Retrying read\n");
+	  ret = i2c_master_recv(pclient, i2c_data, 2);
+	}
 	return i2c_data[0];
 }
 
 static int i2c_read_signed(int r)
 {
+	int ret;
 	unsigned char i2c_msg[1];
 	unsigned char i2c_data[2];
 	i2c_msg[0] = r;
-	i2c_master_send(pclient, i2c_msg, 1);
-	i2c_master_recv(pclient, i2c_data, 2);
+	ret = i2c_master_send(pclient, i2c_msg, 1);
+	if(ret==-EAGAIN){
+	  msleep(10);
+	  printk("ds2746: i2c bus busy; Retrying write\n");
+	  ret = i2c_master_send(pclient, i2c_msg, 1);
+	}
+	ret = i2c_master_recv(pclient, i2c_data, 2);
+	if(ret==-EAGAIN){
+	  msleep(10);
+	  printk("ds2746: i2c bus busy; Retrying read\n");
+	  ret = i2c_master_recv(pclient, i2c_data, 2);
+	}
 	if((i2c_data[0] & 0x80) == 0)
 		return i2c_data[0];
 	else
 		return -(i2c_data[0] & 0x7F);
 }
 
+#endif
+
 static void i2c_write(int r, int v)
 {
 	unsigned char i2c_msg[3];
+	int ret;
 	i2c_msg[0] = r;
 	i2c_msg[1] = v & 0xFF;
-	i2c_master_send(pclient, i2c_msg, 2);
+	ret = i2c_master_send(pclient, i2c_msg, 2);
+	if(ret==-EAGAIN){
+	  msleep(10);
+	  printk("ds2746: i2c bus busy; Retrying write\n");
+	  ret = i2c_master_send(pclient, i2c_msg, 2);
+	}
 }
 
 static void i2c_write_signed(int r, int v)
 {
 	unsigned char i2c_msg[2];
+	int ret;
 	i2c_msg[0] = r;
 	if(v>=0)
 		i2c_msg[1] = min(v, 0x7F);
 	else
 		i2c_msg[1] = 0x80 | min(-v, 0x7F);
-	i2c_master_send(pclient, i2c_msg, 2);
+	ret = i2c_master_send(pclient, i2c_msg, 2);
+	if(ret==-EAGAIN){
+	  msleep(1);
+	  printk("ds2746: i2c bus busy; Retrying write\n");
+	  ret = i2c_master_send(pclient, i2c_msg, 2);
+	}
 }
 
 static int reading2capacity(int r)
