@@ -31,7 +31,7 @@
 
 
 
-//#define DEBUG
+#undef DEBUG
 
 #include "board-htckovsky.h"
 #include "devices.h"
@@ -329,34 +329,34 @@ static void htckovsky_mddi_power_client(struct msm_mddi_client_data *client_data
 	pr_info("htckovsky_mddi_power_client(%d)\n", on);
 //	return;
 	if (on) {
-		pr_info("%s: +powering up panel\n", __func__);
+		pr_debug("%s: +powering up panel\n", __func__);
 		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
-		pr_info("%s: enabled panel power\n", __func__);
+		pr_debug("%s: enabled panel power\n", __func__);
 
 		vreg_enable(vreg_18v);
 		vreg_enable(vreg_26v);
 		vreg_enable(vreg_aux2);
 		msleep(5);
 		htckovsky_mddi_bridge_reset(1);
-		pr_info("%s: enabled mddi bridge power\n", __func__);
-		pr_info("%s: -powering up panel\n", __func__);
+		pr_debug("%s: enabled mddi bridge power\n", __func__);
+		pr_debug("%s: -powering up panel\n", __func__);
 	} else {
 
-		pr_info("%s: +shutting down panel\n", __func__);
+		pr_debug("%s: +shutting down panel\n", __func__);
 		htckovsky_mddi_bridge_reset(0);
 		vreg_disable(vreg_aux2);
 		vreg_disable(vreg_26v);
 		vreg_disable(vreg_18v);
 		gpio_tlmm_config(GPIO_CFG(KOVS100_LCD_PWR, 0, GPIO_CFG_OUTPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_DISABLE);
 		msleep(10);
-		pr_info("%s: disabled panel power\n", __func__);
-		pr_info("%s: -shutting down panel\n", __func__);
+		pr_debug("%s: disabled panel power\n", __func__);
+		pr_debug("%s: -shutting down panel\n", __func__);
 	}
 }
 
 static int htckovsky_mddi_panel_init(struct msm_mddi_bridge_platform_data *bridge_data,
 					struct msm_mddi_client_data *client_data) {
-	pr_info("%s: +init panel\n", __func__);
+	pr_debug("%s: +init panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
 	htckovsky_process_mddi_table(client_data,
 				mddi_epson_init_table_1,
@@ -371,7 +371,7 @@ static int htckovsky_mddi_panel_init(struct msm_mddi_bridge_platform_data *bridg
 				ARRAY_SIZE(mddi_epson_init_table_2));
 
 	client_data->auto_hibernate(client_data, 1);
-	pr_info("%s: -init panel\n", __func__);
+	pr_debug("%s: -init panel\n", __func__);
 	return 0;
 
 }
@@ -380,13 +380,13 @@ static int htckovsky_mddi_panel_deinit(struct msm_mddi_bridge_platform_data
 				      *bridge_data,
 				      struct msm_mddi_client_data *client_data)
 {
-	pr_info("%s: +deinit panel\n", __func__);
+	pr_debug("%s: +deinit panel\n", __func__);
 	client_data->auto_hibernate(client_data, 0);
 	htckovsky_process_mddi_table(client_data,
 				     mddi_epson_deinit_table,
 				     ARRAY_SIZE(mddi_epson_deinit_table));
 	client_data->auto_hibernate(client_data, 1);
-	pr_info("%s: -deinit panel\n", __func__);
+	pr_debug("%s: -deinit panel\n", __func__);
 	return 0;
 }
 
@@ -394,12 +394,12 @@ static int htckovsky_mddi_panel_unblank(struct msm_mddi_bridge_platform_data
 				      *bridge_data,
 				      struct msm_mddi_client_data *client_data)
 {
-	pr_info("%s: +unblank panel\n", __func__);
+	pr_debug("%s: +unblank panel\n", __func__);
 	htckovsky_leds_enable_backlight(1);
  	client_data->auto_hibernate(client_data, 0);
 	client_data->remote_write(client_data, (1 << 14), 0x600);
 	client_data->auto_hibernate(client_data, 1);
-	pr_info("%s: -unblank panel\n", __func__);
+	pr_debug("%s: -unblank panel\n", __func__);
 	return 0;
 }
 
@@ -407,12 +407,12 @@ static int htckovsky_mddi_panel_blank(struct msm_mddi_bridge_platform_data
 				      *bridge_data,
 				      struct msm_mddi_client_data *client_data)
 {
-	pr_info("%s: +blank panel\n", __func__);
+	pr_debug("%s: +blank panel\n", __func__);
 	htckovsky_leds_enable_backlight(0);
 	client_data->auto_hibernate(client_data, 0);
 	client_data->remote_write(client_data, (1 << 14) | (1 << 7), 0x600);
 	client_data->auto_hibernate(client_data, 1);
-	pr_info("%s: -blank panel\n", __func__);
+	pr_debug("%s: -blank panel\n", __func__);
 	return 0;
 }
 
