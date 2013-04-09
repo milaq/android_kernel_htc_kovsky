@@ -230,7 +230,6 @@ static struct power_supply bat_ps = {
 /* -----------------------------------------------------------
  * i2c utilitiy functions
  */
-#if 1
 #define I2C_READ_RETRY_TIMES 10
 #define I2C_WRITE_RETRY_TIMES 10
 
@@ -296,53 +295,6 @@ static int i2c_read_signed(int r)
 		return -(data & 0x7F);
 }
 
-#else 
-static int i2c_read(int r)
-{
-	int ret;
-	unsigned char i2c_msg[1];
-	unsigned char i2c_data[2];
-	i2c_msg[0] = r;
-	ret = i2c_master_send(pclient, i2c_msg, 1);
-	if(ret==-EAGAIN){
-	  msleep(10);
-	  printk("ds2746: i2c bus busy; Retrying write\n");
-	  ret = i2c_master_send(pclient, i2c_msg, 1);
-	}
-	ret = i2c_master_recv(pclient, i2c_data, 2);
-	if(ret==-EAGAIN){
-	  msleep(10);
-	  printk("ds2746: i2c bus busy; Retrying read\n");
-	  ret = i2c_master_recv(pclient, i2c_data, 2);
-	}
-	return i2c_data[0];
-}
-
-static int i2c_read_signed(int r)
-{
-	int ret;
-	unsigned char i2c_msg[1];
-	unsigned char i2c_data[2];
-	i2c_msg[0] = r;
-	ret = i2c_master_send(pclient, i2c_msg, 1);
-	if(ret==-EAGAIN){
-	  msleep(10);
-	  printk("ds2746: i2c bus busy; Retrying write\n");
-	  ret = i2c_master_send(pclient, i2c_msg, 1);
-	}
-	ret = i2c_master_recv(pclient, i2c_data, 2);
-	if(ret==-EAGAIN){
-	  msleep(10);
-	  printk("ds2746: i2c bus busy; Retrying read\n");
-	  ret = i2c_master_recv(pclient, i2c_data, 2);
-	}
-	if((i2c_data[0] & 0x80) == 0)
-		return i2c_data[0];
-	else
-		return -(i2c_data[0] & 0x7F);
-}
-
-#endif
 
 static void i2c_write(int r, int v)
 {
@@ -384,7 +336,8 @@ static int ds2746_battery_read_temp(struct ds2746_info *b)
 {
 	int cur_idx = b->last_temp_index;
 	int search_dir;
-
+	int temp;
+	
 	if (b->last_temp_adc > b->temp_adc) {
 		search_dir = -1;
 	} else {
@@ -398,7 +351,12 @@ static int ds2746_battery_read_temp(struct ds2746_info *b)
 		if (temp_max > b->temp_adc && temp_min <= b->temp_adc) {
 			b->last_temp_index = cur_idx;
 			b->last_temp_adc = b->temp_adc;
-			return (TEMP_MAX - cur_idx) * 10;
+			temp = (TEMP_MAX - cur_idx) * 10;;
+			if(temp > 600){
+			  printk("%s: Temp was calculated to %d. Reduced to 60\n", __func__, temp/10);
+			  temp=600;
+			}
+			return temp;
 		}
 
 		cur_idx += search_dir;
