@@ -138,8 +138,6 @@ static struct clkctl_acpu_speed  acpu_freq_tbl[] = {
 	{ 614400, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 160000, 0, 5, -1 },
 	{ 633600, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 160000, 0, 5, -1 },
 	{ 652800, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 160000, 0, 5, -1 },
-	{ 672000, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 160000, 0, 5, -1 },
-	{ 691200, ACPU_PLL_2, 2, 1, 132000, 3, VDD_7, 160000, 0, 5, -1 },
 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
 };
 #endif
@@ -157,9 +155,7 @@ static struct cpufreq_frequency_table freq_table[] = {
 	{ 7, 614400 },
 	{ 8, 633600 },
 	{ 9, 652800 },
-	{ 10, 672000 },
-	{ 11, 691200 },
-	{ 12, CPUFREQ_TABLE_END },
+	{ 10, CPUFREQ_TABLE_END },
 };
 #endif
 
