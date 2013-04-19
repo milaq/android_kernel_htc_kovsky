@@ -160,7 +160,7 @@ static int htckovsky_microp_keymap[] = {
 	KEY_RESERVED, // invalid
 	KEY_ENTER,
 	KEY_LEFT,
-	KEY_F1, // NAVI_SILVER_LEFT; Menu-Key for Android
+	KEY_BACK, // NAVI_SILVER_LEFT; Back for Android
 	KEY_SEND, // NAVI_GREEN
 	KEY_A,
 	KEY_F,
@@ -168,10 +168,10 @@ static int htckovsky_microp_keymap[] = {
 	KEY_D,
 	KEY_RESERVED,
 	KEY_RESERVED,
-	KEY_SEARCH, // NAVI_SILVER_RIGHT; Power-Key for Android
+	KEY_F1, // NAVI_SILVER_RIGHT; Menu for Android
 	KEY_DOWN,
 	KEY_RIGHT,
-	KEY_HOME, // NAVI_XPANEL; Home-Key for Android
+	KEY_HOME, // NAVI_XPANEL; Home for Android
 	KEY_K,
 	KEY_J,
 	KEY_H,
@@ -179,7 +179,7 @@ static int htckovsky_microp_keymap[] = {
 	KEY_RESERVED,
 	KEY_RESERVED,
 	KEY_END, // NAVI_RED
-	KEY_BACK, // NAVI_OK; Back-Key for Android
+	KEY_SEARCH, // NAVI_OK; Search for Android
 	KEY_UP,
 	KEY_RESERVED,
 	KEY_L,
@@ -213,7 +213,7 @@ static int htckovsky_microp_keymap[] = {
 	KEY_SPACE,
 	KEY_BACKSPACE, //CLOSE
 	KEY_DOT,
-	KEY_BACK, //OK ; same as front OK
+	KEY_SEARCH, //OK ; same as front OK
 	KEY_SLASH,
 	KEY_COMMA,
 	KEY_RESERVED,
