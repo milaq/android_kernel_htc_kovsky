@@ -158,6 +158,7 @@ static struct ds2746_info *bi;
 /* Mutexes */
 static DEFINE_MUTEX(bat_lock);
 static struct delayed_work bat_work;
+static struct wake_lock chrg_lock;
 struct mutex work_lock;
 
 /* Polling  */
@@ -594,11 +595,19 @@ static void ds2746_battery_work(struct work_struct *work)
 	bi->charging_enabled = false;
 	am_i_supplied = power_supply_am_i_supplied(bi->bat);
 	if (am_i_supplied) {
+		if (!wake_lock_active(&chrg_lock)){
+			printk("%s: usb powered, aquiring wakelock", __func__);
+			wake_lock(&chrg_lock);
+		}
 		next_update = msecs_to_jiffies(FAST_POLL);
 		if (!charge_ended)
 			bi->charging_enabled = true;
 	}
 	else {
+		if (wake_lock_active(&chrg_lock)){
+			printk("%s: usb not powered, releasing wakelock", __func__);
+			wake_unlock(&chrg_lock);
+		}
 		next_update = msecs_to_jiffies(SLOW_POLL);
 	}
 
@@ -623,6 +632,9 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		.high_voltage = DEFAULT_HIGH_VOLTAGE,
 		.low_voltage = DEFAULT_LOW_VOLTAGE,
 	};
+
+	// init the charger wakelock
+	wake_lock_init(&chrg_lock, WAKE_LOCK_SUSPEND, "charger_wakelock");
 
 	// Try and check if we actually have the ds2746 on this device
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
@@ -698,6 +710,7 @@ ds2746_probe(struct i2c_client *client, const struct i2c_device_id *id)
 static int ds2746_detach_client(struct i2c_client *client)
 {
 //	i2c_detach_client(client);
+	wake_lock_destroy(&chrg_lock);
 	return 0;
 }
 
