@@ -201,7 +201,7 @@ static void htckovsky_update_button_light(struct work_struct* work) {
 	char buffer[3] = {MICROP_KEYPAD_BRIGHTNESS_KOVS, 0, 0};
 	char brightness = kovsky_leds[BUTTONS].brightness;
 	if (brightness) {
-		buffer[1] = 0x94 >> 2;
+		buffer[1] = 0x94;
 		buffer[2] = brightness >> 2;
 	}
 	microp_ng_write(client, buffer, 3);
