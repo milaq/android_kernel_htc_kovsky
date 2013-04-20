@@ -129,14 +129,6 @@ static void htckovsky_update_backlight(struct work_struct* work) {
     int light=0;
     if(debuglevel) printk("%s: 0x%.8X\n", __func__, kovsky_leds[LCD].brightness);
     
-    if(brightness== 0xff){
-      auto_brightness = 1;
-      if(debuglevel) printk("%s: Turning ON auto brightness\n", __func__);
-    } else {
-      auto_brightness = 0;
-      if(debuglevel) printk("%s: Turning OFF auto brightness\n", __func__);
-    }
-    
     if(unblank){
  	buffer[0] = MICROP_LCD_BRIGHTNESS_KOVS;
         buffer[1] = LED_FULL;
@@ -224,7 +216,7 @@ static void htckovsky_set_brightness_color(struct led_classdev *led_cdev,
 static void htckovsky_set_button_light(struct led_classdev *led_cdev,
 					       enum led_brightness brightness)
 {
-  schedule_work(&buttonlight_wq);
+	schedule_work(&buttonlight_wq);
 }
 
 static void htckovsky_set_backlight(struct led_classdev *led_cdev,
